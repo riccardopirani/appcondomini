@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Condominio App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.grey),
         useMaterial3: true,
         textTheme: TextTheme(
           headlineMedium: TextStyle(
@@ -45,7 +45,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late List<dynamic> posts = [];
-  bool isLoggedIn = true; // State to track if the user is logged in
+  bool isLoggedIn = true;
 
   @override
   void initState() {
@@ -70,12 +70,14 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: true
+      body: isLoggedIn
           ? DefaultTabController(
         length: 2,
         child: Scaffold(
           appBar: AppBar(
             title: Text(widget.title),
+            backgroundColor: Colors.grey,
+            elevation: 5,
             bottom: const TabBar(
               tabs: [
                 Tab(text: 'Posts'),
@@ -97,8 +99,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // Handle Login Process (dummy example)
   void handleLogin(String username, String password) {
-    print(username);
-    if (username == 'user') {
+    if (username == 'user' && password == 'password') {
       setState(() {
         isLoggedIn = true;
       });
@@ -119,29 +120,68 @@ class LoginScreen extends StatelessWidget {
     final _passwordController = TextEditingController();
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          TextField(
-            controller: _usernameController,
-            decoration: const InputDecoration(labelText: 'Username'),
+      padding: const EdgeInsets.all(24.0),
+      child: Center(
+        child: Card(
+          elevation: 10,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _passwordController,
-            decoration: const InputDecoration(labelText: 'Password'),
-            obscureText: true,
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Login to Condominio App',
+                  style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                    color: Colors.deepPurple,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                TextField(
+                  controller: _usernameController,
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    prefixIcon: const Icon(Icons.person),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    prefixIcon: const Icon(Icons.lock),
+                    //obscureText: true,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  onPressed: () {
+                    // Simulate a login action
+                    //handleLogin("prov","prova");
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 14, horizontal: 40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+
+                    textStyle: TextStyle(fontSize: 16),
+                  ),
+                  child: const Text('Login'),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              // Simulate a login action
-              //handleLogin("prov","prova");
-            },
-            child: const Text('Login'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -166,7 +206,7 @@ class PostTab extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.all(16.0),
           child: Card(
-            elevation: 5,
+            elevation: 10,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),
             ),
@@ -182,11 +222,13 @@ class PostTab extends StatelessWidget {
                         Text(
                           title,
                           style: Theme.of(context).textTheme.headlineMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           excerpt,
-                          style: Theme.of(context).textTheme.headlineLarge,
+                          style: Theme.of(context).textTheme.bodyMedium,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -233,17 +275,38 @@ class _EmailFormTabState extends State<EmailFormTab> {
         children: [
           TextField(
             controller: _emailController,
-            decoration: const InputDecoration(labelText: 'Recipient Email'),
+            decoration: InputDecoration(
+              labelText: 'Recipient Email',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              prefixIcon: const Icon(Icons.email),
+            ),
           ),
+          const SizedBox(height: 20),
           TextField(
             controller: _subjectController,
-            decoration: const InputDecoration(labelText: 'Subject'),
+            decoration: InputDecoration(
+              labelText: 'Subject',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              prefixIcon: const Icon(Icons.subject),
+            ),
           ),
+          const SizedBox(height: 20),
           TextField(
             controller: _bodyController,
-            decoration: const InputDecoration(labelText: 'Body'),
+            decoration: InputDecoration(
+              labelText: 'Body',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              prefixIcon: const Icon(Icons.message),
+            ),
             maxLines: 5,
           ),
+          const SizedBox(height: 30),
           ElevatedButton(
             onPressed: () {
               final recipient = _emailController.text;
@@ -261,6 +324,14 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 );
               }
             },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+             // primary: Colors.deepPurple,
+              textStyle: TextStyle(fontSize: 16),
+            ),
             child: const Text('Send Email'),
           ),
         ],
