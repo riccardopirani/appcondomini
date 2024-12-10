@@ -45,6 +45,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late List<dynamic> posts = [];
+  bool isLoggedIn = true; // State to track if the user is logged in
 
   @override
   void initState() {
@@ -68,24 +69,79 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Posts'),
-              Tab(text: 'Send Email'),
+    return Scaffold(
+      body: true
+          ? DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(widget.title),
+            bottom: const TabBar(
+              tabs: [
+                Tab(text: 'Posts'),
+                Tab(text: 'Send Email'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              PostTab(posts: posts), // Pass the posts data to PostTab
+              EmailFormTab(), // Your EmailFormTab here (kept as is)
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            PostTab(posts: posts), // Pass the posts data to PostTab
-            EmailFormTab(), // Your EmailFormTab here (kept as is)
-          ],
-        ),
+      )
+          : const LoginScreen(),
+    );
+  }
+
+  // Handle Login Process (dummy example)
+  void handleLogin(String username, String password) {
+    print(username);
+    if (username == 'user') {
+      setState(() {
+        isLoggedIn = true;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid credentials')),
+      );
+    }
+  }
+}
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final _usernameController = TextEditingController();
+    final _passwordController = TextEditingController();
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(labelText: 'Username'),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _passwordController,
+            decoration: const InputDecoration(labelText: 'Password'),
+            obscureText: true,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              // Simulate a login action
+              //handleLogin("prov","prova");
+            },
+            child: const Text('Login'),
+          ),
+        ],
       ),
     );
   }
@@ -130,7 +186,7 @@ class PostTab extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           excerpt,
-                          style: Theme.of(context).textTheme.headlineMedium,
+                          style: Theme.of(context).textTheme.headlineLarge,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
