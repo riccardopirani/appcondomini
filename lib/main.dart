@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.grey),
         useMaterial3: true,
-        textTheme: TextTheme(
+        textTheme: const TextTheme(
           headlineMedium: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -88,7 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
           body: TabBarView(
             children: [
               PostTab(posts: posts), // Pass the posts data to PostTab
-              EmailFormTab(), // Your EmailFormTab here (kept as is)
+              const EmailFormTab(), // Your EmailFormTab here (kept as is)
             ],
           ),
         ),
@@ -174,7 +174,7 @@ class LoginScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
 
-                    textStyle: TextStyle(fontSize: 16),
+                    textStyle: const TextStyle(fontSize: 16),
                   ),
                   child: const Text('Login'),
                 ),
@@ -330,7 +330,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 borderRadius: BorderRadius.circular(20),
               ),
              // primary: Colors.deepPurple,
-              textStyle: TextStyle(fontSize: 16),
+              textStyle: const TextStyle(fontSize: 16),
             ),
             child: const Text('Send Email'),
           ),
