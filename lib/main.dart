@@ -76,12 +76,12 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Scaffold(
           appBar: AppBar(
             title: Text(widget.title),
-            backgroundColor: Colors.grey,
+            backgroundColor: Colors.green,
             elevation: 5,
             bottom: const TabBar(
               tabs: [
                 Tab(text: 'Posts'),
-                Tab(text: 'Send Email'),
+                Tab(text: 'Contatti'),
               ],
             ),
           ),
