@@ -202,7 +202,7 @@ class PostTab extends StatelessWidget {
         String title = post['title']['rendered'];
         String excerpt = post['excerpt']['rendered'];
         // Remove all HTML tags using a regular expression
-        String cleanExcerpt = excerpt.replaceAll(RegExp(r'<[^>]*>'), '');
+        excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
         String imageUrl = "https://www.condominio360.it/logo.png"; // Placeholder if no image
 
         return Padding(
