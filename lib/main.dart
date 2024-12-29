@@ -272,44 +272,68 @@ class _EmailFormTabState extends State<EmailFormTab> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(20.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Email Input
           TextField(
             controller: _emailController,
             decoration: InputDecoration(
-              labelText: 'Recipient Email',
+              labelText: 'Email del destinatario',
+              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              hintText: 'Inserisci l\'email del destinatario',
+              hintStyle: TextStyle(color: Colors.grey),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(color: Colors.deepPurpleAccent),
               ),
-              prefixIcon: const Icon(Icons.email),
+              prefixIcon: Icon(Icons.email, color: Colors.deepPurpleAccent),
+              contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
+
+          // Subject Input
           TextField(
             controller: _subjectController,
             decoration: InputDecoration(
-              labelText: 'Subject',
+              labelText: 'Oggetto',
+              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              hintText: 'Inserisci l\'oggetto della mail',
+              hintStyle: TextStyle(color: Colors.grey),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(color: Colors.deepPurpleAccent),
               ),
-              prefixIcon: const Icon(Icons.subject),
+              prefixIcon: Icon(Icons.subject, color: Colors.deepPurpleAccent),
+              contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
+
+          // Body Input
           TextField(
             controller: _bodyController,
             decoration: InputDecoration(
-              labelText: 'Body',
+              labelText: 'Messaggio',
+              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              hintText: 'Scrivi il corpo del messaggio',
+              hintStyle: TextStyle(color: Colors.grey),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(color: Colors.deepPurpleAccent),
               ),
-              prefixIcon: const Icon(Icons.message),
+              prefixIcon: Icon(Icons.message, color: Colors.deepPurpleAccent),
+              contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
             maxLines: 5,
           ),
           const SizedBox(height: 30),
-          ElevatedButton(
+
+          Center(
+          child: ElevatedButton(
+
             onPressed: () {
               final recipient = _emailController.text;
               final subject = _subjectController.text;
@@ -318,23 +342,23 @@ class _EmailFormTabState extends State<EmailFormTab> {
               if (recipient.isNotEmpty && subject.isNotEmpty && body.isNotEmpty) {
                 // Email sending logic (you can use FlutterMailer for this)
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Email sent successfully')),
+                  const SnackBar(content: Text('Email inviata con successo')),
                 );
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please fill in all fields')),
+                  const SnackBar(content: Text('Compila tutti i campi')),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(30),
               ),
-             // primary: Colors.deepPurple,
-              textStyle: const TextStyle(fontSize: 16),
+              textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
-            child: const Text('Send Email'),
+            child: const Text('Invia Email'),
+          ),
           ),
         ],
       ),
