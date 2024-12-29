@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Condominio App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.grey),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
         textTheme: const TextTheme(
           headlineMedium: TextStyle(
@@ -201,6 +201,8 @@ class PostTab extends StatelessWidget {
         var post = posts[index];
         String title = post['title']['rendered'];
         String excerpt = post['excerpt']['rendered'];
+        // Remove all HTML tags using a regular expression
+        String cleanExcerpt = excerpt.replaceAll(RegExp(r'<[^>]*>'), '');
         String imageUrl = "https://www.condominio360.it/logo.png"; // Placeholder if no image
 
         return Padding(
