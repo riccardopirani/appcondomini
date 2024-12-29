@@ -1,6 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 void main() {
   runApp(const MyApp());
@@ -45,15 +46,14 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late List<dynamic> posts = [];
-  bool isLoggedIn = true;
+  bool isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    fetchPosts();
   }
 
-  // Function to fetch posts from WordPress API
+  // Fetch posts only after login
   Future<void> fetchPosts() async {
     final response = await http.get(Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
 
@@ -80,16 +80,16 @@ class _MyHomePageState extends State<MyHomePage> {
             elevation: 5,
             bottom: const TabBar(
               tabs: [
-                Tab(text: 'Posts'),
-                Tab(text: 'Contatti'),
+                      Tab(text: 'Post'),
+                      Tab(text: 'Contatti'),
               ],
             ),
           ),
           body: TabBarView(
             children: [
               PostTab(posts: posts), // Pass the posts data to PostTab
-              const EmailFormTab(), // Your EmailFormTab here (kept as is)
-            ],
+                    const EmailFormTab(), // EmailFormTab for sending email
+                  ],
           ),
         ),
       )
@@ -97,15 +97,24 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Handle Login Process (dummy example)
-  void handleLogin(String username, String password) {
-    if (username == 'user' && password == 'password') {
-      setState(() {
-        isLoggedIn = true;
-      });
+  // Handle WordPress login API call
+  Future<void> handleLogin(String username, String password) async {
+    final response = await http.post(
+      Uri.parse('https://portobellodigallura.it/new/wp-json/jwt-auth/v1/token'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'username': username,
+        'password': password,
+      }),
+    );
+    setState(() {
+      isLoggedIn = true;
+    });
+    fetchPosts(); // Fetch posts after login
+    if (response.statusCode == 200) {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid credentials')),
+        const SnackBar(content: Text('Credenziali non valide')),
       );
     }
   }
@@ -133,7 +142,7 @@ class LoginScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Login to Condominio App',
+                  'Login Condominio App',
                   style: Theme.of(context).textTheme.headlineMedium!.copyWith(
                     color: Colors.deepPurple,
                   ),
@@ -142,7 +151,7 @@ class LoginScreen extends StatelessWidget {
                 TextField(
                   controller: _usernameController,
                   decoration: InputDecoration(
-                    labelText: 'Username',
+                    labelText: 'Nome utente',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -158,14 +167,26 @@ class LoginScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(15),
                     ),
                     prefixIcon: const Icon(Icons.lock),
-                    //obscureText: true,
                   ),
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
                   onPressed: () {
-                    // Simulate a login action
-                    //handleLogin("prov","prova");
+                    // Trigger WordPress login API
+                    final username = _usernameController.text;
+                    final password = _passwordController.text;
+                    if (username.isNotEmpty && password.isNotEmpty) {
+                      // Call handleLogin method
+                      final homePageState =
+                          context.findAncestorStateOfType<_MyHomePageState>();
+                      if (homePageState != null) {
+                        homePageState.handleLogin(username, password);
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Compila tutti i campi')),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
@@ -173,7 +194,6 @@ class LoginScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-
                     textStyle: const TextStyle(fontSize: 16),
                   ),
                   child: const Text('Login'),
@@ -201,8 +221,8 @@ class PostTab extends StatelessWidget {
         var post = posts[index];
         String title = post['title']['rendered'];
         String excerpt = post['excerpt']['rendered'];
-        // Remove all HTML tags using a regular expression
-        excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
+              // Remove HTML tags using regular expression
+              excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
         String imageUrl = "https://www.condominio360.it/logo.png"; // Placeholder if no image
 
         return Padding(
@@ -332,33 +352,35 @@ class _EmailFormTabState extends State<EmailFormTab> {
           const SizedBox(height: 30),
 
           Center(
-          child: ElevatedButton(
+            child: ElevatedButton(
+              onPressed: () {
+                final recipient = _emailController.text;
+                final subject = _subjectController.text;
+                final body = _bodyController.text;
 
-            onPressed: () {
-              final recipient = _emailController.text;
-              final subject = _subjectController.text;
-              final body = _bodyController.text;
-
-              if (recipient.isNotEmpty && subject.isNotEmpty && body.isNotEmpty) {
-                // Email sending logic (you can use FlutterMailer for this)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Email inviata con successo')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Compila tutti i campi')),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+                if (recipient.isNotEmpty &&
+                    subject.isNotEmpty &&
+                    body.isNotEmpty) {
+                  // Email sending logic (you can use FlutterMailer for this)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Email inviata con successo')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Compila tutti i campi')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              child: const Text('Invia Email'),
             ),
-            child: const Text('Invia Email'),
-          ),
           ),
         ],
       ),
