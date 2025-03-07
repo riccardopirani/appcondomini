@@ -97,7 +97,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Handle WordPress login API call
   Future<void> handleLogin(String username, String password) async {
     final response = await http.post(
       Uri.parse('https://portobellodigallura.it/new/wp-json/jwt-auth/v1/token'),
