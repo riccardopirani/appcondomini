@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -29,7 +28,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      debugShowCheckedModeBanner: false, // Remove debug banner
+      debugShowCheckedModeBanner: false,
       home: const MyHomePage(title: 'Condominio App'),
     );
   }
@@ -53,7 +52,6 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
   }
 
-  // Fetch posts only after login
   Future<void> fetchPosts() async {
     final response = await http.get(Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
 
@@ -80,16 +78,16 @@ class _MyHomePageState extends State<MyHomePage> {
             elevation: 5,
             bottom: const TabBar(
               tabs: [
-                      Tab(text: 'Post'),
-                      Tab(text: 'Contatti'),
+                Tab(text: 'Post'),
+                Tab(text: 'Contatti'),
               ],
             ),
           ),
           body: TabBarView(
             children: [
-              PostTab(posts: posts), // Pass the posts data to PostTab
-                    const EmailFormTab(), // EmailFormTab for sending email
-                  ],
+              PostTab(posts: posts),
+              const EmailFormTab(),
+            ],
           ),
         ),
       )
@@ -109,9 +107,8 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       isLoggedIn = true;
     });
-    fetchPosts(); // Fetch posts after login
-    if (response.statusCode == 200) {
-    } else {
+    fetchPosts();
+    if (response.statusCode != 200) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Credenziali non valide')),
       );
@@ -171,13 +168,11 @@ class LoginScreen extends StatelessWidget {
                 const SizedBox(height: 30),
                 ElevatedButton(
                   onPressed: () {
-                    // Trigger WordPress login API
                     final username = _usernameController.text;
                     final password = _passwordController.text;
                     if (username.isNotEmpty && password.isNotEmpty) {
-                      // Call handleLogin method
                       final homePageState =
-                          context.findAncestorStateOfType<_MyHomePageState>();
+                      context.findAncestorStateOfType<_MyHomePageState>();
                       if (homePageState != null) {
                         homePageState.handleLogin(username, password);
                       }
@@ -220,9 +215,8 @@ class PostTab extends StatelessWidget {
         var post = posts[index];
         String title = post['title']['rendered'];
         String excerpt = post['excerpt']['rendered'];
-              // Remove HTML tags using regular expression
-              excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
-        String imageUrl = "https://www.condominio360.it/logo.png"; // Placeholder if no image
+        excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
+        String imageUrl = "https://www.condominio360.it/logo.png";
 
         return Padding(
           padding: const EdgeInsets.all(16.0),
@@ -233,7 +227,6 @@ class PostTab extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // Left column for text content
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -257,7 +250,6 @@ class PostTab extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Right column for image
                 ClipRRect(
                   borderRadius: BorderRadius.circular(15),
                   child: Image.network(
@@ -295,7 +287,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Email Input
           TextField(
             controller: _emailController,
             decoration: InputDecoration(
@@ -312,8 +303,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Subject Input
           TextField(
             controller: _subjectController,
             decoration: InputDecoration(
@@ -330,8 +319,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Body Input
           TextField(
             controller: _bodyController,
             decoration: InputDecoration(
@@ -349,7 +336,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
             maxLines: 5,
           ),
           const SizedBox(height: 30),
-
           Center(
             child: ElevatedButton(
               onPressed: () {
@@ -360,7 +346,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 if (recipient.isNotEmpty &&
                     subject.isNotEmpty &&
                     body.isNotEmpty) {
-                  // Email sending logic (you can use FlutterMailer for this)
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Email inviata con successo')),
                   );
@@ -372,7 +357,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               },
               style: ElevatedButton.styleFrom(
                 padding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
