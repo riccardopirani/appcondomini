@@ -129,18 +129,16 @@ class LoginScreen extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Immagine di sfondo
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage(
-                    'assets/background.jpg'), // Cambia con il tuo file
+                image: NetworkImage(
+                  'https://www.immobiliare.it/news/app/uploads/2022/05/Condominio.jpeg',
+                ),
                 fit: BoxFit.cover,
               ),
             ),
           ),
-
-          // Contenuto Login
           Padding(
             padding: const EdgeInsets.all(24.0),
             child: Center(
@@ -160,7 +158,7 @@ class LoginScreen extends StatelessWidget {
                             .textTheme
                             .headlineMedium!
                             .copyWith(
-                              color: Colors.deepPurple,
+                              color: Colors.blue,
                             ),
                       ),
                       const SizedBox(height: 30),
