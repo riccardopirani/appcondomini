@@ -18,5 +18,8 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
 
+assets:
+  - assets/background.jpg
+
 flutter:
   uses-material-design: true

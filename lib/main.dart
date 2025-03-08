@@ -53,7 +53,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> fetchPosts() async {
-    final response = await http.get(Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
+    final response = await http.get(
+        Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
 
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
@@ -70,27 +71,27 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       body: isLoggedIn
           ? DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(widget.title),
-            backgroundColor: Colors.green,
-            elevation: 5,
-            bottom: const TabBar(
-              tabs: [
-                Tab(text: 'Post'),
-                Tab(text: 'Contatti'),
-              ],
-            ),
-          ),
-          body: TabBarView(
-            children: [
-              PostTab(posts: posts),
-              const EmailFormTab(),
-            ],
-          ),
-        ),
-      )
+              length: 2,
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Text(widget.title),
+                  backgroundColor: Colors.green,
+                  elevation: 5,
+                  bottom: const TabBar(
+                    tabs: [
+                      Tab(text: 'Post'),
+                      Tab(text: 'Contatti'),
+                    ],
+                  ),
+                ),
+                body: TabBarView(
+                  children: [
+                    PostTab(posts: posts),
+                    const EmailFormTab(),
+                  ],
+                ),
+              ),
+            )
           : const LoginScreen(),
     );
   }
@@ -124,78 +125,102 @@ class LoginScreen extends StatelessWidget {
     final _usernameController = TextEditingController();
     final _passwordController = TextEditingController();
 
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Center(
-        child: Card(
-          elevation: 10,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Login Condominio App',
-                  style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                    color: Colors.deepPurple,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                TextField(
-                  controller: _usernameController,
-                  decoration: InputDecoration(
-                    labelText: 'Nome utente',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    prefixIcon: const Icon(Icons.person),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    prefixIcon: const Icon(Icons.lock),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: () {
-                    final username = _usernameController.text;
-                    final password = _passwordController.text;
-                    if (username.isNotEmpty && password.isNotEmpty) {
-                      final homePageState =
-                      context.findAncestorStateOfType<_MyHomePageState>();
-                      if (homePageState != null) {
-                        homePageState.handleLogin(username, password);
-                      }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Compila tutti i campi')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    textStyle: const TextStyle(fontSize: 16),
-                  ),
-                  child: const Text('Login'),
-                ),
-              ],
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Immagine di sfondo
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(
+                    'assets/background.jpg'), // Cambia con il tuo file
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-        ),
+
+          // Contenuto Login
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(
+              child: Card(
+                elevation: 10,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Login',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium!
+                            .copyWith(
+                              color: Colors.deepPurple,
+                            ),
+                      ),
+                      const SizedBox(height: 30),
+                      TextField(
+                        controller: _usernameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nome utente',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          prefixIcon: const Icon(Icons.person),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          prefixIcon: const Icon(Icons.lock),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      ElevatedButton(
+                        onPressed: () {
+                          final username = _usernameController.text;
+                          final password = _passwordController.text;
+                          if (username.isNotEmpty && password.isNotEmpty) {
+                            final homePageState = context
+                                .findAncestorStateOfType<_MyHomePageState>();
+                            if (homePageState != null) {
+                              homePageState.handleLogin(username, password);
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Compila tutti i campi')),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 14, horizontal: 40),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: const TextStyle(fontSize: 16),
+                        ),
+                        child: const Text('Login'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -210,61 +235,62 @@ class PostTab extends StatelessWidget {
     return posts.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : ListView.builder(
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        var post = posts[index];
-        String title = post['title']['rendered'];
-        String excerpt = post['excerpt']['rendered'];
-        excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
-        String imageUrl = "https://www.condominio360.it/logo.png";
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              var post = posts[index];
+              String title = post['title']['rendered'];
+              String excerpt = post['excerpt']['rendered'];
+              excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
+              String imageUrl = "https://www.condominio360.it/logo.png";
 
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Card(
-            elevation: 10,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: Theme.of(context).textTheme.headlineMedium,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Card(
+                  elevation: 10,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style:
+                                    Theme.of(context).textTheme.headlineMedium,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                excerpt,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          excerpt,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.network(
+                          imageUrl,
+                          height: 150,
+                          width: 150,
+                          fit: BoxFit.cover,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Image.network(
-                    imageUrl,
-                    height: 150,
-                    width: 150,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
   }
 }
 
@@ -299,7 +325,8 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 borderSide: BorderSide(color: Colors.deepPurpleAccent),
               ),
               prefixIcon: Icon(Icons.email, color: Colors.deepPurpleAccent),
-              contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              contentPadding:
+                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
@@ -315,7 +342,8 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 borderSide: BorderSide(color: Colors.deepPurpleAccent),
               ),
               prefixIcon: Icon(Icons.subject, color: Colors.deepPurpleAccent),
-              contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              contentPadding:
+                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
@@ -331,7 +359,8 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 borderSide: BorderSide(color: Colors.deepPurpleAccent),
               ),
               prefixIcon: Icon(Icons.message, color: Colors.deepPurpleAccent),
-              contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              contentPadding:
+                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
             maxLines: 5,
           ),
@@ -357,7 +386,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               },
               style: ElevatedButton.styleFrom(
                 padding:
-                const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
