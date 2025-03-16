@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -29,7 +30,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: const MyHomePage(title: 'Condominio App'),
+      home: const OnboardingScreen(),
     );
   }
 }
@@ -43,82 +44,98 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  late List<dynamic> posts = [];
-  bool isLoggedIn = false;
+class OnboardingScreen extends StatefulWidget {
+  const OnboardingScreen({super.key});
 
   @override
-  void initState() {
-    super.initState();
-  }
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
 
-  Future<void> fetchPosts() async {
-    final response = await http.get(
-        Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
-
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      setState(() {
-        posts = data;
-      });
-    } else {
-      throw Exception('Failed to load posts');
-    }
-  }
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  final PageController _pageController = PageController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: isLoggedIn
-          ? DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(widget.title),
-            backgroundColor: Colors.green,
-            elevation: 5,
-            bottom: const TabBar(
-              tabs: [
-                Tab(text: 'Post'),
-                Tab(text: 'Contatti'),
-              ],
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: PageView(
+          controller: _pageController,
+          children: [
+            _buildOnboardingPage(
+              'Benvenuto nell\'app per il condominio!',
+              'Gestisci facilmente tutte le informazioni relative al tuo condominio.',
+              'https://i2.res.24o.it/images2010/Editrice/ILSOLE24ORE/QUOTIDIANI_VERTICALI/2021/08/04/Quotidiani%20Verticali/ImmaginiWeb/Ritagli/Condominio-moderno-834-AdobeStock-kEKG--1440x752@Quotidiani_Verticali-Web.jpg',
             ),
-          ),
-          body: TabBarView(
-            children: [
-              PostTab(posts: posts),
-              const EmailFormTab(),
-            ],
+            _buildOnboardingPage(
+              'Tieniti aggiornato!',
+              'Visualizza le ultime novità e aggiornamenti riguardanti il tuo condominio.',
+              'https://www.immobiliare.it/news/app/uploads/2022/05/Condominio.jpeg',
+            ),
+            _buildOnboardingPage(
+              'Contatta i vicini',
+              'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini.',
+              'https://www.alperia.eu/wp-content/uploads/2024/08/teleriscladamenti-condomini-1024x705-1.jpg',
+            ),
+          ],
+        ),
+      ),
+      bottomSheet: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          },
+          child: const Text('Inizia'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            textStyle: const TextStyle(fontSize: 18), // Button color
           ),
         ),
-      )
-          : const LoginScreen(),
+      ),
     );
   }
 
-  Future<void> handleLogin(String username, String password) async {
-    final response = await http.post(
-      Uri.parse('https://portobellodigallura.it/new/wp-json/jwt-auth/v1/token'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'username': username,
-        'password': password,
-      }),
+  Widget _buildOnboardingPage(
+      String title, String description, String imagePath) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.network(imagePath,
+                height: 300, width: double.infinity, fit: BoxFit.cover),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            description,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium!
+                .copyWith(fontSize: 16, color: Colors.black54),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
-
-    if (response.statusCode == 200) {
-      setState(() {
-        isLoggedIn = true;
-      });
-      fetchPosts();
-    } else {
-      setState(() {
-        isLoggedIn = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credenziali non valide')),
-      );
-    }
   }
 }
 
@@ -163,8 +180,8 @@ class LoginScreen extends StatelessWidget {
                             .textTheme
                             .headlineMedium!
                             .copyWith(
-                          color: Colors.blue,
-                        ),
+                              color: Colors.blue,
+                            ),
                       ),
                       const SizedBox(height: 30),
                       TextField(
@@ -229,6 +246,80 @@ class LoginScreen extends StatelessWidget {
   }
 }
 
+class _MyHomePageState extends State<MyHomePage> {
+  late List<dynamic> posts = [];
+  bool isLoggedIn = false;
+
+  Future<void> fetchPosts() async {
+    final response = await http.get(
+        Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      setState(() {
+        posts = data;
+      });
+    } else {
+      throw Exception('Failed to load posts');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: isLoggedIn
+          ? DefaultTabController(
+              length: 2,
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Text(widget.title),
+                  backgroundColor: Colors.green,
+                  elevation: 5,
+                  bottom: const TabBar(
+                    tabs: [
+                      Tab(text: 'Post'),
+                      Tab(text: 'Contatti'),
+                    ],
+                  ),
+                ),
+                body: TabBarView(
+                  children: [
+                    PostTab(posts: posts),
+                    const EmailFormTab(),
+                  ],
+                ),
+              ),
+            )
+          : const LoginScreen(),
+    );
+  }
+
+  Future<void> handleLogin(String username, String password) async {
+    final response = await http.post(
+      Uri.parse('https://portobellodigallura.it/new/wp-json/jwt-auth/v1/token'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'username': username,
+        'password': password,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        isLoggedIn = true;
+      });
+      fetchPosts();
+    } else {
+      setState(() {
+        isLoggedIn = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credenziali non valide')),
+      );
+    }
+  }
+}
+
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
   const PostTab({super.key, required this.posts});
@@ -238,62 +329,62 @@ class PostTab extends StatelessWidget {
     return posts.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : ListView.builder(
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        var post = posts[index];
-        String title = post['title']['rendered'];
-        String excerpt = post['excerpt']['rendered'];
-        excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
-        String imageUrl = "https://www.condominio360.it/logo.png";
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              var post = posts[index];
+              String title = post['title']['rendered'];
+              String excerpt = post['excerpt']['rendered'];
+              excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
+              String imageUrl = "https://www.condominio360.it/logo.png";
 
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Card(
-            elevation: 10,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style:
-                          Theme.of(context).textTheme.headlineMedium,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Card(
+                  elevation: 10,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style:
+                                    Theme.of(context).textTheme.headlineMedium,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                excerpt,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          excerpt,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.network(
+                          imageUrl,
+                          height: 150,
+                          width: 150,
+                          fit: BoxFit.cover,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: Image.network(
-                    imageUrl,
-                    height: 150,
-                    width: 150,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
   }
 }
 
@@ -329,7 +420,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               ),
               prefixIcon: Icon(Icons.email, color: Colors.deepPurpleAccent),
               contentPadding:
-              EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
@@ -346,7 +437,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               ),
               prefixIcon: Icon(Icons.subject, color: Colors.deepPurpleAccent),
               contentPadding:
-              EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
@@ -363,7 +454,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               ),
               prefixIcon: Icon(Icons.message, color: Colors.deepPurpleAccent),
               contentPadding:
-              EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
             maxLines: 5,
           ),
@@ -389,7 +480,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               },
               style: ElevatedButton.styleFrom(
                 padding:
-                const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
