@@ -71,27 +71,27 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       body: isLoggedIn
           ? DefaultTabController(
-              length: 2,
-              child: Scaffold(
-                appBar: AppBar(
-                  title: Text(widget.title),
-                  backgroundColor: Colors.green,
-                  elevation: 5,
-                  bottom: const TabBar(
-                    tabs: [
-                      Tab(text: 'Post'),
-                      Tab(text: 'Contatti'),
-                    ],
-                  ),
-                ),
-                body: TabBarView(
-                  children: [
-                    PostTab(posts: posts),
-                    const EmailFormTab(),
-                  ],
-                ),
-              ),
-            )
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(widget.title),
+            backgroundColor: Colors.green,
+            elevation: 5,
+            bottom: const TabBar(
+              tabs: [
+                Tab(text: 'Post'),
+                Tab(text: 'Contatti'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              PostTab(posts: posts),
+              const EmailFormTab(),
+            ],
+          ),
+        ),
+      )
           : const LoginScreen(),
     );
   }
@@ -105,11 +105,16 @@ class _MyHomePageState extends State<MyHomePage> {
         'password': password,
       }),
     );
-    setState(() {
-      isLoggedIn = true;
-    });
-    fetchPosts();
-    if (response.statusCode != 200) {
+
+    if (response.statusCode == 200) {
+      setState(() {
+        isLoggedIn = true;
+      });
+      fetchPosts();
+    } else {
+      setState(() {
+        isLoggedIn = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Credenziali non valide')),
       );
@@ -158,8 +163,8 @@ class LoginScreen extends StatelessWidget {
                             .textTheme
                             .headlineMedium!
                             .copyWith(
-                              color: Colors.blue,
-                            ),
+                          color: Colors.blue,
+                        ),
                       ),
                       const SizedBox(height: 30),
                       TextField(
@@ -233,62 +238,62 @@ class PostTab extends StatelessWidget {
     return posts.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : ListView.builder(
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              var post = posts[index];
-              String title = post['title']['rendered'];
-              String excerpt = post['excerpt']['rendered'];
-              excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
-              String imageUrl = "https://www.condominio360.it/logo.png";
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        var post = posts[index];
+        String title = post['title']['rendered'];
+        String excerpt = post['excerpt']['rendered'];
+        excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
+        String imageUrl = "https://www.condominio360.it/logo.png";
 
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  elevation: 10,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style:
-                                    Theme.of(context).textTheme.headlineMedium,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                excerpt,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Card(
+            elevation: 10,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style:
+                          Theme.of(context).textTheme.headlineMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Image.network(
-                          imageUrl,
-                          height: 150,
-                          width: 150,
-                          fit: BoxFit.cover,
+                        const SizedBox(height: 8),
+                        Text(
+                          excerpt,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              );
-            },
-          );
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Image.network(
+                    imageUrl,
+                    height: 150,
+                    width: 150,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -324,7 +329,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               ),
               prefixIcon: Icon(Icons.email, color: Colors.deepPurpleAccent),
               contentPadding:
-                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
@@ -341,7 +346,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               ),
               prefixIcon: Icon(Icons.subject, color: Colors.deepPurpleAccent),
               contentPadding:
-                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
           ),
           const SizedBox(height: 20),
@@ -358,7 +363,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               ),
               prefixIcon: Icon(Icons.message, color: Colors.deepPurpleAccent),
               contentPadding:
-                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+              EdgeInsets.symmetric(vertical: 18, horizontal: 16),
             ),
             maxLines: 5,
           ),
@@ -384,7 +389,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               },
               style: ElevatedButton.styleFrom(
                 padding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
+                const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
