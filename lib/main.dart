@@ -296,7 +296,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> handleLogin(String username, String password) async {
     final response = await http.post(
-      Uri.parse('https://portobellodigallura.it/new/wp-json/jwt-auth/v1/token'),
+      Uri.parse('https://portobellodigallura.it/wp-json/jwt-auth/v1/token'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'username': username,
@@ -304,17 +304,19 @@ class _MyHomePageState extends State<MyHomePage> {
       }),
     );
 
+    print("Status Code: ${response.statusCode}");
+    print("Response Body: ${response.body}");
+
     if (response.statusCode == 200) {
-      setState(() {
-        isLoggedIn = true;
-      });
-      fetchPosts();
-    } else {
-      setState(() {
-        isLoggedIn = false;
-      });
+      final data = json.decode(response.body);
+      String token = data['token']; // Il token JWT ottenuto
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credenziali non valide')),
+        SnackBar(content: Text('Login riuscito! Token: $token')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Credenziali non valide o errore nel server')),
       );
     }
   }
