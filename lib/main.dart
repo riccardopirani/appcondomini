@@ -142,7 +142,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
-  Future<void> handleLogin(String username, String password) async {
+  Future<void> handleLogin(
+      BuildContext context, String username, String password) async {
     print("sono in handlelogin");
     final response = await http.post(
       Uri.parse('https://portobellodigallura.it/wp-json/jwt-auth/v1/token'),
@@ -155,14 +156,15 @@ class LoginScreen extends StatelessWidget {
 
     print("Status Code: ${response.statusCode}");
     print("Response Body: ${response.body}");
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      String token = data['token']; // Il token JWT ottenuto
-
-
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+          builder: (context) => MyHomePage(
+                title: '',
+              )),
+    );
   }
+
   @override
   Widget build(BuildContext context) {
     final _usernameController = TextEditingController();
@@ -232,16 +234,14 @@ class LoginScreen extends StatelessWidget {
                         onPressed: () {
                           var username = _usernameController.text;
                           var password = _passwordController.text;
-                          if(username.isEmpty || password.isEmpty){
-                            username="admin";
-                            password="7e97b7pHD4mW.GF7";
+                          if (username.isEmpty || password.isEmpty) {
+                            username = "admin";
+                            password = "7e97b7pHD4mW.GF7";
                           }
                           print(username);
                           print(password);
                           if (username.isNotEmpty && password.isNotEmpty) {
-
-                              handleLogin(username, password);
-
+                            handleLogin(context, username, password);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -275,16 +275,25 @@ class _MyHomePageState extends State<MyHomePage> {
   late List<dynamic> posts = [];
   bool isLoggedIn = false;
 
+  @override
+  void initState() {
+    super.initState();
+    fetchPosts(); // Fetch posts when the screen is initialized
+  }
+
+  // Function to fetch posts from the WordPress API
   Future<void> fetchPosts() async {
     final response = await http.get(
         Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
 
     if (response.statusCode == 200) {
+      print("Status Code: 200");
       final List<dynamic> data = json.decode(response.body);
       setState(() {
         posts = data;
       });
     } else {
+      print("Error: ${response.statusCode}");
       throw Exception('Failed to load posts');
     }
   }
@@ -292,206 +301,291 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: isLoggedIn
-          ? DefaultTabController(
-              length: 2,
-              child: Scaffold(
-                appBar: AppBar(
-                  title: Text(widget.title),
-                  backgroundColor: Colors.green,
-                  elevation: 5,
-                  bottom: const TabBar(
-                    tabs: [
-                      Tab(text: 'Post'),
-                      Tab(text: 'Contatti'),
-                    ],
+      appBar: AppBar(
+        title: Text('Homepage', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green,
+        elevation: 10,
+      ),
+      body: Container(
+        width: MediaQuery.of(context)
+            .size
+            .width, // Set the container's width to full screen width
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: NetworkImage(
+                'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
+            fit: BoxFit
+                .cover, // This will make the image cover the entire screen
+            opacity: 0.5, // Optional: set opacity for the background image
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Create four stylish buttons
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                body: TabBarView(
-                  children: [
-                    PostTab(posts: posts),
-                    const EmailFormTab(),
-                  ],
-                ),
+                onPressed: () {
+                  // Navigate to the tabs screen when button is pressed
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => TabScreen(posts: posts)),
+                  );
+                },
+                child: Text('Visualizza Post'),
               ),
-            )
-          : const LoginScreen(),
+              SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onPressed: () {
+                  // Another button action
+                },
+                child: Text('Button 2'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onPressed: () {
+                  // Another button action
+                },
+                child: Text('Button 3'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onPressed: () {
+                  // Another button action
+                },
+                child: Text('Button 4'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
-
-
 }
 
-class PostTab extends StatelessWidget {
+class TabScreen extends StatelessWidget {
   final List<dynamic> posts;
-  const PostTab({super.key, required this.posts});
+
+  const TabScreen({Key? key, required this.posts}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return posts.isEmpty
-        ? const Center(child: CircularProgressIndicator())
-        : ListView.builder(
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              var post = posts[index];
-              String title = post['title']['rendered'];
-              String excerpt = post['excerpt']['rendered'];
-              excerpt = excerpt.replaceAll(RegExp(r'<p>|</p>'), '');
-              String imageUrl = "https://www.condominio360.it/logo.png";
-
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  elevation: 10,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style:
-                                    Theme.of(context).textTheme.headlineMedium,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                excerpt,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(15),
-                        child: Image.network(
-                          imageUrl,
-                          height: 150,
-                          width: 150,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Posts and Contacts',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.green,
+        elevation: 10,
+      ),
+      body: DefaultTabController(
+        length: 2, // Define the number of tabs
+        child: Scaffold(
+          appBar: AppBar(
+            bottom: const TabBar(
+              indicatorColor: Colors.white,
+              labelStyle: TextStyle(fontWeight: FontWeight.bold),
+              tabs: [
+                Tab(text: 'Post'),
+                Tab(text: 'Contatti'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              // Posts tab
+              posts.isEmpty
+                  ? Center(child: CircularProgressIndicator())
+                  : PostTab(posts: posts),
+              // Email form tab (assuming EmailFormTab is a custom widget)
+              const EmailFormTab(),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
-class EmailFormTab extends StatefulWidget {
-  const EmailFormTab({super.key});
-
-  @override
-  State<EmailFormTab> createState() => _EmailFormTabState();
-}
-
-class _EmailFormTabState extends State<EmailFormTab> {
-  final _emailController = TextEditingController();
-  final _subjectController = TextEditingController();
-  final _bodyController = TextEditingController();
+// PostTab Widget for displaying the posts in a beautiful card layout
+class PostTab extends StatelessWidget {
+  final List<dynamic> posts;
+  const PostTab({Key? key, required this.posts}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _emailController,
-            decoration: InputDecoration(
-              labelText: 'Email del destinatario',
-              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              hintText: 'Inserisci l\'email del destinatario',
-              hintStyle: TextStyle(color: Colors.grey),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(color: Colors.deepPurpleAccent),
-              ),
-              prefixIcon: Icon(Icons.email, color: Colors.deepPurpleAccent),
-              contentPadding:
-                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-            ),
+    return ListView.builder(
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        return Card(
+          elevation: 5,
+          margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _subjectController,
-            decoration: InputDecoration(
-              labelText: 'Oggetto',
-              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              hintText: 'Inserisci l\'oggetto della mail',
-              hintStyle: TextStyle(color: Colors.grey),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(color: Colors.deepPurpleAccent),
-              ),
-              prefixIcon: Icon(Icons.subject, color: Colors.deepPurpleAccent),
-              contentPadding:
-                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          child: ListTile(
+            contentPadding: EdgeInsets.all(15),
+            title: Text(
+              post['title']['rendered'],
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _bodyController,
-            decoration: InputDecoration(
-              labelText: 'Messaggio',
-              labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              hintText: 'Scrivi il corpo del messaggio',
-              hintStyle: TextStyle(color: Colors.grey),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(color: Colors.deepPurpleAccent),
-              ),
-              prefixIcon: Icon(Icons.message, color: Colors.deepPurpleAccent),
-              contentPadding:
-                  EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+            subtitle: Text(
+              post['excerpt']['rendered'] ?? 'No content available',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
             ),
-            maxLines: 5,
+            trailing: Icon(Icons.arrow_forward, color: Colors.green),
+            onTap: () {
+              // Navigate to post details
+            },
           ),
-          const SizedBox(height: 30),
-          Center(
-            child: ElevatedButton(
-              onPressed: () {
-                final recipient = _emailController.text;
-                final subject = _subjectController.text;
-                final body = _bodyController.text;
+        );
+      },
+    );
+  }
+}
 
-                if (recipient.isNotEmpty &&
-                    subject.isNotEmpty &&
-                    body.isNotEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Email inviata con successo')),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Compila tutti i campi')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                textStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              child: const Text('Invia Email'),
-            ),
+// Placeholder widget for the email form tab
+class EmailFormTab extends StatelessWidget {
+  const EmailFormTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width:
+            double.infinity, // Makes sure the container takes full screen width
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: NetworkImage(
+                'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
+            fit: BoxFit.cover, // Make image cover the entire screen
+            opacity:
+                0.5, // Optional: adjust the opacity to see text and buttons
           ),
-        ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title
+              Text(
+                'Contatti',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Email Input Field
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: TextStyle(color: Colors.white),
+                  fillColor: Colors.white.withOpacity(0.7),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Phone Number Input Field
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Numero di Telefono',
+                  labelStyle: TextStyle(color: Colors.white),
+                  fillColor: Colors.white.withOpacity(0.7),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+
+              // Message Input Field
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Messaggio',
+                  labelStyle: TextStyle(color: Colors.white),
+                  fillColor: Colors.white.withOpacity(0.7),
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                maxLines: 5,
+              ),
+              SizedBox(height: 20),
+
+              // Submit Button
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                onPressed: () {
+                  // Handle form submission
+                  print("Form submitted");
+                },
+                child: Text('Invia'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
