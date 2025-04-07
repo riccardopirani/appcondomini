@@ -159,7 +159,7 @@ class LoginScreen extends StatelessWidget {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-          builder: (context) => MyHomePage(
+          builder: (context) => const MyHomePage(
                 title: '',
               )),
     );
@@ -302,7 +302,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Homepage', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Homepage', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green,
         elevation: 10,
       ),
@@ -310,7 +310,7 @@ class _MyHomePageState extends State<MyHomePage> {
         width: MediaQuery.of(context)
             .size
             .width, // Set the container's width to full screen width
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage(
                 'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
@@ -327,33 +327,32 @@ class _MyHomePageState extends State<MyHomePage> {
               // Create four stylish buttons
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 onPressed: () {
-                  // Navigate to the tabs screen when button is pressed
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (context) => TabScreen(posts: posts)),
                   );
                 },
-                child: Text('Visualizza Post'),
+                child: const Text('Visualizza Post'),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -361,16 +360,16 @@ class _MyHomePageState extends State<MyHomePage> {
                 onPressed: () {
                   // Another button action
                 },
-                child: Text('Button 2'),
+                child: const Text('Button 2'),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -378,16 +377,16 @@ class _MyHomePageState extends State<MyHomePage> {
                 onPressed: () {
                   // Another button action
                 },
-                child: Text('Button 3'),
+                child: const Text('Button 3'),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -395,7 +394,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 onPressed: () {
                   // Another button action
                 },
-                child: Text('Button 4'),
+                child: const Text('Button 4'),
               ),
             ],
           ),
@@ -414,7 +413,7 @@ class TabScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Posts and Contacts',
+        title: const Text('Posts and Contacts',
             style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green,
         elevation: 10,
@@ -436,7 +435,7 @@ class TabScreen extends StatelessWidget {
             children: [
               // Posts tab
               posts.isEmpty
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : PostTab(posts: posts),
               // Email form tab (assuming EmailFormTab is a custom widget)
               const EmailFormTab(),
@@ -461,21 +460,21 @@ class PostTab extends StatelessWidget {
         final post = posts[index];
         return Card(
           elevation: 5,
-          margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+          margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
           child: ListTile(
-            contentPadding: EdgeInsets.all(15),
+            contentPadding: const EdgeInsets.all(15),
             title: Text(
               post['title']['rendered'],
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
               post['excerpt']['rendered'] ?? 'No content available',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
-            trailing: Icon(Icons.arrow_forward, color: Colors.green),
+            trailing: const Icon(Icons.arrow_forward, color: Colors.green),
             onTap: () {
               // Navigate to post details
             },
@@ -496,7 +495,7 @@ class EmailFormTab extends StatelessWidget {
       body: Container(
         width:
             double.infinity, // Makes sure the container takes full screen width
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage(
                 'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
@@ -512,7 +511,7 @@ class EmailFormTab extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Title
-              Text(
+              const Text(
                 'Contatti',
                 style: TextStyle(
                   fontSize: 28,
@@ -520,13 +519,13 @@ class EmailFormTab extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Email Input Field
               TextField(
                 decoration: InputDecoration(
                   labelText: 'Email',
-                  labelStyle: TextStyle(color: Colors.white),
+                  labelStyle: const TextStyle(color: Colors.white),
                   fillColor: Colors.white.withOpacity(0.7),
                   filled: true,
                   border: OutlineInputBorder(
@@ -534,13 +533,13 @@ class EmailFormTab extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Phone Number Input Field
               TextField(
                 decoration: InputDecoration(
                   labelText: 'Numero di Telefono',
-                  labelStyle: TextStyle(color: Colors.white),
+                  labelStyle: const TextStyle(color: Colors.white),
                   fillColor: Colors.white.withOpacity(0.7),
                   filled: true,
                   border: OutlineInputBorder(
@@ -548,13 +547,13 @@ class EmailFormTab extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Message Input Field
               TextField(
                 decoration: InputDecoration(
                   labelText: 'Messaggio',
-                  labelStyle: TextStyle(color: Colors.white),
+                  labelStyle: const TextStyle(color: Colors.white),
                   fillColor: Colors.white.withOpacity(0.7),
                   filled: true,
                   border: OutlineInputBorder(
@@ -563,16 +562,16 @@ class EmailFormTab extends StatelessWidget {
                 ),
                 maxLines: 5,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Submit Button
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
-                  textStyle: TextStyle(
+                  textStyle: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -581,7 +580,7 @@ class EmailFormTab extends StatelessWidget {
                   // Handle form submission
                   print("Form submitted");
                 },
-                child: Text('Invia'),
+                child: const Text('Invia'),
               ),
             ],
           ),
