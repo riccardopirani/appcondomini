@@ -278,10 +278,9 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    fetchPosts(); // Fetch posts when the screen is initialized
+    fetchPosts();
   }
 
-  // Function to fetch posts from the WordPress API
   Future<void> fetchPosts() async {
     final response = await http.get(
         Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
