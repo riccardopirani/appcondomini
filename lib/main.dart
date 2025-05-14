@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+String? jwtToken;
+
 void main() {
   runApp(const MyApp());
 }
@@ -153,15 +155,18 @@ class LoginScreen extends StatelessWidget {
         'password': password,
       }),
     );
+    try {
+      print(response);
+      print(response.statusCode);
 
-    print("Status Code: ${response.statusCode}");
-    print("Response Body: ${response.body}");
+      final data = json.decode(response.body);
+      jwtToken = data['token'];
+    } catch (err) {
+      print(err.toString());
+    }
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-          builder: (context) => const MyHomePage(
-                title: '',
-              )),
+      MaterialPageRoute(builder: (context) => const MyHomePage(title: '')),
     );
   }
 
@@ -283,7 +288,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> fetchPosts() async {
     final response = await http.get(
-        Uri.parse('https://portobellodigallura.it/new/wp-json/wp/v2/posts'));
+      Uri.parse(
+          'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc'),
+      headers: {
+        'Authorization': 'Bearer $jwtToken', // <-- Aggiunto per autenticazione
+      },
+    );
 
     if (response.statusCode == 200) {
       print("Status Code: 200");
@@ -301,7 +311,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Homepage', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Homepage',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green,
         elevation: 10,
       ),
@@ -326,7 +337,8 @@ class _MyHomePageState extends State<MyHomePage> {
               // Create four stylish buttons
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -347,7 +359,8 @@ class _MyHomePageState extends State<MyHomePage> {
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -364,7 +377,8 @@ class _MyHomePageState extends State<MyHomePage> {
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -381,7 +395,8 @@ class _MyHomePageState extends State<MyHomePage> {
               const SizedBox(height: 20),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
                   ),
@@ -410,36 +425,32 @@ class TabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Posts and Contacts',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.green,
-        elevation: 10,
-      ),
-      body: DefaultTabController(
-        length: 2, // Define the number of tabs
-        child: Scaffold(
-          appBar: AppBar(
-            bottom: const TabBar(
-              indicatorColor: Colors.white,
-              labelStyle: TextStyle(fontWeight: FontWeight.bold),
-              tabs: [
-                Tab(text: 'Post'),
-                Tab(text: 'Contatti'),
-              ],
-            ),
+    return DefaultTabController(
+      length: 2, // Define the number of tabs
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'Post e Contatti',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          body: TabBarView(
-            children: [
-              // Posts tab
-              posts.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : PostTab(posts: posts),
-              // Email form tab (assuming EmailFormTab is a custom widget)
-              const EmailFormTab(),
+          backgroundColor: Colors.green,
+          elevation: 10,
+          bottom: const TabBar(
+            indicatorColor: Colors.white,
+            labelStyle: TextStyle(fontWeight: FontWeight.bold),
+            tabs: [
+              Tab(text: 'Post'),
+              Tab(text: 'Contatti'),
             ],
           ),
+        ),
+        body: TabBarView(
+          children: [
+            posts.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : PostTab(posts: posts),
+            const EmailFormTab(),
+          ],
         ),
       ),
     );
@@ -450,6 +461,11 @@ class TabScreen extends StatelessWidget {
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
   const PostTab({Key? key, required this.posts}) : super(key: key);
+
+  String _removeHtmlTags(String htmlText) {
+    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
+    return htmlText.replaceAll(regex, '');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -470,7 +486,7 @@ class PostTab extends StatelessWidget {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
-              post['excerpt']['rendered'] ?? 'No content available',
+              _removeHtmlTags(post['excerpt']['rendered'] ?? ''),
               style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
             trailing: const Icon(Icons.arrow_forward, color: Colors.green),
@@ -484,106 +500,141 @@ class PostTab extends StatelessWidget {
   }
 }
 
-// Placeholder widget for the email form tab
-class EmailFormTab extends StatelessWidget {
+class EmailFormTab extends StatefulWidget {
   const EmailFormTab({Key? key}) : super(key: key);
+
+  @override
+  State<EmailFormTab> createState() => _EmailFormTabState();
+}
+
+class _EmailFormTabState extends State<EmailFormTab> {
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _messageController = TextEditingController();
+
+  void _submitForm() {
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final message = _messageController.text.trim();
+
+    if (email.isEmpty || message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Email e messaggio sono obbligatori")),
+      );
+      return;
+    }
+
+    print("Email: $email");
+    print("Telefono: $phone");
+    print("Messaggio: $message");
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Messaggio inviato!")),
+    );
+
+    _emailController.clear();
+    _phoneController.clear();
+    _messageController.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width:
-            double.infinity, // Makes sure the container takes full screen width
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-                'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
-            fit: BoxFit.cover, // Make image cover the entire screen
-            opacity:
-                0.5, // Optional: adjust the opacity to see text and buttons
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Opacity(
+            opacity: 0.4,
+            child: Image(
+              image: NetworkImage(
+                  'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title
-              const Text(
-                'Contatti',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Card(
+                elevation: 15,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Email Input Field
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  labelStyle: const TextStyle(color: Colors.white),
-                  fillColor: Colors.white.withOpacity(0.7),
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
+                color: Colors.white.withOpacity(0.95),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Contattaci',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          labelText: 'Email *',
+                          prefixIcon: const Icon(Icons.email),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Numero di Telefono',
+                          prefixIcon: const Icon(Icons.phone),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextField(
+                        controller: _messageController,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          labelText: 'Messaggio *',
+                          prefixIcon: const Icon(Icons.message),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.send),
+                        label: const Text('Invia'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onPressed: _submitForm,
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Phone Number Input Field
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Numero di Telefono',
-                  labelStyle: const TextStyle(color: Colors.white),
-                  fillColor: Colors.white.withOpacity(0.7),
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Message Input Field
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Messaggio',
-                  labelStyle: const TextStyle(color: Colors.white),
-                  fillColor: Colors.white.withOpacity(0.7),
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                ),
-                maxLines: 5,
-              ),
-              const SizedBox(height: 20),
-
-              // Submit Button
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onPressed: () {
-                  // Handle form submission
-                  print("Form submitted");
-                },
-                child: const Text('Invia'),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
