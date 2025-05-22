@@ -206,9 +206,12 @@ class LoginScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Login',
-                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                          color: Colors.blue,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium!
+                            .copyWith(
+                              color: Colors.blue,
+                            ),
                       ),
                       const SizedBox(height: 30),
                       TextField(
@@ -273,7 +276,6 @@ class LoginScreen extends StatelessWidget {
         ],
       ),
     );
-
   }
 }
 
@@ -425,6 +427,7 @@ class TabScreen extends StatelessWidget {
     );
   }
 }
+
 // PostTab Widget for displaying the posts in a beautiful card layout
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
@@ -492,6 +495,7 @@ class PostTab extends StatelessWidget {
     );
   }
 }
+
 class EmailFormTab extends StatefulWidget {
   const EmailFormTab({Key? key}) : super(key: key);
 
