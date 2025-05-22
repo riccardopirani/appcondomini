@@ -67,17 +67,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             _buildOnboardingPage(
               'Benvenuto nell\'app per il condominio!',
               'Gestisci facilmente tutte le informazioni relative al tuo condominio.',
-              'https://i2.res.24o.it/images2010/Editrice/ILSOLE24ORE/QUOTIDIANI_VERTICALI/2021/08/04/Quotidiani%20Verticali/ImmaginiWeb/Ritagli/Condominio-moderno-834-AdobeStock-kEKG--1440x752@Quotidiani_Verticali-Web.jpg',
+              'assets/condominio.jpeg',
             ),
             _buildOnboardingPage(
               'Tieniti aggiornato!',
               'Visualizza le ultime novità e aggiornamenti riguardanti il tuo condominio.',
-              'https://www.immobiliare.it/news/app/uploads/2022/05/Condominio.jpeg',
+              'assets/2.jpeg',
             ),
             _buildOnboardingPage(
               'Contatta i vicini',
               'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini.',
-              'https://www.alperia.eu/wp-content/uploads/2024/08/teleriscladamenti-condomini-1024x705-1.jpg',
+              'assets/3.jpg',
             ),
           ],
         ),
@@ -114,10 +114,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: Image.network(imagePath,
-                height: 300, width: double.infinity, fit: BoxFit.cover),
+            child: Image.asset(
+              imagePath, // <-- specifica il tuo path locale
+              height: 300,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Text(
             title,
             style: Theme.of(context).textTheme.headlineMedium!.copyWith(
@@ -180,11 +184,9 @@ class LoginScreen extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               image: DecorationImage(
-                image: NetworkImage(
-                  'https://www.immobiliare.it/news/app/uploads/2022/05/Condominio.jpeg',
-                ),
+                image: AssetImage("assets/2.jpeg"),
                 fit: BoxFit.cover,
               ),
             ),
@@ -204,12 +206,9 @@ class LoginScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Login',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium!
-                            .copyWith(
-                              color: Colors.blue,
-                            ),
+                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                          color: Colors.blue,
+                        ),
                       ),
                       const SizedBox(height: 30),
                       TextField(
@@ -250,7 +249,8 @@ class LoginScreen extends StatelessWidget {
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                  content: Text('Compila tutti i campi')),
+                                content: Text('Compila tutti i campi'),
+                              ),
                             );
                           }
                         },
@@ -273,6 +273,7 @@ class LoginScreen extends StatelessWidget {
         ],
       ),
     );
+
   }
 }
 
