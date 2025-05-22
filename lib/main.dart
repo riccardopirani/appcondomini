@@ -509,9 +509,26 @@ class _EmailFormTabState extends State<EmailFormTab> {
     final phone = _phoneController.text.trim();
     final message = _messageController.text.trim();
 
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+\$');
+    final phoneRegex = RegExp(r'^[0-9]{6,15}\$');
+
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Inserisci un'email valida")),
+      );
+      return;
+    }
+
     if (email.isEmpty || message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Email e messaggio sono obbligatori")),
+      );
+      return;
+    }
+
+    if (phone.isNotEmpty && !phoneRegex.hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Inserisci un numero di telefono valido")),
       );
       return;
     }
