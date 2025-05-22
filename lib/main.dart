@@ -292,18 +292,16 @@ class _MyHomePageState extends State<MyHomePage> {
       Uri.parse(
           'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc'),
       headers: {
-        'Authorization': 'Bearer $jwtToken', // <-- Aggiunto per autenticazione
+        'Authorization': 'Bearer $jwtToken',
       },
     );
 
     if (response.statusCode == 200) {
-      print("Status Code: 200");
       final List<dynamic> data = json.decode(response.body);
       setState(() {
         posts = data;
       });
     } else {
-      print("Error: ${response.statusCode}");
       throw Exception('Failed to load posts');
     }
   }
@@ -312,109 +310,74 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Homepage',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.green,
-        elevation: 10,
+        title: const Text(
+          'Homepage',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 22,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: const Color(0xFF48C9B0),
+        elevation: 6,
+        centerTitle: true,
       ),
       body: Container(
-        width: MediaQuery.of(context)
-            .size
-            .width, // Set the container's width to full screen width
+        width: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage(
-                'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
-            fit: BoxFit
-                .cover, // This will make the image cover the entire screen
-            opacity: 0.5, // Optional: set opacity for the background image
+              'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977',
+            ),
+            fit: BoxFit.cover,
+            opacity: 0.4,
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Create four stylish buttons
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onPressed: () {
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _modernButton(context, 'Visualizza Post', () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => TabScreen(posts: posts)),
+                      builder: (context) => TabScreen(posts: posts),
+                    ),
                   );
-                },
-                child: const Text('Visualizza Post'),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onPressed: () {
-                  // Another button action
-                },
-                child: const Text('Button 2'),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onPressed: () {
-                  // Another button action
-                },
-                child: const Text('Button 3'),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                onPressed: () {
-                  // Another button action
-                },
-                child: const Text('Button 4'),
-              ),
-            ],
+                }),
+                const SizedBox(height: 20),
+                _modernButton(context, 'Servizi', () {}),
+                const SizedBox(height: 20),
+                _modernButton(context, 'Documenti', () {}),
+                const SizedBox(height: 20),
+                _modernButton(context, 'Contatti', () {}),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _modernButton(BuildContext context, String label, VoidCallback onTap) {
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF1ABC9C),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 60),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        elevation: 4,
+        textStyle: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      child: Text(label),
     );
   }
 }
@@ -427,37 +390,41 @@ class TabScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2, // Define the number of tabs
+      length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Post e Contatti',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: Colors.green,
-          elevation: 10,
-          bottom: const TabBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        body: Column(
+          children: [
+            Expanded(
+              child: TabBarView(
+                children: [
+                  posts.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : PostTab(posts: posts),
+                  const EmailFormTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: Container(
+          color: const Color(0xFF1ABC9C),
+          child: const TabBar(
             indicatorColor: Colors.white,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold),
+            indicatorWeight: 3,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             tabs: [
-              Tab(text: 'Post'),
-              Tab(text: 'Contatti'),
+              Tab(icon: Icon(Icons.article), text: 'Post'),
+              Tab(icon: Icon(Icons.email), text: 'Contatti'),
             ],
           ),
-        ),
-        body: TabBarView(
-          children: [
-            posts.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : PostTab(posts: posts),
-            const EmailFormTab(),
-          ],
         ),
       ),
     );
   }
 }
-
 // PostTab Widget for displaying the posts in a beautiful card layout
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
@@ -471,26 +438,51 @@ class PostTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       itemCount: posts.length,
       itemBuilder: (context, index) {
         final post = posts[index];
-        return Card(
-          elevation: 5,
-          margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.all(15),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 20,
+              horizontal: 20,
+            ),
             title: Text(
               post['title']['rendered'],
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C3E50),
+              ),
             ),
-            subtitle: Text(
-              _removeHtmlTags(post['excerpt']['rendered'] ?? ''),
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                _removeHtmlTags(post['excerpt']['rendered'] ?? ''),
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black54,
+                ),
+              ),
             ),
-            trailing: const Icon(Icons.arrow_forward, color: Colors.green),
+            trailing: const Icon(
+              Icons.arrow_forward_ios,
+              color: Color(0xFF1ABC9C),
+              size: 20,
+            ),
             onTap: () {
               // Navigate to post details
             },
@@ -500,7 +492,6 @@ class PostTab extends StatelessWidget {
     );
   }
 }
-
 class EmailFormTab extends StatefulWidget {
   const EmailFormTab({Key? key}) : super(key: key);
 
@@ -541,101 +532,100 @@ class _EmailFormTabState extends State<EmailFormTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const Opacity(
-            opacity: 0.4,
-            child: Image(
-              image: NetworkImage(
-                  'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977'),
-              fit: BoxFit.cover,
-            ),
-          ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Card(
-                elevation: 15,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
                 ),
-                color: Colors.white.withOpacity(0.95),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Contattaci',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: 'Email *',
-                          prefixIcon: const Icon(Icons.email),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: 'Numero di Telefono',
-                          prefixIcon: const Icon(Icons.phone),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      TextField(
-                        controller: _messageController,
-                        maxLines: 4,
-                        decoration: InputDecoration(
-                          labelText: 'Messaggio *',
-                          prefixIcon: const Icon(Icons.message),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 25),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.send),
-                        label: const Text('Invia'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        onPressed: _submitForm,
-                      ),
-                    ],
+              ],
+            ),
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Contattaci',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1ABC9C),
                   ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
+                const SizedBox(height: 20),
+                _buildTextField(
+                  controller: _emailController,
+                  label: 'Email *',
+                  icon: Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 15),
+                _buildTextField(
+                  controller: _phoneController,
+                  label: 'Numero di Telefono',
+                  icon: Icons.phone,
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 15),
+                _buildTextField(
+                  controller: _messageController,
+                  label: 'Messaggio *',
+                  icon: Icons.message,
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 25),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.send),
+                  label: const Text('Invia'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1ABC9C),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed: _submitForm,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        filled: true,
+        fillColor: Colors.grey[100],
       ),
     );
   }
