@@ -322,18 +322,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final buttonWidth = screenWidth > 500 ? 400.0 : double.infinity;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Homepage',
+          'Porto di Gallura',
           style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF48C9B0),
-        elevation: 6,
+        backgroundColor: const Color(0xFFFFC107), // Giallo sole
+        elevation: 8,
         centerTitle: true,
       ),
       body: Container(
@@ -341,33 +344,36 @@ class _MyHomePageState extends State<MyHomePage> {
         decoration: const BoxDecoration(
           image: DecorationImage(
             image: NetworkImage(
-              'https://images2-wpc.corriereobjects.it/HLJL2uFOpO9HAdqNn7gQ3sv6NDc=/fit-in/562x740/style.corriere.it/assets/uploads/2020/04/Lantern-House-exterior.jpg?v=243977',
+              'https://images.unsplash.com/photo-1507525428034-b723cf961d3e', // mare al tramonto
             ),
             fit: BoxFit.cover,
-            opacity: 0.4,
+            opacity: 0.6,
           ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _modernButton(context, 'Visualizza Post', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TabScreen(posts: posts),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 20),
-                _modernButton(context, 'Servizi', () {}),
-                const SizedBox(height: 20),
-                _modernButton(context, 'Documenti', () {}),
-                const SizedBox(height: 20),
-                _modernButton(context, 'Contatti', () {}),
-              ],
+        child: Container(
+          color: const Color(0xCCFFF8E1), // sabbia chiara trasparente
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _modernButton(context, 'Visualizza Post', buttonWidth, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TabScreen(posts: posts),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 20),
+                  _modernButton(context, 'Servizi', buttonWidth, () {}),
+                  const SizedBox(height: 20),
+                  _modernButton(context, 'Documenti', buttonWidth, () {}),
+                  const SizedBox(height: 20),
+                  _modernButton(context, 'Contatti', buttonWidth, () {}),
+                ],
+              ),
             ),
           ),
         ),
@@ -375,23 +381,28 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Widget _modernButton(BuildContext context, String label, VoidCallback onTap) {
-    return ElevatedButton(
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF1ABC9C),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 60),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
+  Widget _modernButton(
+      BuildContext context, String label, double width, VoidCallback onTap) {
+    return SizedBox(
+      width: width,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFFFC107), // Giallo sole
+          foregroundColor: const Color(0xFF333333), // Testo scuro
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+            side: const BorderSide(color: Color(0xFF1565C0), width: 2),
+          ),
+          elevation: 6,
+          textStyle: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        elevation: 4,
-        textStyle: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-        ),
+        child: Text(label),
       ),
-      child: Text(label),
     );
   }
 }
