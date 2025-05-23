@@ -417,29 +417,39 @@ class TabScreen extends StatelessWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
-        body: Column(
-          children: [
-            Expanded(
-              child: TabBarView(
-                children: [
-                  posts.isEmpty
-                      ? const Center(child: CircularProgressIndicator())
-                      : PostTab(posts: posts),
-                  const EmailFormTab(),
-                ],
-              ),
+        appBar: AppBar(
+          title: const Text(
+            'Porto di Gallura',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+              color: Colors.white,
             ),
+          ),
+          backgroundColor: const Color(0xFFFFC107), // Giallo sole
+          centerTitle: true,
+          elevation: 6,
+        ),
+        backgroundColor: const Color(0xFFFFF8E1), // Sabbia chiara
+        body: TabBarView(
+          children: [
+            posts.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : PostTab(posts: posts),
+            const EmailFormTab(),
           ],
         ),
         bottomNavigationBar: Container(
-          color: const Color(0xFF1ABC9C),
+          color: const Color(0xFFFFC107), // Giallo sole
           child: const TabBar(
-            indicatorColor: Colors.white,
-            indicatorWeight: 3,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            indicatorColor: Color(0xFF1565C0), // Blu mare
+            indicatorWeight: 4,
+            labelColor: Colors.black, // Testo attivo
+            unselectedLabelColor: Colors.black54, // Testo non attivo
+            labelStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
             tabs: [
               Tab(icon: Icon(Icons.article), text: 'Post'),
               Tab(icon: Icon(Icons.email), text: 'Contatti'),
@@ -450,7 +460,6 @@ class TabScreen extends StatelessWidget {
     );
   }
 }
-
 // PostTab Widget for displaying the posts in a beautiful card layout
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
@@ -576,7 +585,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFFFF8E1), // Sabbia chiara
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -601,7 +610,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1ABC9C),
+                    color: Colors.black, // Testo principale nero
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -628,10 +637,11 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 ),
                 const SizedBox(height: 25),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.send),
+                  icon: const Icon(Icons.send, color: Colors.black),
                   label: const Text('Invia'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1ABC9C),
+                    backgroundColor: const Color(0xFFFFC107), // Giallo sole
+                    foregroundColor: Colors.black, // Testo nero
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(25),
