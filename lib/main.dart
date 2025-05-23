@@ -205,6 +205,7 @@ class LoginScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24.0),
             child: Center(
               child: Card(
+                color: Colors.white, // Sfondo bianco
                 elevation: 10,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -214,24 +215,25 @@ class LoginScreen extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Image.asset("assets/logo.jpg", width: 80, height: 80),
+                      const SizedBox(height: 16),
                       Text(
                         'Login',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium!
-                            .copyWith(
-                              color: Colors.blue,
-                            ),
+                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                          color: Colors.black, // Testo nero
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 30),
                       TextField(
                         controller: _usernameController,
                         decoration: InputDecoration(
                           labelText: 'Nome utente',
+                          labelStyle: const TextStyle(color: Colors.black),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
-                          prefixIcon: const Icon(Icons.person),
+                          prefixIcon: const Icon(Icons.person, color: Colors.black),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -240,10 +242,11 @@ class LoginScreen extends StatelessWidget {
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'Password',
+                          labelStyle: const TextStyle(color: Colors.black),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
-                          prefixIcon: const Icon(Icons.lock),
+                          prefixIcon: const Icon(Icons.lock, color: Colors.black),
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -255,8 +258,6 @@ class LoginScreen extends StatelessWidget {
                             username = "admin";
                             password = "7e97b7pHD4mW.GF7";
                           }
-                          print(username);
-                          print(password);
                           if (username.isNotEmpty && password.isNotEmpty) {
                             handleLogin(context, username, password);
                           } else {
@@ -268,8 +269,9 @@ class LoginScreen extends StatelessWidget {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 14, horizontal: 40),
+                          backgroundColor: Colors.blue, // Bottone blu
+                          foregroundColor: Colors.white, // Testo del bottone bianco
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -280,7 +282,7 @@ class LoginScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
+              )
             ),
           ),
         ],
