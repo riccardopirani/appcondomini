@@ -93,7 +93,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      MaterialPageRoute(
+                          builder: (context) => const LoginScreen()),
                     );
                   },
                   child: const Text('Inizia'),
@@ -204,86 +205,89 @@ class LoginScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(24.0),
             child: Center(
-              child: Card(
-                color: Colors.white, // Sfondo bianco
-                elevation: 10,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset("assets/logo.jpg", width: 80, height: 80),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Login',
-                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                          color: Colors.black, // Testo nero
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      TextField(
-                        controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Nome utente',
-                          labelStyle: const TextStyle(color: Colors.black),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          prefixIcon: const Icon(Icons.person, color: Colors.black),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          labelStyle: const TextStyle(color: Colors.black),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          prefixIcon: const Icon(Icons.lock, color: Colors.black),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      ElevatedButton(
-                        onPressed: () {
-                          var username = _usernameController.text;
-                          var password = _passwordController.text;
-                          if (username.isEmpty || password.isEmpty) {
-                            username = "admin";
-                            password = "7e97b7pHD4mW.GF7";
-                          }
-                          if (username.isNotEmpty && password.isNotEmpty) {
-                            handleLogin(context, username, password);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Compila tutti i campi'),
+                child: Card(
+              color: Colors.white, // Sfondo bianco
+              elevation: 10,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset("assets/logo.jpg", width: 80, height: 80),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Login',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium!.copyWith(
+                                color: Colors.black, // Testo nero
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue, // Bottone blu
-                          foregroundColor: Colors.white, // Testo del bottone bianco
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          textStyle: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 30),
+                    TextField(
+                      controller: _usernameController,
+                      decoration: InputDecoration(
+                        labelText: 'Nome utente',
+                        labelStyle: const TextStyle(color: Colors.black),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                        child: const Text('Login'),
+                        prefixIcon:
+                            const Icon(Icons.person, color: Colors.black),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: const TextStyle(color: Colors.black),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        prefixIcon: const Icon(Icons.lock, color: Colors.black),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton(
+                      onPressed: () {
+                        var username = _usernameController.text;
+                        var password = _passwordController.text;
+                        if (username.isEmpty || password.isEmpty) {
+                          username = "admin";
+                          password = "7e97b7pHD4mW.GF7";
+                        }
+                        if (username.isNotEmpty && password.isNotEmpty) {
+                          handleLogin(context, username, password);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Compila tutti i campi'),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue, // Bottone blu
+                        foregroundColor:
+                            Colors.white, // Testo del bottone bianco
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14, horizontal: 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        textStyle: const TextStyle(fontSize: 16),
+                      ),
+                      child: const Text('Login'),
+                    ),
+                  ],
                 ),
-              )
-            ),
+              ),
+            )),
           ),
         ],
       ),
@@ -460,6 +464,7 @@ class TabScreen extends StatelessWidget {
     );
   }
 }
+
 // PostTab Widget for displaying the posts in a beautiful card layout
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
