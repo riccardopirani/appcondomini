@@ -61,45 +61,54 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: PageView(
-          controller: _pageController,
+        child: Column(
           children: [
-            _buildOnboardingPage(
-              'Benvenuto nell\'app per il condominio!',
-              'Gestisci facilmente tutte le informazioni relative al tuo condominio.',
-              'assets/condominio.jpeg',
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                children: [
+                  _buildOnboardingPage(
+                    'Benvenuto nell\'app per il condominio!',
+                    'Gestisci facilmente tutte le informazioni relative al tuo condominio.',
+                    'assets/condominio.jpeg',
+                  ),
+                  _buildOnboardingPage(
+                    'Tieniti aggiornato!',
+                    'Visualizza le ultime novità e aggiornamenti riguardanti il tuo condominio.',
+                    'assets/2.jpeg',
+                  ),
+                  _buildOnboardingPage(
+                    'Contatta i vicini',
+                    'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini.',
+                    'assets/3.jpg',
+                  ),
+                ],
+              ),
             ),
-            _buildOnboardingPage(
-              'Tieniti aggiornato!',
-              'Visualizza le ultime novità e aggiornamenti riguardanti il tuo condominio.',
-              'assets/2.jpeg',
-            ),
-            _buildOnboardingPage(
-              'Contatta i vicini',
-              'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini.',
-              'assets/3.jpg',
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  },
+                  child: const Text('Inizia'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    textStyle: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
             ),
           ],
-        ),
-      ),
-      bottomSheet: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
-          child: const Text('Inizia'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            textStyle: const TextStyle(fontSize: 18), // Button color
-          ),
         ),
       ),
     );
@@ -107,39 +116,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildOnboardingPage(
       String title, String description, String imagePath) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.asset(
-              imagePath, // <-- specifica il tuo path locale
-              height: 300,
-              width: double.infinity,
-              fit: BoxFit.cover,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                imagePath,
+                height: 300,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-          SizedBox(height: 24),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            description,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium!
-                .copyWith(fontSize: 16, color: Colors.black54),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              description,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium!
+                  .copyWith(fontSize: 16, color: Colors.black54),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
