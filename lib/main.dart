@@ -298,6 +298,13 @@ class LoginScreen extends StatelessWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late List<dynamic> posts = [];
   bool isLoggedIn = false;
+  int _selectedIndex = 0;
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   void initState() {
@@ -324,60 +331,150 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Widget _getBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return _homeContent();
+      case 1:
+        return const EmailFormTab();
+      case 2:
+        return Center(child: Text('Servizi (da implementare)'));
+      default:
+        return Container();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final buttonWidth = screenWidth > 500 ? 400.0 : double.infinity;
-
+    final buttonWidth = screenWidth > 300 ? 300.0 : double.infinity;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Porto di Gallura',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: const Color(0xFFFFC107), // Giallo sole
+        title: const Text('Porto di Gallura'),
+        backgroundColor: const Color(0xFFFFC107),
         elevation: 8,
         centerTitle: true,
       ),
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(
-              'https://images.unsplash.com/photo-1507525428034-b723cf961d3e', // mare al tramonto
-            ),
-            fit: BoxFit.cover,
-            opacity: 0.6,
-          ),
-        ),
-        child: Container(
-          color: const Color(0xCCFFF8E1), // sabbia chiara trasparente
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _modernButton(context, 'Visualizza Post', buttonWidth, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TabScreen(posts: posts),
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 20),
-                  _modernButton(context, 'Servizi', buttonWidth, () {}),
-                  const SizedBox(height: 20),
-                  _modernButton(context, 'Documenti', buttonWidth, () {}),
-                  const SizedBox(height: 20),
-                  _modernButton(context, 'Contatti', buttonWidth, () {}),
-                ],
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Color(0xFFFFC107),
               ),
+              child: Text(
+                'Porto Bello\ndi Gallura',
+                style: TextStyle(fontSize: 24, color: Colors.white),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.article),
+              title: const Text('Visualizza Post'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TabScreen(posts: posts),
+                  ),
+                );
+              },
+            ),
+
+          ],
+        ),
+      ),
+      body: _getBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFFFFC107),
+        selectedItemColor: const Color(0xFF1565C0),
+        unselectedItemColor: Colors.black54,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+
+          BottomNavigationBarItem(
+            icon: Icon(Icons.contact_mail),
+            label: 'Contatti',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.room_service),
+            label: 'Servizi',
+          ),
+        ],
+      ),
+    );
+  }
+  String _removeHtmlTags(String htmlText) {
+    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
+    return htmlText.replaceAll(regex, '');
+  }
+
+  Widget _homeContent() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final buttonWidth = screenWidth > 500 ? 400.0 : double.infinity;
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: NetworkImage(
+            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
+          ),
+          fit: BoxFit.cover,
+          opacity: 0.6,
+        ),
+      ),
+      child: Container(
+        color: const Color(0xCCFFF8E1),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (posts.isNotEmpty)
+                  ...posts.take(3).map((post) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            post['title']['rendered'],
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _removeHtmlTags(post['excerpt']['rendered'] ?? ''),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )),
+
+              ],
             ),
           ),
         ),
@@ -385,30 +482,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Widget _modernButton(
-      BuildContext context, String label, double width, VoidCallback onTap) {
-    return SizedBox(
-      width: width,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFFFC107), // Giallo sole
-          foregroundColor: const Color(0xFF333333), // Testo scuro
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-            side: const BorderSide(color: Color(0xFF1565C0), width: 2),
-          ),
-          elevation: 6,
-          textStyle: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        child: Text(label),
-      ),
-    );
-  }
 }
 
 class TabScreen extends StatelessWidget {
@@ -455,8 +528,8 @@ class TabScreen extends StatelessWidget {
               fontSize: 16,
             ),
             tabs: [
-              Tab(icon: Icon(Icons.article), text: 'Post'),
-              Tab(icon: Icon(Icons.email), text: 'Contatti'),
+              Tab(icon: Icon(Icons.article), text: 'Home'),
+              Tab(icon: Icon(Icons.email), text: 'Leggi Post'),
             ],
           ),
         ),
@@ -465,7 +538,6 @@ class TabScreen extends StatelessWidget {
   }
 }
 
-// PostTab Widget for displaying the posts in a beautiful card layout
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
   const PostTab({Key? key, required this.posts}) : super(key: key);
