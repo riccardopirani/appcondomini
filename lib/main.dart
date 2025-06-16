@@ -161,7 +161,7 @@ class LoginScreen extends StatelessWidget {
 
   Future<void> handleLogin(
       BuildContext context, String username, String password) async {
-    print("sono in handlelogin");
+    print("sono in handlelogin con username: "+username+" password: "+password);
     final response = await http.post(
       Uri.parse('https://portobellodigallura.it/wp-json/jwt-auth/v1/token'),
       headers: {'Content-Type': 'application/json'},
@@ -315,7 +315,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchPosts() async {
     final response = await http.get(
       Uri.parse(
-          'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc'),
+          'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc&_embed=true'
+      ),
       headers: {
         'Authorization': 'Bearer $jwtToken',
       },
@@ -323,13 +324,25 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
+
+      final filtered = data.where((post) {
+        final status = post['status'];
+        final content = post['content']['rendered'] ?? '';
+        final isPublished = status == 'publish';
+        final isPrivate = status == 'private';
+        final isAccessible = content.contains('login') == false;
+
+        return isPublished || (isPrivate && isAccessible);
+      }).toList();
+
       setState(() {
-        posts = data;
+        posts = filtered;
       });
     } else {
       throw Exception('Failed to load posts');
     }
   }
+
 
   Widget _getBody() {
     switch (_selectedIndex) {
@@ -439,7 +452,17 @@ class _MyHomePageState extends State<MyHomePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (posts.isNotEmpty)
-                  ...posts.take(3).map((post) => Padding(
+                  ...posts.where((post) {
+                    final content = post['content']['rendered'] ?? '';
+                    final excerpt = post['excerpt']['rendered'] ?? '';
+
+                    // Filtra post se il contenuto o l'excerpt contiene testo di restrizione
+                    final isRestricted = content.contains('effettuare il login') ||
+                        excerpt.contains('effettuare il login') ||
+                        excerpt.contains('devi essere loggato') ||
+                        content.trim().isEmpty;
+                    return !isRestricted;
+                  }).map((post) => Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Container(
                       decoration: BoxDecoration(
@@ -472,7 +495,9 @@ class _MyHomePageState extends State<MyHomePage> {
                         ],
                       ),
                     ),
-                  )),
+                  ))
+                else
+                Text("Nessun post presente per l'utente"),
 
               ],
             ),
@@ -529,7 +554,7 @@ class TabScreen extends StatelessWidget {
             ),
             tabs: [
               Tab(icon: Icon(Icons.article), text: 'Home'),
-              Tab(icon: Icon(Icons.email), text: 'Leggi Post'),
+              Tab(icon: Icon(Icons.email), text: 'Contatti'),
             ],
           ),
         ),
@@ -549,11 +574,30 @@ class PostTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Filtra i post che non contengono 'restricted' nel titolo
+    final visiblePosts = posts.where((post) {
+      final title = post['title']['rendered']?.toLowerCase() ?? '';
+      return !title.contains('restricted');
+    }).toList();
+
+    if (visiblePosts.isEmpty) {
+      return Center(
+        child: Text(
+          'Non hai accesso a questi post',
+          style: const TextStyle(
+            fontSize: 18,
+            color: Colors.black54,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      itemCount: posts.length,
+      itemCount: visiblePosts.length,
       itemBuilder: (context, index) {
-        final post = posts[index];
+        final post = visiblePosts[index];
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
@@ -596,7 +640,7 @@ class PostTab extends StatelessWidget {
               size: 20,
             ),
             onTap: () {
-              // Navigate to post details
+              // TODO: Navigate to post details
             },
           ),
         );
