@@ -161,7 +161,6 @@ class LoginScreen extends StatelessWidget {
 
   Future<void> handleLogin(
       BuildContext context, String username, String password) async {
-    print("sono in handlelogin con username: "+username+" password: "+password);
     final response = await http.post(
       Uri.parse('https://portobellodigallura.it/wp-json/jwt-auth/v1/token'),
       headers: {'Content-Type': 'application/json'},
@@ -171,9 +170,6 @@ class LoginScreen extends StatelessWidget {
       }),
     );
     try {
-      print(response);
-      print(response.statusCode);
-
       final data = json.decode(response.body);
       jwtToken = data['token'];
     } catch (err) {
@@ -315,8 +311,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchPosts() async {
     final response = await http.get(
       Uri.parse(
-          'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc&_embed=true'
-      ),
+          'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc&_embed=true'),
       headers: {
         'Authorization': 'Bearer $jwtToken',
       },
@@ -343,7 +338,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-
   Widget _getBody() {
     switch (_selectedIndex) {
       case 0:
@@ -359,16 +353,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final buttonWidth = screenWidth > 300 ? 300.0 : double.infinity;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Porto di Gallura'),
-        backgroundColor: const Color(0xFFFFC107),
-        elevation: 8,
-        centerTitle: true,
-      ),
-      drawer: Drawer(
+      endDrawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
@@ -394,8 +380,54 @@ class _MyHomePageState extends State<MyHomePage> {
                 );
               },
             ),
-
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Logout'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MyApp(),
+                  ),
+                );
+              },
+            ),
           ],
+        ),
+      ),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Builder(
+          builder: (context) => AppBar(
+            backgroundColor: const Color(0xFFFFC107),
+            elevation: 8,
+            automaticallyImplyLeading: false,
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Logo a sinistra
+                Row(
+                  children: [
+                    Image.asset(
+                      'assets/logo.jpg',
+                      height: 40,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Porto di Gallura',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                // Hamburger a destra
+              ],
+            ),
+          ),
         ),
       ),
       body: _getBody(),
@@ -410,7 +442,6 @@ class _MyHomePageState extends State<MyHomePage> {
             icon: Icon(Icons.home),
             label: 'Home',
           ),
-
           BottomNavigationBarItem(
             icon: Icon(Icons.contact_mail),
             label: 'Contatti',
@@ -423,6 +454,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
+
   String _removeHtmlTags(String htmlText) {
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
     return htmlText.replaceAll(regex, '');
@@ -466,42 +498,42 @@ class _MyHomePageState extends State<MyHomePage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: visiblePosts.isNotEmpty
                   ? visiblePosts.map((post) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          post['title']['rendered'],
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post['title']['rendered'],
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _removeHtmlTags(
+                                    post['excerpt']['rendered'] ?? ''),
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _removeHtmlTags(
-                              post['excerpt']['rendered'] ?? ''),
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList()
+                      );
+                    }).toList()
                   : const [NoAccessMessage()],
             ),
           ),
@@ -509,7 +541,6 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
-
 }
 
 class TabScreen extends StatelessWidget {
@@ -565,6 +596,7 @@ class TabScreen extends StatelessWidget {
     );
   }
 }
+
 class NoAccessMessage extends StatefulWidget {
   const NoAccessMessage({super.key});
 
@@ -645,6 +677,7 @@ class _NoAccessMessageState extends State<NoAccessMessage>
     );
   }
 }
+
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
   const PostTab({Key? key, required this.posts}) : super(key: key);
@@ -761,10 +794,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
       );
       return;
     }
-
-    print("Email: $email");
-    print("Telefono: $phone");
-    print("Messaggio: $message");
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Messaggio inviato!")),
