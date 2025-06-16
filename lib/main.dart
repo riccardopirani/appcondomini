@@ -562,7 +562,86 @@ class TabScreen extends StatelessWidget {
     );
   }
 }
+class NoAccessMessage extends StatefulWidget {
+  const NoAccessMessage({super.key});
 
+  @override
+  State<NoAccessMessage> createState() => _NoAccessMessageState();
+}
+
+class _NoAccessMessageState extends State<NoAccessMessage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnimation,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.lock_outline, color: Color(0xFF1ABC9C), size: 40),
+              SizedBox(height: 12),
+              Text(
+                'Non hai accesso a questi post',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  color: Color(0xFF2C3E50),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Contatta l’amministratore per ottenere i permessi necessari.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
   const PostTab({Key? key, required this.posts}) : super(key: key);
@@ -581,16 +660,7 @@ class PostTab extends StatelessWidget {
     }).toList();
 
     if (visiblePosts.isEmpty) {
-      return Center(
-        child: Text(
-          'Non hai accesso a questi post',
-          style: const TextStyle(
-            fontSize: 18,
-            color: Colors.black54,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      );
+      return const NoAccessMessage();
     }
 
     return ListView.builder(
