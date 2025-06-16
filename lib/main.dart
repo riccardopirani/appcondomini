@@ -97,7 +97,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           builder: (context) => const LoginScreen()),
                     );
                   },
-                  child: const Text('Inizia'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: Colors.green,
@@ -106,6 +105,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     textStyle: const TextStyle(fontSize: 18),
                   ),
+                  child: const Text('Inizia'),
                 ),
               ),
             ),
@@ -183,15 +183,15 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _usernameController = TextEditingController();
-    final _passwordController = TextEditingController();
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               image: DecorationImage(
                 image: AssetImage("assets/2.jpeg"),
                 fit: BoxFit.cover,
@@ -224,7 +224,7 @@ class LoginScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 30),
                     TextField(
-                      controller: _usernameController,
+                      controller: usernameController,
                       decoration: InputDecoration(
                         labelText: 'Nome utente',
                         labelStyle: const TextStyle(color: Colors.black),
@@ -237,7 +237,7 @@ class LoginScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     TextField(
-                      controller: _passwordController,
+                      controller: passwordController,
                       obscureText: true,
                       decoration: InputDecoration(
                         labelText: 'Password',
@@ -251,8 +251,8 @@ class LoginScreen extends StatelessWidget {
                     const SizedBox(height: 30),
                     ElevatedButton(
                       onPressed: () {
-                        var username = _usernameController.text;
-                        var password = _passwordController.text;
+                        var username = usernameController.text;
+                        var password = passwordController.text;
                         if (username.isEmpty || password.isEmpty) {
                           username = "admin";
                           password = "7e97b7pHD4mW.GF7";
@@ -345,7 +345,40 @@ class _MyHomePageState extends State<MyHomePage> {
       case 1:
         return const EmailFormTab();
       case 2:
-        return Center(child: Text('Servizi (da implementare)'));
+        return const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.anchor,
+                size: 80,
+                color: Color(0xFF1E88E5), // Blu mare
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Servizi in arrivo!',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E88E5),
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Stiamo preparando il meglio per te...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 30),
+              CircularProgressIndicator(
+                color: Color(0xFF1E88E5),
+              ),
+            ],
+          ),
+        );
       default:
         return Container();
     }
@@ -355,52 +388,68 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       endDrawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Color(0xFFFFC107),
+        child: Container(
+          color: const Color(0xFFE0F7FA), // Azzurro mare
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0288D1), // Blu mare
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Image.asset('assets/logo.png', height: 48),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Porto Bello\ndi Gallura',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Text(
-                'Porto Bello\ndi Gallura',
-                style: TextStyle(fontSize: 24, color: Colors.white),
+              ListTile(
+                leading: const Icon(Icons.article, color: Colors.black87),
+                title: const Text('Visualizza Post'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TabScreen(posts: posts),
+                    ),
+                  );
+                },
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.article),
-              title: const Text('Visualizza Post'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TabScreen(posts: posts),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MyApp(),
-                  ),
-                );
-              },
-            ),
-          ],
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.black87),
+                title: const Text('Logout'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MyApp(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: Builder(
           builder: (context) => AppBar(
-            backgroundColor: const Color(0xFFFFC107),
+            backgroundColor: const Color(0xFFFFC107), // Giallo sole
             elevation: 8,
             automaticallyImplyLeading: false,
             title: Row(
@@ -424,7 +473,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
-                // Hamburger a destra
+
               ],
             ),
           ),
@@ -455,15 +504,13 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+
   String _removeHtmlTags(String htmlText) {
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
     return htmlText.replaceAll(regex, '');
   }
 
   Widget _homeContent() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final buttonWidth = screenWidth > 500 ? 400.0 : double.infinity;
-
     final visiblePosts = posts.where((post) {
       final title = post['title']['rendered']?.toLowerCase() ?? '';
       final content = post['content']['rendered'] ?? '';
@@ -546,7 +593,7 @@ class _MyHomePageState extends State<MyHomePage> {
 class TabScreen extends StatelessWidget {
   final List<dynamic> posts;
 
-  const TabScreen({Key? key, required this.posts}) : super(key: key);
+  const TabScreen({super.key, required this.posts});
 
   @override
   Widget build(BuildContext context) {
@@ -639,17 +686,17 @@ class _NoAccessMessageState extends State<NoAccessMessage>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 color: Colors.black26,
                 blurRadius: 20,
-                offset: const Offset(0, 8),
+                offset: Offset(0, 8),
               ),
             ],
           ),
-          child: Column(
+          child: const Column(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Icon(Icons.lock_outline, color: Color(0xFF1ABC9C), size: 40),
               SizedBox(height: 12),
               Text(
@@ -680,7 +727,7 @@ class _NoAccessMessageState extends State<NoAccessMessage>
 
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
-  const PostTab({Key? key, required this.posts}) : super(key: key);
+  const PostTab({super.key, required this.posts});
 
   String _removeHtmlTags(String htmlText) {
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
@@ -755,7 +802,7 @@ class PostTab extends StatelessWidget {
 }
 
 class EmailFormTab extends StatefulWidget {
-  const EmailFormTab({Key? key}) : super(key: key);
+  const EmailFormTab({super.key});
 
   @override
   State<EmailFormTab> createState() => _EmailFormTabState();
@@ -807,32 +854,38 @@ class _EmailFormTabState extends State<EmailFormTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8E1), // Sabbia chiara
+      backgroundColor: const Color(0xFFE0F7FA), // Azzurro mare
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+                  color: Colors.blueGrey.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(28.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Icon(
+                  Icons.anchor,
+                  size: 48,
+                  color: Color(0xFF0288D1), // Blu mare
+                ),
+                const SizedBox(height: 12),
                 const Text(
-                  'Contattaci',
+                  'Contattaci al Porto',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black, // Testo principale nero
+                    color: Color(0xFF01579B),
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -857,23 +910,33 @@ class _EmailFormTabState extends State<EmailFormTab> {
                   icon: Icons.message,
                   maxLines: 4,
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 30),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.send, color: Colors.black),
+                  icon: const Icon(Icons.send, color: Colors.white),
                   label: const Text('Invia'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFC107), // Giallo sole
-                    foregroundColor: Colors.black, // Testo nero
+                    backgroundColor: const Color(0xFFFFD54F), // Giallo sole
+                    foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
+                      borderRadius: BorderRadius.circular(30),
                     ),
+                    elevation: 4,
                     textStyle: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   onPressed: _submitForm,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Ti risponderemo al più presto via email o telefono.\nGrazie per averci contattato!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -882,6 +945,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
       ),
     );
   }
+
 
   Widget _buildTextField({
     required TextEditingController controller,
