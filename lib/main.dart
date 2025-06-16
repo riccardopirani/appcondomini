@@ -432,6 +432,20 @@ class _MyHomePageState extends State<MyHomePage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final buttonWidth = screenWidth > 500 ? 400.0 : double.infinity;
 
+    final visiblePosts = posts.where((post) {
+      final title = post['title']['rendered']?.toLowerCase() ?? '';
+      final content = post['content']['rendered'] ?? '';
+      final excerpt = post['excerpt']['rendered'] ?? '';
+
+      final hasRestrictedTitle = title.contains('restricted');
+      final hasRestrictedContent = content.contains('effettuare il login') ||
+          excerpt.contains('effettuare il login') ||
+          excerpt.contains('devi essere loggato') ||
+          content.trim().isEmpty;
+
+      return !hasRestrictedTitle && !hasRestrictedContent;
+    }).toList();
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -450,56 +464,45 @@ class _MyHomePageState extends State<MyHomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (posts.isNotEmpty)
-                  ...posts.where((post) {
-                    final content = post['content']['rendered'] ?? '';
-                    final excerpt = post['excerpt']['rendered'] ?? '';
-
-                    // Filtra post se il contenuto o l'excerpt contiene testo di restrizione
-                    final isRestricted = content.contains('effettuare il login') ||
-                        excerpt.contains('effettuare il login') ||
-                        excerpt.contains('devi essere loggato') ||
-                        content.trim().isEmpty;
-                    return !isRestricted;
-                  }).map((post) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            post['title']['rendered'],
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _removeHtmlTags(post['excerpt']['rendered'] ?? ''),
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
+              children: visiblePosts.isNotEmpty
+                  ? visiblePosts.map((post) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ))
-                else
-                Text("Nessun post presente per l'utente"),
-
-              ],
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post['title']['rendered'],
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _removeHtmlTags(
+                              post['excerpt']['rendered'] ?? ''),
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList()
+                  : const [NoAccessMessage()],
             ),
           ),
         ),
@@ -653,7 +656,6 @@ class PostTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Filtra i post che non contengono 'restricted' nel titolo
     final visiblePosts = posts.where((post) {
       final title = post['title']['rendered']?.toLowerCase() ?? '';
       return !title.contains('restricted');
