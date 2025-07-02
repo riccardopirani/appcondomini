@@ -99,7 +99,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: Color(0xFFFFC107), // Giallo sole per il pulsante
+                    backgroundColor:
+                        Color(0xFFFFC107), // Giallo sole per il pulsante
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -107,7 +108,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   child: const Text(
                     'Inizia',
-                    style: TextStyle(color: Colors.white), // Testo bianco per contrasto
+                    style: TextStyle(
+                        color: Colors.white), // Testo bianco per contrasto
                   ),
                 ),
               ),
@@ -146,10 +148,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const SizedBox(height: 16),
             Text(
               description,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium!
-                  .copyWith(fontSize: 16, color: Colors.white70), // Testo bianco chiaro
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  fontSize: 16, color: Colors.white70), // Testo bianco chiaro
               textAlign: TextAlign.center,
             ),
           ],
@@ -205,87 +205,90 @@ class LoginScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24.0),
             child: Center(
                 child: Card(
-                  color: Colors.white.withOpacity(0.9), // Card con opacità per contrastare il blu
-                  elevation: 10,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset("assets/logo.png", width: 80, height: 80),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Login',
-                          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                            color: Colors.blue, // Titolo blu per richiamare il mare
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        TextField(
-                          controller: usernameController,
-                          decoration: InputDecoration(
-                            labelText: 'Nome utente',
-                            labelStyle: const TextStyle(color: Colors.black),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            prefixIcon:
-                            const Icon(Icons.person, color: Colors.blue),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextField(
-                          controller: passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            labelStyle: const TextStyle(color: Colors.black),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            prefixIcon: const Icon(Icons.lock, color: Colors.blue),
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        ElevatedButton(
-                          onPressed: () {
-                            var username = usernameController.text;
-                            var password = passwordController.text;
-                            if (username.isEmpty || password.isEmpty) {
-                              username = "admin";
-                              password = "7e97b7pHD4mW.GF7";
-                            }
-                            if (username.isNotEmpty && password.isNotEmpty) {
-                              handleLogin(context, username, password);
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Compila tutti i campi'),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFFFFC107), // Giallo sole
-                            foregroundColor:
-                            Colors.white, // Testo del bottone bianco
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 14, horizontal: 40),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            textStyle: const TextStyle(fontSize: 16),
-                          ),
-                          child: const Text('Login'),
-                        ),
-                      ],
+              color: Colors.white
+                  .withOpacity(0.9), // Card con opacità per contrastare il blu
+              elevation: 10,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset("assets/logo.png", width: 80, height: 80),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Login',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium!.copyWith(
+                                color: Colors
+                                    .blue, // Titolo blu per richiamare il mare
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
-                  ),
-                )),
+                    const SizedBox(height: 30),
+                    TextField(
+                      controller: usernameController,
+                      decoration: InputDecoration(
+                        labelText: 'Nome utente',
+                        labelStyle: const TextStyle(color: Colors.black),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        prefixIcon:
+                            const Icon(Icons.person, color: Colors.blue),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: const TextStyle(color: Colors.black),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        prefixIcon: const Icon(Icons.lock, color: Colors.blue),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton(
+                      onPressed: () {
+                        var username = usernameController.text;
+                        var password = passwordController.text;
+                        if (username.isEmpty || password.isEmpty) {
+                          username = "admin";
+                          password = "7e97b7pHD4mW.GF7";
+                        }
+                        if (username.isNotEmpty && password.isNotEmpty) {
+                          handleLogin(context, username, password);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Compila tutti i campi'),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFFFFC107), // Giallo sole
+                        foregroundColor:
+                            Colors.white, // Testo del bottone bianco
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 14, horizontal: 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        textStyle: const TextStyle(fontSize: 16),
+                      ),
+                      child: const Text('Login'),
+                    ),
+                  ],
+                ),
+              ),
+            )),
           ),
         ],
       ),
@@ -475,7 +478,6 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
-
               ],
             ),
           ),
@@ -505,7 +507,6 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
     );
   }
-
 
   String _removeHtmlTags(String htmlText) {
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
@@ -947,7 +948,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
       ),
     );
   }
-
 
   Widget _buildTextField({
     required TextEditingController controller,
