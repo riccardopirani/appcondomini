@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 String? jwtToken;
 
@@ -201,94 +202,108 @@ class LoginScreen extends StatelessWidget {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Center(
-                child: Card(
-              color: Colors.white
-                  .withOpacity(0.9), // Card con opacità per contrastare il blu
-              elevation: 10,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset("assets/logo.png", width: 80, height: 80),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Login',
-                      style:
-                          Theme.of(context).textTheme.headlineMedium!.copyWith(
-                                color: Colors
-                                    .blue, // Titolo blu per richiamare il mare
-                                fontWeight: FontWeight.bold,
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Card(
+                color: Colors.white.withOpacity(0.95),
+                elevation: 10,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset("assets/logo.png", width: 80, height: 80),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Login',
+                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      TextField(
+                        controller: usernameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nome utente',
+                          labelStyle: const TextStyle(color: Colors.black),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          prefixIcon: const Icon(Icons.person, color: Colors.blue),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          labelStyle: const TextStyle(color: Colors.black),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          prefixIcon: const Icon(Icons.lock, color: Colors.blue),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      ElevatedButton(
+                        onPressed: () {
+                          var username = usernameController.text;
+                          var password = passwordController.text;
+                          if (username.isEmpty || password.isEmpty) {
+                            username = "admin";
+                            password = "7e97b7pHD4mW.GF7";
+                          }
+                          if (username.isNotEmpty && password.isNotEmpty) {
+                            handleLogin(context, username, password);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Compila tutti i campi'),
                               ),
-                    ),
-                    const SizedBox(height: 30),
-                    TextField(
-                      controller: usernameController,
-                      decoration: InputDecoration(
-                        labelText: 'Nome utente',
-                        labelStyle: const TextStyle(color: Colors.black),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFC107),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 14, horizontal: 40),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: const TextStyle(fontSize: 16),
                         ),
-                        prefixIcon:
-                            const Icon(Icons.person, color: Colors.blue),
+                        child: const Text('Login'),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: passwordController,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        labelStyle: const TextStyle(color: Colors.black),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        prefixIcon: const Icon(Icons.lock, color: Colors.blue),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              launchUrl(Uri.parse('https://tuosito.it/wp-login.php?action=register'));
+                            },
+                            child: const Text('Crea nuovo utente'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              launchUrl(Uri.parse('https://tuosito.it/wp-login.php?action=lostpassword'));
+                            },
+                            child: const Text('Cambio password'),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: () {
-                        var username = usernameController.text;
-                        var password = passwordController.text;
-                        if (username.isEmpty || password.isEmpty) {
-                          username = "admin";
-                          password = "7e97b7pHD4mW.GF7";
-                        }
-                        if (username.isNotEmpty && password.isNotEmpty) {
-                          handleLogin(context, username, password);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Compila tutti i campi'),
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFFFFC107), // Giallo sole
-                        foregroundColor:
-                            Colors.white, // Testo del bottone bianco
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 14, horizontal: 40),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                      child: const Text('Login'),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            )),
+            ),
           ),
         ],
       ),
