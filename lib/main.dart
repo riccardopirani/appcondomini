@@ -512,11 +512,15 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.contact_mail),
-            label: 'Contatti',
+            label: 'Servizi',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.room_service),
-            label: 'Servizi',
+            label: 'Articoli',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera_alt),
+            label: 'WebCam',
           ),
         ],
       ),
