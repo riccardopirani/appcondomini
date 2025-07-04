@@ -1,15 +1,127 @@
 import 'dart:convert';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 String? jwtToken;
-
+String urlSito="https://www.new.portobellodigallura.it";
 void main() {
   runApp(const MyApp());
 }
 
+
+class WebcamScreen extends StatelessWidget {
+  const WebcamScreen({super.key});
+
+  Future<void> _openWebView(BuildContext context, String title, String url) async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final isConnected = connectivityResult != ConnectivityResult.none;
+
+    if (!isConnected) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Connessione assente'),
+          content: const Text('Webcam non disponibile senza connessione Internet.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            backgroundColor: const Color(0xFFFFC107),
+          ),
+          body: WebViewWidget(
+            controller: WebViewController()
+              ..setJavaScriptMode(JavaScriptMode.unrestricted)
+              ..loadRequest(Uri.parse(url)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Webcam Live'),
+        backgroundColor: const Color(0xFFFFC107),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.videocam),
+              label: const Text('Webcam Porto'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 60),
+              ),
+              onPressed: () {
+                _openWebView(
+                  context,
+                  'Webcam Porto',
+                  'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.landscape),
+              label: const Text('Webcam Panoramica'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 60),
+              ),
+              onPressed: () {
+                _openWebView(
+                  context,
+                  'Webcam Panoramica',
+                  'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.cloud),
+              label: const Text('Stazione Meteo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 60),
+              ),
+              onPressed: () {
+                _openWebView(
+                  context,
+                  'Stazione Meteo',
+                  'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -256,8 +368,8 @@ class LoginScreen extends StatelessWidget {
                           var username = usernameController.text;
                           var password = passwordController.text;
                           if (username.isEmpty || password.isEmpty) {
-                            username = "admin";
-                            password = "7e97b7pHD4mW.GF7";
+                            username = "Riccardo";
+                            password = "Aud4DMehyAz%nuFZjaPFBG0A";
                           }
                           if (username.isNotEmpty && password.isNotEmpty) {
                             handleLogin(context, username, password);
@@ -287,13 +399,13 @@ class LoginScreen extends StatelessWidget {
                         children: [
                           TextButton(
                             onPressed: () {
-                              launchUrl(Uri.parse('https://tuosito.it/wp-login.php?action=register'));
+                              launchUrl(Uri.parse(urlSito+'/wp-login.php?action=register'));
                             },
                             child: const Text('Crea nuovo utente'),
                           ),
                           TextButton(
                             onPressed: () {
-                              launchUrl(Uri.parse('https://tuosito.it/wp-login.php?action=lostpassword'));
+                              launchUrl(Uri.parse(urlSito+'/wp-login.php?action=lostpassword'));
                             },
                             child: const Text('Cambio password'),
                           ),
@@ -331,7 +443,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchPosts() async {
     final response = await http.get(
       Uri.parse(
-          'https://portobellodigallura.it/new/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc&_embed=true'),
+        urlSito+'/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc&_embed=true'),
       headers: {
         'Authorization': 'Bearer $jwtToken',
       },
@@ -399,7 +511,10 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
           ),
         );
-      default:
+
+      case 3:
+        return const WebcamScreen();
+        default:
         return Container();
     }
   }
