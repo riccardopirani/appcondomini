@@ -284,10 +284,11 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  const MyHomePage({super.key, required this.title,required this.userEmail,required this.userName});
 
   final String title;
-
+final String userEmail;
+final String userName;
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
@@ -411,7 +412,7 @@ class LoginScreen extends StatelessWidget {
   Future<void> handleLogin(
       BuildContext context, String username, String password) async {
     final response = await http.post(
-      Uri.parse('https://portobellodigallura.it/wp-json/jwt-auth/v1/token'),
+      Uri.parse(urlSito+'/wp-json/jwt-auth/v1/token'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'username': username,
@@ -426,7 +427,7 @@ class LoginScreen extends StatelessWidget {
     }
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const MyHomePage(title: '')),
+      MaterialPageRoute(builder: (context) => const MyHomePage(title: '',userEmail: '',userName: '',)),
     );
   }
 
@@ -567,17 +568,71 @@ class _MyHomePageState extends State<MyHomePage> {
   late List<dynamic> posts = [];
   bool isLoggedIn = false;
   int _selectedIndex = 0;
+  Map<String, dynamic>? userData;
+  bool isLoadingUserData = true;
+
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
+  List<dynamic> wpMenuItems = [];
+  bool isLoadingMenu = true;
+  Future<void> fetchUserData() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
+        headers: {
+          'Authorization': 'Bearer $jwtToken',
+        },
+      );
 
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          userData = data;
+          isLoadingUserData = false;
+        });
+      } else {
+        throw Exception('Errore recupero dati utente');
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingUserData = false;
+      });
+      print('Errore recupero utente: $e');
+    }
+  }
   @override
   void initState() {
     super.initState();
+    fetchWpMenu();
     fetchPosts();
+    fetchUserData();
+  }
+
+  Future<void> fetchWpMenu() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp-api-menus/v2/menus/1'), // 1 è l'ID del menu primario, cambia se serve
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          wpMenuItems = data['items'] ?? [];
+          isLoadingMenu = false;
+        });
+      } else {
+        throw Exception('Errore caricamento menu');
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingMenu = false;
+      });
+      print(e);
+    }
   }
 
   Future<void> fetchPosts() async {
@@ -615,10 +670,12 @@ class _MyHomePageState extends State<MyHomePage> {
       case 0:
         return _homeContent();
       case 1:
-        return const EmailFormTab();
+        return ContactOptionsScreen(
+          userName: userData?['name'] ?? '',
+          userEmail: userData?['email'] ?? '',
+        );
       case 2:
         return CategoryPostViewer(posts: posts);
-
       case 3:
         return const WebcamScreen();
       default:
@@ -628,6 +685,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoadingUserData) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
     return Scaffold(
       endDrawer: Drawer(
         child: Container(
@@ -659,13 +721,48 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               ListTile(
                 leading: const Icon(Icons.article, color: Colors.black87),
-                title: const Text('Visualizza Post'),
+                title: const Text('Identità'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => TabScreen(posts: posts),
+                      builder: (context) =>  WebViewPage(
+                        title: 'Identità',
+                        url: 'https://www.new.portobellodigallura.it/dove-siamo/',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.article, color: Colors.black87),
+                title: const Text('Numeri utili'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>  WebViewPage(
+                        title: 'Identità',
+                        url: 'https://www.new.portobellodigallura.it/numeri-util/',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.article, color: Colors.black87),
+                title: const Text('Servizi'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>  WebViewPage(
+                        title: 'Identità',
+                        url: 'https://www.new.portobellodigallura.it/servizi/',
+                      ),
                     ),
                   );
                 },
@@ -866,11 +963,38 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+class WebViewPage extends StatelessWidget {
+  final String title;
+  final String url;
+
+   WebViewPage({
+    super.key,
+    required this.title,
+    required this.url,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: WebViewWidget(
+        controller: WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..loadRequest(Uri.parse(url)),
+      ),
+    );
+  }
+}
 class TabScreen extends StatelessWidget {
   final List<dynamic> posts;
+  final String userName;
+  final String userEmail;
 
-  const TabScreen({super.key, required this.posts});
-
+  const TabScreen({
+    super.key,
+    required this.posts,
+    required this.userName,
+    required this.userEmail,
+  });
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -895,7 +1019,11 @@ class TabScreen extends StatelessWidget {
             posts.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : PostTab(posts: posts),
-            const EmailFormTab(),
+            EmailFormTab(
+              userName: userName,
+              userEmail: userEmail,
+              subject: "Contatti",
+            ),
           ],
         ),
         bottomNavigationBar: Container(
@@ -1077,43 +1205,118 @@ class PostTab extends StatelessWidget {
   }
 }
 
+class ContactOptionsScreen extends StatelessWidget {
+  final String userName;
+  final String userEmail;
+
+  const ContactOptionsScreen({
+    super.key,
+    required this.userName,
+    required this.userEmail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFE0F7FA), // Azzurro mare
+      appBar: AppBar(
+        title: const Text("Contatta il Porto"),
+        backgroundColor: const Color(0xFFFFC107),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildButton(context, "Bombole Gas", Icons.local_gas_station),
+            const SizedBox(height: 20),
+            _buildButton(context, "Rifiuti", Icons.delete),
+            const SizedBox(height: 20),
+            _buildButton(context, "Guasto", Icons.build),
+            const SizedBox(height: 20),
+            _buildButton(context, "Porto", Icons.anchor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButton(BuildContext context, String label, IconData icon) {
+    return SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton.icon(
+        icon: Icon(icon, color: Colors.white),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0288D1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmailFormTab(
+                userName: userName,
+                userEmail: userEmail,
+                subject: label,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 class EmailFormTab extends StatefulWidget {
-  const EmailFormTab({super.key});
+  final String userName;
+  final String userEmail;
+  final String subject;
+
+  const EmailFormTab({
+    super.key,
+    required this.userName,
+    required this.userEmail,
+    required this.subject,
+  });
 
   @override
   State<EmailFormTab> createState() => _EmailFormTabState();
 }
-
 class _EmailFormTabState extends State<EmailFormTab> {
-  final _emailController = TextEditingController();
+  late final TextEditingController _emailController;
+  late final TextEditingController _nameController;
   final _phoneController = TextEditingController();
   final _messageController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.userEmail);
+    _nameController = TextEditingController(text: widget.userName);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
+
   void _submitForm() {
     final email = _emailController.text.trim();
+    final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
     final message = _messageController.text.trim();
 
-    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+\$');
-    final phoneRegex = RegExp(r'^[0-9]{6,15}\$');
-
-    if (!emailRegex.hasMatch(email)) {
+    if (email.isEmpty || message.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Inserisci un'email valida")),
-      );
-      return;
-    }
-
-    if (email.isEmpty || message.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email e messaggio sono obbligatori")),
-      );
-      return;
-    }
-
-    if (phone.isNotEmpty && !phoneRegex.hasMatch(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Inserisci un numero di telefono valido")),
+        const SnackBar(content: Text("Compila tutti i campi obbligatori")),
       );
       return;
     }
@@ -1122,7 +1325,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
       const SnackBar(content: Text("Messaggio inviato!")),
     );
 
-    _emailController.clear();
     _phoneController.clear();
     _messageController.clear();
   }
@@ -1130,7 +1332,11 @@ class _EmailFormTabState extends State<EmailFormTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE0F7FA), // Azzurro mare
+      backgroundColor: const Color(0xFFE0F7FA),
+      appBar: AppBar(
+        title: Text(widget.subject),
+        backgroundColor: const Color(0xFFFFC107),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -1150,14 +1356,10 @@ class _EmailFormTabState extends State<EmailFormTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
-                  Icons.anchor,
-                  size: 48,
-                  color: Color(0xFF0288D1), // Blu mare
-                ),
+                const Icon(Icons.contact_mail, size: 48, color: Color(0xFF0288D1)),
                 const SizedBox(height: 12),
                 const Text(
-                  'Contattaci al Porto',
+                  'Invia un messaggio',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -1167,6 +1369,12 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 ),
                 const SizedBox(height: 20),
                 _buildTextField(
+                  controller: _nameController,
+                  label: 'Nome *',
+                  icon: Icons.person,
+                ),
+                const SizedBox(height: 15),
+                _buildTextField(
                   controller: _emailController,
                   label: 'Email *',
                   icon: Icons.email,
@@ -1175,7 +1383,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
                 const SizedBox(height: 15),
                 _buildTextField(
                   controller: _phoneController,
-                  label: 'Numero di Telefono',
+                  label: 'Telefono',
                   icon: Icons.phone,
                   keyboardType: TextInputType.phone,
                 ),
@@ -1191,7 +1399,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
                   icon: const Icon(Icons.send, color: Colors.white),
                   label: const Text('Invia'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD54F), // Giallo sole
+                    backgroundColor: const Color(0xFFFFD54F),
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -1204,15 +1412,6 @@ class _EmailFormTabState extends State<EmailFormTab> {
                     ),
                   ),
                   onPressed: _submitForm,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Ti risponderemo al più presto via email o telefono.\nGrazie per averci contattato!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                  textAlign: TextAlign.center,
                 ),
               ],
             ),
