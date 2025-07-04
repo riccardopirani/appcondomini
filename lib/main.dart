@@ -8,6 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 String? jwtToken;
 String urlSito = "https://www.new.portobellodigallura.it";
+
 void main() {
   runApp(const MyApp());
 }
@@ -284,11 +285,16 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title,required this.userEmail,required this.userName});
+  const MyHomePage(
+      {super.key,
+      required this.title,
+      required this.userEmail,
+      required this.userName});
 
   final String title;
-final String userEmail;
-final String userName;
+  final String userEmail;
+  final String userName;
+
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
@@ -412,7 +418,7 @@ class LoginScreen extends StatelessWidget {
   Future<void> handleLogin(
       BuildContext context, String username, String password) async {
     final response = await http.post(
-      Uri.parse(urlSito+'/wp-json/jwt-auth/v1/token'),
+      Uri.parse(urlSito + '/wp-json/jwt-auth/v1/token'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'username': username,
@@ -427,7 +433,12 @@ class LoginScreen extends StatelessWidget {
     }
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const MyHomePage(title: '',userEmail: '',userName: '',)),
+      MaterialPageRoute(
+          builder: (context) => const MyHomePage(
+                title: '',
+                userEmail: '',
+                userName: '',
+              )),
     );
   }
 
@@ -571,14 +582,15 @@ class _MyHomePageState extends State<MyHomePage> {
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
 
-
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
+
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
+
   Future<void> fetchUserData() async {
     try {
       final response = await http.get(
@@ -604,6 +616,7 @@ class _MyHomePageState extends State<MyHomePage> {
       print('Errore recupero utente: $e');
     }
   }
+
   @override
   void initState() {
     super.initState();
@@ -615,7 +628,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchWpMenu() async {
     try {
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp-api-menus/v2/menus/1'), // 1 è l'ID del menu primario, cambia se serve
+        Uri.parse(
+            '$urlSito/wp-json/wp-api-menus/v2/menus/1'), // 1 è l'ID del menu primario, cambia se serve
       );
 
       if (response.statusCode == 200) {
@@ -638,7 +652,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchPosts() async {
     final response = await http.get(
       Uri.parse(
-        '$urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term'),
+          '$urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term'),
       headers: {
         'Authorization': 'Bearer $jwtToken',
       },
@@ -727,9 +741,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>  WebViewPage(
+                      builder: (context) => WebViewPage(
                         title: 'Identità',
-                        url: 'https://www.new.portobellodigallura.it/dove-siamo/',
+                        url:
+                            'https://www.new.portobellodigallura.it/dove-siamo/',
                       ),
                     ),
                   );
@@ -743,9 +758,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>  WebViewPage(
+                      builder: (context) => WebViewPage(
                         title: 'Identità',
-                        url: 'https://www.new.portobellodigallura.it/numeri-util/',
+                        url:
+                            'https://www.new.portobellodigallura.it/numeri-util/',
                       ),
                     ),
                   );
@@ -759,7 +775,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>  WebViewPage(
+                      builder: (context) => WebViewPage(
                         title: 'Identità',
                         url: 'https://www.new.portobellodigallura.it/servizi/',
                       ),
@@ -967,7 +983,7 @@ class WebViewPage extends StatelessWidget {
   final String title;
   final String url;
 
-   WebViewPage({
+  WebViewPage({
     super.key,
     required this.title,
     required this.url,
@@ -984,6 +1000,7 @@ class WebViewPage extends StatelessWidget {
     );
   }
 }
+
 class TabScreen extends StatelessWidget {
   final List<dynamic> posts;
   final String userName;
@@ -995,6 +1012,7 @@ class TabScreen extends StatelessWidget {
     required this.userName,
     required this.userEmail,
   });
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -1029,10 +1047,13 @@ class TabScreen extends StatelessWidget {
         bottomNavigationBar: Container(
           color: const Color(0xFFFFC107), // Giallo sole
           child: const TabBar(
-            indicatorColor: Color(0xFF1565C0), // Blu mare
+            indicatorColor: Color(0xFF1565C0),
+            // Blu mare
             indicatorWeight: 4,
-            labelColor: Colors.black, // Testo attivo
-            unselectedLabelColor: Colors.black54, // Testo non attivo
+            labelColor: Colors.black,
+            // Testo attivo
+            unselectedLabelColor: Colors.black54,
+            // Testo non attivo
             labelStyle: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
@@ -1131,6 +1152,7 @@ class _NoAccessMessageState extends State<NoAccessMessage>
 
 class PostTab extends StatelessWidget {
   final List<dynamic> posts;
+
   const PostTab({super.key, required this.posts});
 
   String _removeHtmlTags(String htmlText) {
@@ -1271,6 +1293,7 @@ class ContactOptionsScreen extends StatelessWidget {
     );
   }
 }
+
 class EmailFormTab extends StatefulWidget {
   final String userName;
   final String userEmail;
@@ -1286,6 +1309,7 @@ class EmailFormTab extends StatefulWidget {
   @override
   State<EmailFormTab> createState() => _EmailFormTabState();
 }
+
 class _EmailFormTabState extends State<EmailFormTab> {
   late final TextEditingController _emailController;
   late final TextEditingController _nameController;
@@ -1356,7 +1380,8 @@ class _EmailFormTabState extends State<EmailFormTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.contact_mail, size: 48, color: Color(0xFF0288D1)),
+                const Icon(Icons.contact_mail,
+                    size: 48, color: Color(0xFF0288D1)),
                 const SizedBox(height: 12),
                 const Text(
                   'Invia un messaggio',
