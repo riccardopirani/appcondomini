@@ -7,16 +7,147 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 String? jwtToken;
-String urlSito="https://www.new.portobellodigallura.it";
+String urlSito = "https://www.new.portobellodigallura.it";
 void main() {
   runApp(const MyApp());
 }
 
+class CategoryPostViewer extends StatelessWidget {
+  final List<dynamic> posts;
+
+  const CategoryPostViewer({super.key, required this.posts});
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<String, List<dynamic>> categoryMap = {};
+
+    for (final post in posts) {
+      final categories = post['_embedded']?['wp:term']?[0];
+      final names = (categories != null && categories.isNotEmpty)
+          ? categories.map<String>((c) => c['name'] as String).toList()
+          : ['Senza categoria'];
+
+      for (final name in names) {
+        categoryMap.putIfAbsent(name, () => []).add(post);
+      }
+    }
+
+    final categories = categoryMap.keys.toList()..sort();
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: categories.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final category = categories[index];
+        final postCount = categoryMap[category]?.length ?? 0;
+
+        return Card(
+          elevation: 2,
+          child: ListTile(
+            title: Text(
+              category,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Text('$postCount post'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CategoryPostsScreen(
+                    category: category,
+                    posts: categoryMap[category] ?? [],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class CategoryPostsScreen extends StatelessWidget {
+  final String category;
+  final List<dynamic> posts;
+
+  const CategoryPostsScreen({
+    super.key,
+    required this.category,
+    required this.posts,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(category),
+        backgroundColor: const Color(0xFFFFC107),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: posts.length,
+        itemBuilder: (context, index) {
+          final post = posts[index];
+          final title = post['title']['rendered'] ?? '';
+          final excerpt = post['excerpt']['rendered'] ?? '';
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.all(16),
+              title: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2C3E50),
+                ),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  _removeHtmlTags(excerpt),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _removeHtmlTags(String htmlText) {
+    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
+    return htmlText.replaceAll(regex, '');
+  }
+}
 
 class WebcamScreen extends StatelessWidget {
   const WebcamScreen({super.key});
 
-  Future<void> _openWebView(BuildContext context, String title, String url) async {
+  Future<void> _openWebView(
+      BuildContext context, String title, String url) async {
     final connectivityResult = await Connectivity().checkConnectivity();
     final isConnected = connectivityResult != ConnectivityResult.none;
 
@@ -25,7 +156,8 @@ class WebcamScreen extends StatelessWidget {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Connessione assente'),
-          content: const Text('Webcam non disponibile senza connessione Internet.'),
+          content:
+              const Text('Webcam non disponibile senza connessione Internet.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -122,6 +254,7 @@ class WebcamScreen extends StatelessWidget {
     );
   }
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -172,7 +305,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF2E86C1), // Blu mare come sfondo
+      backgroundColor: const Color(0xFF2E86C1), // Blu mare come sfondo
       body: SafeArea(
         child: Column(
           children: [
@@ -213,7 +346,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor:
-                        Color(0xFFFFC107), // Giallo sole per il pulsante
+                        const Color(0xFFFFC107), // Giallo sole per il pulsante
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -332,10 +465,13 @@ class LoginScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         'Login',
-                        style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium!
+                            .copyWith(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 30),
                       TextField(
@@ -346,7 +482,8 @@ class LoginScreen extends StatelessWidget {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
-                          prefixIcon: const Icon(Icons.person, color: Colors.blue),
+                          prefixIcon:
+                              const Icon(Icons.person, color: Colors.blue),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -359,7 +496,8 @@ class LoginScreen extends StatelessWidget {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
-                          prefixIcon: const Icon(Icons.lock, color: Colors.blue),
+                          prefixIcon:
+                              const Icon(Icons.lock, color: Colors.blue),
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -399,13 +537,15 @@ class LoginScreen extends StatelessWidget {
                         children: [
                           TextButton(
                             onPressed: () {
-                              launchUrl(Uri.parse(urlSito+'/wp-login.php?action=register'));
+                              launchUrl(Uri.parse(
+                                  '$urlSito/wp-login.php?action=register'));
                             },
                             child: const Text('Crea nuovo utente'),
                           ),
                           TextButton(
                             onPressed: () {
-                              launchUrl(Uri.parse(urlSito+'/wp-login.php?action=lostpassword'));
+                              launchUrl(Uri.parse(
+                                  '$urlSito/wp-login.php?action=lostpassword'));
                             },
                             child: const Text('Cambio password'),
                           ),
@@ -443,7 +583,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> fetchPosts() async {
     final response = await http.get(
       Uri.parse(
-        urlSito+'/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc&_embed=true'),
+        '$urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term'),
       headers: {
         'Authorization': 'Bearer $jwtToken',
       },
@@ -477,44 +617,11 @@ class _MyHomePageState extends State<MyHomePage> {
       case 1:
         return const EmailFormTab();
       case 2:
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.anchor,
-                size: 80,
-                color: Color(0xFF1E88E5), // Blu mare
-              ),
-              SizedBox(height: 20),
-              Text(
-                'Servizi in arrivo!',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E88E5),
-                ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'Stiamo preparando il meglio per te...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black54,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 30),
-              CircularProgressIndicator(
-                color: Color(0xFF1E88E5),
-              ),
-            ],
-          ),
-        );
+        return CategoryPostViewer(posts: posts);
 
       case 3:
         return const WebcamScreen();
-        default:
+      default:
         return Container();
     }
   }
@@ -662,67 +769,99 @@ class _MyHomePageState extends State<MyHomePage> {
       return !hasRestrictedTitle && !hasRestrictedContent;
     }).toList();
 
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: NetworkImage(
-            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
-          ),
-          fit: BoxFit.cover,
-          opacity: 0.6,
-        ),
-      ),
-      child: Container(
-        color: const Color(0xCCFFF8E1),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: visiblePosts.isNotEmpty
-                  ? visiblePosts.map((post) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                post['title']['rendered'],
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _removeHtmlTags(
-                                    post['excerpt']['rendered'] ?? ''),
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList()
-                  : const [NoAccessMessage()],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardHeight = constraints.maxHeight * 0.3;
+
+        return Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: NetworkImage(
+                'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
+              ),
+              fit: BoxFit.cover,
+              opacity: 0.6,
             ),
           ),
-        ),
-      ),
+          child: Container(
+            color: const Color(0xCCFFF8E1),
+            child: Center(
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: visiblePosts.isNotEmpty
+                      ? visiblePosts.map((post) {
+                          // Recuperiamo TUTTE le categorie
+                          final categories = post['_embedded']?['wp:term']?[0];
+                          final categoryNames =
+                              (categories != null && categories.isNotEmpty)
+                                  ? categories
+                                      .map<String>((c) => c['name'] as String)
+                                      .join(', ')
+                                  : 'Senza categoria';
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Container(
+                              height: cardHeight,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Titolo: ' + post['title']['rendered'],
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Categorie: " + categoryNames,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      child: Text(
+                                        "Descrizione: ${_removeHtmlTags(
+                                          post['excerpt']['rendered'] ?? '',
+                                        )}",
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList()
+                      : const [NoAccessMessage()],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
