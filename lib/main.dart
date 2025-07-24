@@ -283,7 +283,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       debugShowCheckedModeBanner: false,
-      home: const OnboardingScreen(),
+      home: const SplashScreen(), // <-- Cambia qui!
     );
   }
 }
@@ -432,11 +432,12 @@ class LoginScreen extends StatelessWidget {
     try {
       final data = json.decode(response.body);
       jwtToken = data['token'];
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('jwtToken', jwtToken!);
+     
     } catch (err) {
       print(err.toString());
     }
+     final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwtToken', username!);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -577,6 +578,55 @@ class LoginScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkLogin();
+  }
+
+  Future<void> _checkLogin() async {
+    print("check login user");
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString('jwtToken');
+    if (savedToken != null && savedToken.isNotEmpty) {
+      jwtToken = savedToken;
+      // Vai direttamente alla home
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MyHomePage(
+            title: '',
+            userEmail: '',
+            userName: '',
+          ),
+        ),
+      );
+    } else {
+      // Mostra la login
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Mostra un loader mentre controlla
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
