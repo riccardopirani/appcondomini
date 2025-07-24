@@ -13,8 +13,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.1
-  webview_flutter: ^4.13.0
+  webview_flutter: ^4.4.1
   connectivity_plus: ^6.1.4
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

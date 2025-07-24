@@ -1,15 +1,19 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 String? jwtToken;
 String urlSito = "https://www.new.portobellodigallura.it";
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  
   runApp(const MyApp());
 }
 
@@ -428,6 +432,8 @@ class LoginScreen extends StatelessWidget {
     try {
       final data = json.decode(response.body);
       jwtToken = data['token'];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwtToken', jwtToken!);
     } catch (err) {
       print(err.toString());
     }
@@ -592,6 +598,14 @@ class _MyHomePageState extends State<MyHomePage> {
   bool isLoadingMenu = true;
 
   Future<void> fetchUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString('jwtToken');
+
+    if (savedToken != null) {
+      jwtToken = savedToken;
+      isLoggedIn = true;
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
