@@ -13,7 +13,6 @@ String urlSito = "https://www.new.portobellodigallura.it";
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
   runApp(const MyApp());
 }
 
@@ -432,12 +431,11 @@ class LoginScreen extends StatelessWidget {
     try {
       final data = json.decode(response.body);
       jwtToken = data['token'];
-     
     } catch (err) {
       print(err.toString());
     }
-     final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('jwtToken', username!);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('jwtToken', username!);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -850,7 +848,9 @@ class _MyHomePageState extends State<MyHomePage> {
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.black87),
                 title: const Text('Logout'),
-                onTap: () {
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.clear();
                   Navigator.pop(context);
                   Navigator.push(
                     context,
@@ -969,87 +969,88 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: visiblePosts.isNotEmpty
                     ? visiblePosts.map((post) {
-                  final categories = post['_embedded']?['wp:term']?[0];
-                  final categoryNames =
-                  (categories != null && categories.isNotEmpty)
-                      ? categories
-                      .map<String>((c) => c['name'] as String)
-                      .join(', ')
-                      : 'Senza categoria';
+                        final categories = post['_embedded']?['wp:term']?[0];
+                        final categoryNames =
+                            (categories != null && categories.isNotEmpty)
+                                ? categories
+                                    .map<String>((c) => c['name'] as String)
+                                    .join(', ')
+                                : 'Senza categoria';
 
-                  // Puoi usare un'immagine di copertina se disponibile:
-                  final imageUrl = post['_embedded']?['wp:featuredmedia']?[0]
-                  ?['source_url'];
+                        // Puoi usare un'immagine di copertina se disponibile:
+                        final imageUrl = post['_embedded']?['wp:featuredmedia']
+                            ?[0]?['source_url'];
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (imageUrl != null)
-                              Image.network(
-                                imageUrl,
-                                width: double.infinity,
-                                height: 150,
-                                fit: BoxFit.cover,
-                              ),
-                            Padding(
-                              padding: const EdgeInsets.all(16),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
                               child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    post['title']['rendered'],
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF01579B), // Blu intenso
+                                  if (imageUrl != null)
+                                    Image.network(
+                                      imageUrl,
+                                      width: double.infinity,
+                                      height: 150,
+                                      fit: BoxFit.cover,
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    "Categorie: $categoryNames",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF0277BD),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _removeHtmlTags(
-                                      post['excerpt']['rendered'] ?? '',
-                                    ),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF37474F),
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          post['title']['rendered'],
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(
+                                                0xFF01579B), // Blu intenso
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          "Categorie: $categoryNames",
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF0277BD),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          _removeHtmlTags(
+                                            post['excerpt']['rendered'] ?? '',
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF37474F),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList()
+                          ),
+                        );
+                      }).toList()
                     : const [NoAccessMessage()],
               ),
             ),
@@ -1268,8 +1269,8 @@ class PostTab extends StatelessWidget {
         itemCount: visiblePosts.length,
         itemBuilder: (context, index) {
           final post = visiblePosts[index];
-          final imageUrl = post['_embedded']?['wp:featuredmedia']?[0]
-          ?['source_url'];
+          final imageUrl =
+              post['_embedded']?['wp:featuredmedia']?[0]?['source_url'];
 
           return Container(
             margin: const EdgeInsets.only(bottom: 24),
@@ -1343,6 +1344,7 @@ class PostTab extends StatelessWidget {
     );
   }
 }
+
 class ContactOptionsScreen extends StatelessWidget {
   final String userName;
   final String userEmail;
