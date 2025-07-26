@@ -13,6 +13,9 @@ String urlSito = "https://www.new.portobellodigallura.it";
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isAndroid) {
+    WebView.platform = SurfaceAndroidWebView();
+  }
   runApp(const MyApp());
 }
 
