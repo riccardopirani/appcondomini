@@ -639,6 +639,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int _selectedIndex = 0;
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
+final Set<int> _notifiedUrgentPostIds = {}; // Mettilo fuori dalla funzione
 
   void _onItemTapped(int index) {
     setState(() {
@@ -646,52 +647,48 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  void startUrgentNotificationWatcher() {
-  final Set<int> notifiedIds = {};
 
+void startUrgentNotificationWatcher(BuildContext context, List<dynamic> posts) {
   Timer.periodic(const Duration(minutes: 5), (timer) {
     final urgentPosts = posts.where((post) {
       final isUrgente = _isUrgent(post);
       final id = post['id'];
-      return isUrgente && !notifiedIds.contains(id);
+      return isUrgente && !_notifiedUrgentPostIds.contains(id);
     }).toList();
 
-    if (urgentPosts.isNotEmpty) {
+    if (urgentPosts.isNotEmpty && context.mounted) {
       final latest = urgentPosts.first;
       final id = latest['id'];
       final title = latest['title']['rendered'] ?? 'Comunicazione urgente';
       final url = latest['link'];
 
-      notifiedIds.add(id); // Segna come già notificato
+      _notifiedUrgentPostIds.add(id); // Segna come notificato
 
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('🚨 Comunicazione urgente'),
-            content: Text(title),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Chiudi'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          WebViewPage(title: title, url: url),
-                    ),
-                  );
-                },
-                child: const Text('Apri'),
-              ),
-            ],
-          ),
-        );
-      }
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('🚨 Comunicazione urgente'),
+          content: Text(title),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Chiudi'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => WebViewPage(title: title, url: url),
+                  ),
+                );
+              },
+              child: const Text('Apri'),
+            ),
+          ],
+        ),
+      );
     }
   });
 }
@@ -739,7 +736,7 @@ class _MyHomePageState extends State<MyHomePage> {
     fetchWpMenu();
     fetchPosts();
     fetchUserData();
-    startUrgentNotificationWatcher(); 
+ startUrgentNotificationWatcher(context, posts); 
   }
 
   Future<void> fetchWpMenu() async {
