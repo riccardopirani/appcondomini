@@ -646,6 +646,56 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  void startUrgentNotificationWatcher() {
+  final Set<int> notifiedIds = {};
+
+  Timer.periodic(const Duration(minutes: 5), (timer) {
+    final urgentPosts = posts.where((post) {
+      final isUrgente = _isUrgent(post);
+      final id = post['id'];
+      return isUrgente && !notifiedIds.contains(id);
+    }).toList();
+
+    if (urgentPosts.isNotEmpty) {
+      final latest = urgentPosts.first;
+      final id = latest['id'];
+      final title = latest['title']['rendered'] ?? 'Comunicazione urgente';
+      final url = latest['link'];
+
+      notifiedIds.add(id); // Segna come già notificato
+
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('🚨 Comunicazione urgente'),
+            content: Text(title),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Chiudi'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          WebViewPage(title: title, url: url),
+                    ),
+                  );
+                },
+                child: const Text('Apri'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  });
+}
+
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
 
@@ -689,6 +739,7 @@ class _MyHomePageState extends State<MyHomePage> {
     fetchWpMenu();
     fetchPosts();
     fetchUserData();
+    startUrgentNotificationWatcher(); 
   }
 
   Future<void> fetchWpMenu() async {
@@ -965,11 +1016,8 @@ class _MyHomePageState extends State<MyHomePage> {
     return bUrgent.toString().compareTo(aUrgent.toString());
   });
 
-  
   return LayoutBuilder(
     builder: (context, constraints) {
-      final cardHeight = constraints.maxHeight * 0.4;
-
       return Container(
         width: double.infinity,
         decoration: const BoxDecoration(
@@ -1001,75 +1049,89 @@ class _MyHomePageState extends State<MyHomePage> {
                           ?['wp:featuredmedia']?[0]?['source_url'];
 
                       final isUrgente = _isUrgent(post);
+                      final url = post['link']; // Link al post WordPress
+                      final title = post['title']['rendered'] ?? 'Post';
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 24),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: isUrgente ? Colors.red : Colors.transparent,
-                              width: isUrgente ? 3 : 0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    WebViewPage(title: title, url: url),
                               ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (imageUrl != null)
-                                  Image.network(
-                                    imageUrl,
-                                    width: double.infinity,
-                                    height: 150,
-                                    fit: BoxFit.cover,
-                                  ),
-                                Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        post['title']['rendered'],
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF01579B),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        "Categorie: $categoryNames",
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF0277BD),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        _removeHtmlTags(
-                                          post['excerpt']['rendered'] ?? '',
-                                        ),
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: Color(0xFF37474F),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color:
+                                    isUrgente ? Colors.red : Colors.transparent,
+                                width: isUrgente ? 3 : 0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 6),
                                 ),
                               ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (imageUrl != null)
+                                    Image.network(
+                                      imageUrl,
+                                      width: double.infinity,
+                                      height: 150,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          post['title']['rendered'],
+                                          style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF01579B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          "Categorie: $categoryNames",
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF0277BD),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          _removeHtmlTags(
+                                            post['excerpt']['rendered'] ?? '',
+                                          ),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF37474F),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
