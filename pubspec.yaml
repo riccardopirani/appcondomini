@@ -1,5 +1,5 @@
 name: condominio
-description: "A new Flutter project."
+description: "porto bello di gallura condominio"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -14,9 +14,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.1
   webview_flutter: ^4.2.2
-  webview_flutter_android: ^3.10.2
+  webview_flutter_android: ^4.8.2
   connectivity_plus: ^6.1.4
   shared_preferences: ^2.5.3
+  webview_flutter_wkwebview: ^3.22.1
 
 
 dev_dependencies:
