@@ -5,12 +5,23 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
 
 String? jwtToken;
 String urlSito = "https://www.new.portobellodigallura.it";
+
+Future<void> _openInAppBrowser(String url) async {
+  final Uri uri = Uri.parse(url);
+
+  if (!await launchUrl(
+    uri,
+    mode: LaunchMode.inAppWebView, // apre dentro l'app ma senza WebView
+  )) {
+    throw Exception('Impossibile aprire $url');
+  }
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -151,46 +162,6 @@ class CategoryPostsScreen extends StatelessWidget {
 class WebcamScreen extends StatelessWidget {
   const WebcamScreen({super.key});
 
-  Future<void> _openWebView(
-      BuildContext context, String title, String url) async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    final isConnected = connectivityResult != ConnectivityResult.none;
-
-    if (!isConnected) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Connessione assente'),
-          content:
-              const Text('Webcam non disponibile senza connessione Internet.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            backgroundColor: const Color(0xFFFFC107),
-          ),
-          body: WebViewWidget(
-            controller: WebViewController()
-              ..setJavaScriptMode(JavaScriptMode.unrestricted)
-              ..loadRequest(Uri.parse(url)),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -212,9 +183,7 @@ class WebcamScreen extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 60),
               ),
               onPressed: () {
-                _openWebView(
-                  context,
-                  'Webcam Porto',
+                _openInAppBrowser(
                   'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
                 );
               },
@@ -229,9 +198,7 @@ class WebcamScreen extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 60),
               ),
               onPressed: () {
-                _openWebView(
-                  context,
-                  'Webcam Panoramica',
+                _openInAppBrowser(
                   'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
                 );
               },
@@ -246,9 +213,7 @@ class WebcamScreen extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 60),
               ),
               onPressed: () {
-                _openWebView(
-                  context,
-                  'Stazione Meteo',
+                _openInAppBrowser(
                   'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
                 );
               },
@@ -674,12 +639,6 @@ class _MyHomePageState extends State<MyHomePage> {
               TextButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => WebViewPage(title: title, url: url),
-                    ),
-                  );
                 },
                 child: const Text('Apri'),
               ),
@@ -849,16 +808,9 @@ class _MyHomePageState extends State<MyHomePage> {
                 title: const Text('Identità'),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => WebViewPage(
-                        title: 'Identità',
-                        url:
-                            'https://www.new.portobellodigallura.it/dove-siamo/',
-                      ),
-                    ),
-                  );
+
+                  _openInAppBrowser(
+                      'https://www.new.portobellodigallura.it/dove-siamo/');
                 },
               ),
               ListTile(
@@ -866,16 +818,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 title: const Text('Numeri utili'),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => WebViewPage(
-                        title: 'Identità',
-                        url:
-                            'https://www.new.portobellodigallura.it/numeri-util/',
-                      ),
-                    ),
-                  );
+                  _openInAppBrowser(
+                      'https://www.new.portobellodigallura.it/numeri-util/');
                 },
               ),
               ListTile(
@@ -883,14 +827,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 title: const Text('Servizi'),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => WebViewPage(
-                        title: 'Identità',
-                        url: 'https://www.new.portobellodigallura.it/servizi/',
-                      ),
-                    ),
+                  _openInAppBrowser(
+                    'https://www.new.portobellodigallura.it/servizi/',
                   );
                 },
               ),
@@ -1049,13 +987,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           padding: const EdgeInsets.only(bottom: 24),
                           child: GestureDetector(
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      WebViewPage(title: title, url: url),
-                                ),
-                              );
+                              _openInAppBrowser(url);
                             },
                             child: Container(
                               width: double.infinity,
@@ -1137,28 +1069,6 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         );
       },
-    );
-  }
-}
-
-class WebViewPage extends StatelessWidget {
-  final String title;
-  final String url;
-
-  WebViewPage({
-    super.key,
-    required this.title,
-    required this.url,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: WebViewWidget(
-        controller: WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..loadRequest(Uri.parse(url)),
-      ),
     );
   }
 }
