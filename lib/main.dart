@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+
 String? jwtToken;
 String urlSito = "https://www.new.portobellodigallura.it";
 
@@ -636,7 +636,7 @@ class _MyHomePageState extends State<MyHomePage> {
   int _selectedIndex = 0;
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
-final Set<int> _notifiedUrgentPostIds = {}; // Mettilo fuori dalla funzione
+  final Set<int> _notifiedUrgentPostIds = {}; // Mettilo fuori dalla funzione
 
   void _onItemTapped(int index) {
     setState(() {
@@ -644,51 +644,51 @@ final Set<int> _notifiedUrgentPostIds = {}; // Mettilo fuori dalla funzione
     });
   }
 
+  void startUrgentNotificationWatcher(
+      BuildContext context, List<dynamic> posts) {
+    Timer.periodic(const Duration(minutes: 5), (timer) {
+      final urgentPosts = posts.where((post) {
+        final isUrgente = _isUrgent(post);
+        final id = post['id'];
+        return isUrgente && !_notifiedUrgentPostIds.contains(id);
+      }).toList();
 
-void startUrgentNotificationWatcher(BuildContext context, List<dynamic> posts) {
-  Timer.periodic(const Duration(minutes: 5), (timer) {
-    final urgentPosts = posts.where((post) {
-      final isUrgente = _isUrgent(post);
-      final id = post['id'];
-      return isUrgente && !_notifiedUrgentPostIds.contains(id);
-    }).toList();
+      if (urgentPosts.isNotEmpty && context.mounted) {
+        final latest = urgentPosts.first;
+        final id = latest['id'];
+        final title = latest['title']['rendered'] ?? 'Comunicazione urgente';
+        final url = latest['link'];
 
-    if (urgentPosts.isNotEmpty && context.mounted) {
-      final latest = urgentPosts.first;
-      final id = latest['id'];
-      final title = latest['title']['rendered'] ?? 'Comunicazione urgente';
-      final url = latest['link'];
+        _notifiedUrgentPostIds.add(id); // Segna come notificato
 
-      _notifiedUrgentPostIds.add(id); // Segna come notificato
-
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('🚨 Comunicazione urgente'),
-          content: Text(title),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Chiudi'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WebViewPage(title: title, url: url),
-                  ),
-                );
-              },
-              child: const Text('Apri'),
-            ),
-          ],
-        ),
-      );
-    }
-  });
-}
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('🚨 Comunicazione urgente'),
+            content: Text(title),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Chiudi'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WebViewPage(title: title, url: url),
+                    ),
+                  );
+                },
+                child: const Text('Apri'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
+  }
 
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
@@ -733,7 +733,7 @@ void startUrgentNotificationWatcher(BuildContext context, List<dynamic> posts) {
     fetchWpMenu();
     fetchPosts();
     fetchUserData();
- startUrgentNotificationWatcher(context, posts); 
+    startUrgentNotificationWatcher(context, posts);
   }
 
   Future<void> fetchWpMenu() async {
@@ -987,158 +987,158 @@ void startUrgentNotificationWatcher(BuildContext context, List<dynamic> posts) {
         (c['name'] as String?)?.toLowerCase().contains('urgenti') ?? false);
   }
 
-
   Widget _homeContent() {
-  final visiblePosts = posts.where((post) {
-    final title = post['title']['rendered']?.toLowerCase() ?? '';
-    final content = post['content']['rendered'] ?? '';
-    final excerpt = post['excerpt']['rendered'] ?? '';
+    final visiblePosts = posts.where((post) {
+      final title = post['title']['rendered']?.toLowerCase() ?? '';
+      final content = post['content']['rendered'] ?? '';
+      final excerpt = post['excerpt']['rendered'] ?? '';
 
-    final hasRestrictedTitle = title.contains('restricted');
-    final hasRestrictedContent = content.contains('effettuare il login') ||
-        excerpt.contains('effettuare il login') ||
-        excerpt.contains('devi essere loggato') ||
-        content.trim().isEmpty;
+      final hasRestrictedTitle = title.contains('restricted');
+      final hasRestrictedContent = content.contains('effettuare il login') ||
+          excerpt.contains('effettuare il login') ||
+          excerpt.contains('devi essere loggato') ||
+          content.trim().isEmpty;
 
-    return !hasRestrictedTitle && !hasRestrictedContent;
-  }).toList();
+      return !hasRestrictedTitle && !hasRestrictedContent;
+    }).toList();
 
-  // Ordina: prima i post urgenti
-  visiblePosts.sort((a, b) {
-    bool aUrgent = _isUrgent(a);
-    bool bUrgent = _isUrgent(b);
-    return bUrgent.toString().compareTo(aUrgent.toString());
-  });
+    // Ordina: prima i post urgenti
+    visiblePosts.sort((a, b) {
+      bool aUrgent = _isUrgent(a);
+      bool bUrgent = _isUrgent(b);
+      return bUrgent.toString().compareTo(aUrgent.toString());
+    });
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      return Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFF81D4FA), // Azzurro mare
-              Color(0xFFE1F5FE), // Celeste chiaro
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF81D4FA), // Azzurro mare
+                Color(0xFFE1F5FE), // Celeste chiaro
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: visiblePosts.isNotEmpty
-                  ? visiblePosts.map((post) {
-                      final categories = post['_embedded']?['wp:term']?[0];
-                      final categoryNames =
-                          (categories != null && categories.isNotEmpty)
-                              ? categories
-                                  .map<String>((c) => c['name'] as String)
-                                  .join(', ')
-                              : 'Senza categoria';
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: visiblePosts.isNotEmpty
+                    ? visiblePosts.map((post) {
+                        final categories = post['_embedded']?['wp:term']?[0];
+                        final categoryNames =
+                            (categories != null && categories.isNotEmpty)
+                                ? categories
+                                    .map<String>((c) => c['name'] as String)
+                                    .join(', ')
+                                : 'Senza categoria';
 
-                      final imageUrl = post['_embedded']
-                          ?['wp:featuredmedia']?[0]?['source_url'];
+                        final imageUrl = post['_embedded']?['wp:featuredmedia']
+                            ?[0]?['source_url'];
 
-                      final isUrgente = _isUrgent(post);
-                      final url = post['link']; // Link al post WordPress
-                      final title = post['title']['rendered'] ?? 'Post';
+                        final isUrgente = _isUrgent(post);
+                        final url = post['link']; // Link al post WordPress
+                        final title = post['title']['rendered'] ?? 'Post';
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    WebViewPage(title: title, url: url),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color:
-                                    isUrgente ? Colors.red : Colors.transparent,
-                                width: isUrgente ? 3 : 0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      WebViewPage(title: title, url: url),
                                 ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (imageUrl != null)
-                                    Image.network(
-                                      imageUrl,
-                                      width: double.infinity,
-                                      height: 150,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          post['title']['rendered'],
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF01579B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          "Categorie: $categoryNames",
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF0277BD),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          _removeHtmlTags(
-                                            post['excerpt']['rendered'] ?? '',
-                                          ),
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF37474F),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                              );
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: isUrgente
+                                      ? Colors.red
+                                      : Colors.transparent,
+                                  width: isUrgente ? 3 : 0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
                                   ),
                                 ],
                               ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (imageUrl != null)
+                                      Image.network(
+                                        imageUrl,
+                                        width: double.infinity,
+                                        height: 150,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            post['title']['rendered'],
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF01579B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            "Categorie: $categoryNames",
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF0277BD),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            _removeHtmlTags(
+                                              post['excerpt']['rendered'] ?? '',
+                                            ),
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Color(0xFF37474F),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList()
-                  : const [NoAccessMessage()],
+                        );
+                      }).toList()
+                    : const [NoAccessMessage()],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 }
 
 class WebViewPage extends StatelessWidget {

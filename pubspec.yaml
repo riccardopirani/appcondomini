@@ -16,7 +16,6 @@ dependencies:
   webview_flutter: ^4.2.2
   connectivity_plus: ^6.1.4
   shared_preferences: ^2.5.3
-  webview_flutter_wkwebview: ^3.22.1
 
 
 dev_dependencies:
