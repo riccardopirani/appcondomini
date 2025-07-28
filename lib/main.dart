@@ -14,9 +14,6 @@ String urlSito = "https://www.new.portobellodigallura.it";
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
- 
-
   runApp(const MyApp());
 }
 
