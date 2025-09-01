@@ -609,6 +609,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
   final Set<int> _notifiedUrgentPostIds = {}; // Mettilo fuori dalla funzione
+  Timer? _notificationTimer;
 
   void _onItemTapped(int index) {
     setState(() {
@@ -618,7 +619,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void startUrgentNotificationWatcher(
       BuildContext context, List<dynamic> posts) {
-    Timer.periodic(const Duration(minutes: 5), (timer) {
+    _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       final urgentPosts = posts.where((post) {
         final isUrgente = _isUrgent(post);
         final id = post['id'];
@@ -652,6 +653,12 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    super.dispose();
   }
 
   List<dynamic> wpMenuItems = [];
@@ -732,32 +739,56 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> fetchPosts() async {
-    final response = await http.get(
-      Uri.parse(
-          '$urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term'),
-      headers: {
-        'Authorization': 'Bearer $jwtToken',
-      },
-    );
+    try {
+      // Prepara gli headers con autenticazione solo se disponibile
+      final Map<String, String> headers = {};
+      if (jwtToken != null && jwtToken!.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $jwtToken';
+      }
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
+      final response = await http.get(
+        Uri.parse(
+          '$urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term&per_page=20',
+        ),
+        headers: headers,
+      );
 
-      final filtered = data.where((post) {
-        final status = post['status'];
-        final content = post['content']['rendered'] ?? '';
-        final isPublished = status == 'publish';
-        final isPrivate = status == 'private';
-        final isAccessible = content.contains('login') == false;
+      debugPrint('Status code: ${response.statusCode}');
+      debugPrint('URL richiesta: $urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term&per_page=20');
 
-        return isPublished || (isPrivate && isAccessible);
-      }).toList();
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        debugPrint('Post ricevuti: ${data.length}');
 
-      setState(() {
-        posts = filtered;
-      });
-    } else {
-      throw Exception('Failed to load posts');
+        final filtered = data.where((post) {
+          final status = post['status'];
+          final content = post['content']['rendered'] ?? '';
+          final isPublished = status == 'publish';
+          final isPrivate = status == 'private';
+          final isAccessible = content.contains('login') == false;
+
+          return isPublished || (isPrivate && isAccessible);
+        }).toList();
+
+        debugPrint('Post filtrati: ${filtered.length}');
+
+        if (mounted) {
+          setState(() {
+            posts = filtered;
+          });
+        }
+      } else {
+        debugPrint('Errore HTTP: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
+        throw Exception('Failed to load posts: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Errore caricamento post: $e');
+      if (mounted) {
+        setState(() {
+          posts = [];
+        });
+      }
     }
   }
 
