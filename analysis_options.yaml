@@ -30,7 +30,6 @@ linter:
     use_build_context_synchronously: true
     cancel_subscriptions: true
     close_sinks: true
-    dispose_fields: true
 
     # Miglior leggibilità
     prefer_final_fields: true
@@ -42,5 +41,4 @@ linter:
     sort_constructors_first: true
 
     # Performance
-    avoid_unnecessary_rebuilds: true
     avoid_init_to_null: true

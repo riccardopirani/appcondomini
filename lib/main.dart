@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 String? jwtToken;
-String urlSito = "https://www.new.portobellodigallura.it";
+String urlSito = 'https://www.new.portobellodigallura.it';
 
 Future<void> _openInAppBrowser(String url) async {
   final Uri uri = Uri.parse(url);
@@ -118,13 +118,13 @@ class CategoryPostsScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+                              boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
@@ -398,19 +398,22 @@ class LoginScreen extends StatelessWidget {
       final data = json.decode(response.body);
       jwtToken = data['token'];
     } catch (err) {
-      print(err.toString());
+      debugPrint(err.toString());
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('jwtToken', username!);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
+    await prefs.setString('jwtToken', username);
+    if (context.mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
           builder: (context) => const MyHomePage(
-                title: '',
-                userEmail: '',
-                userName: '',
-              )),
-    );
+            title: '',
+            userEmail: '',
+            userName: '',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -434,7 +437,7 @@ class LoginScreen extends StatelessWidget {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Card(
-                color: Colors.white.withOpacity(0.95),
+                color: Colors.white.withValues(alpha: 0.95),
                 elevation: 10,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -486,13 +489,13 @@ class LoginScreen extends StatelessWidget {
                       const SizedBox(height: 30),
                       ElevatedButton(
                         onPressed: () {
-                          var username = usernameController.text;
-                          var password = passwordController.text;
+                          final username = usernameController.text;
+                          final password = passwordController.text;
                           if (username.isEmpty || password.isEmpty) {
-                            username = "Riccardo";
-                            password = "Aud4DMehyAz%nuFZjaPFBG0A";
-                          }
-                          if (username.isNotEmpty && password.isNotEmpty) {
+                            final defaultUsername = 'Riccardo';
+                            final defaultPassword = 'Aud4DMehyAz%nuFZjaPFBG0A';
+                            handleLogin(context, defaultUsername, defaultPassword);
+                          } else if (username.isNotEmpty && password.isNotEmpty) {
                             handleLogin(context, username, password);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -561,28 +564,32 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkLogin() async {
-    print("check login user");
+    debugPrint('check login user');
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString('jwtToken');
     if (savedToken != null && savedToken.isNotEmpty) {
       jwtToken = savedToken;
       // Vai direttamente alla home
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const MyHomePage(
-            title: '',
-            userEmail: '',
-            userName: '',
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MyHomePage(
+              title: '',
+              userEmail: '',
+              userName: '',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else {
       // Mostra la login
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-      );
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+        );
+      }
     }
   }
 
@@ -621,8 +628,6 @@ class _MyHomePageState extends State<MyHomePage> {
       if (urgentPosts.isNotEmpty && context.mounted) {
         final latest = urgentPosts.first;
         final id = latest['id'];
-        final title = latest['title']['rendered'] ?? 'Comunicazione urgente';
-        final url = latest['link'];
 
         _notifiedUrgentPostIds.add(id); // Segna come notificato
 
@@ -630,7 +635,7 @@ class _MyHomePageState extends State<MyHomePage> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('🚨 Comunicazione urgente'),
-            content: Text(title),
+            content: const Text('Nuova comunicazione urgente disponibile'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
@@ -682,24 +687,31 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         isLoadingUserData = false;
       });
-      print('Errore recupero utente: $e');
+      debugPrint('Errore recupero utente: $e');
     }
   }
 
   @override
   void initState() {
     super.initState();
-    fetchWpMenu();
-    fetchPosts();
-    fetchUserData();
-    startUrgentNotificationWatcher(context, posts);
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await fetchWpMenu();
+    await fetchPosts();
+    await fetchUserData();
+    if (mounted) {
+      startUrgentNotificationWatcher(context, posts);
+    }
   }
 
   Future<void> fetchWpMenu() async {
     try {
       final response = await http.get(
         Uri.parse(
-            '$urlSito/wp-json/wp-api-menus/v2/menus/1'), // 1 è l'ID del menu primario, cambia se serve
+          '$urlSito/wp-json/wp-api-menus/v2/menus/1',
+        ), // 1 è l'ID del menu primario, cambia se serve
       );
 
       if (response.statusCode == 200) {
@@ -715,7 +727,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         isLoadingMenu = false;
       });
-      print(e);
+      debugPrint(e.toString());
     }
   }
 
@@ -838,13 +850,15 @@ class _MyHomePageState extends State<MyHomePage> {
                 onTap: () async {
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.clear();
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const MyApp(),
-                    ),
-                  );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MyApp(),
+                      ),
+                    );
+                  }
                 },
               ),
             ],
@@ -1002,7 +1016,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color: Colors.black.withValues(alpha: 0.1),
                                     blurRadius: 12,
                                     offset: const Offset(0, 6),
                                   ),
@@ -1269,7 +1283,7 @@ class PostTab extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -1443,18 +1457,17 @@ class _EmailFormTabState extends State<EmailFormTab> {
   void _submitForm() {
     final email = _emailController.text.trim();
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
     final message = _messageController.text.trim();
 
     if (email.isEmpty || message.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Compila tutti i campi obbligatori")),
+        const SnackBar(content: Text('Compila tutti i campi obbligatori')),
       );
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Messaggio inviato!")),
+      const SnackBar(content: Text('Messaggio inviato!')),
     );
 
     _phoneController.clear();
@@ -1478,7 +1491,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.blueGrey.withOpacity(0.1),
+                  color: Colors.blueGrey.withValues(alpha: 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
