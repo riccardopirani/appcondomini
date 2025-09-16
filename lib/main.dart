@@ -13,7 +13,7 @@ Future<void> regenerateToken() async {
   final prefs = await SharedPreferences.getInstance();
   final username = prefs.getString('username');
   final password = prefs.getString('password');
-  
+
   if (username != null && password != null) {
     debugPrint('Rigenerazione cookie per: $username');
     try {
@@ -21,7 +21,8 @@ Future<void> regenerateToken() async {
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        body:
+            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
 
       if (loginResponse.headers['set-cookie'] != null) {
@@ -161,13 +162,13 @@ class CategoryPostsScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
@@ -434,36 +435,36 @@ class LoginScreen extends StatelessWidget {
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        body:
+            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
-      
+
       debugPrint('Login response status: ${loginResponse.statusCode}');
       debugPrint('Login response headers: ${loginResponse.headers}');
-      
+
       // Step 2: Verifica se il login è riuscito controllando i cookie
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
         debugPrint('Login cookies ricevuti: $cookies');
-        
+
         // Step 3: Verifica il login controllando se siamo reindirizzati
         // Se il login è riuscito, WordPress reindirizza a wp-admin
-        if (loginResponse.statusCode == 302 || 
+        if (loginResponse.statusCode == 302 ||
             loginResponse.headers['location']?.contains('wp-admin') == true ||
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
-          
           // Login riuscito - salva i cookie
           jwtToken = cookies;
-          
+
           // Salva le credenziali e i cookie
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('jwtToken', jwtToken!);
           await prefs.setString('username', username);
           await prefs.setString('password', password);
           await prefs.setBool('isLoggedIn', true);
-          
+
           debugPrint('Login successful, cookies saved');
-          
+
           if (context.mounted) {
             Navigator.pushReplacement(
               context,
@@ -487,8 +488,6 @@ class LoginScreen extends StatelessWidget {
             );
           }
         }
-
-
       } else {
         debugPrint('No cookies received, login failed');
         if (context.mounted) {
@@ -594,10 +593,12 @@ class LoginScreen extends StatelessWidget {
                               builder: (BuildContext context) {
                                 return AlertDialog(
                                   title: const Text('Campi mancanti'),
-                                  content: const Text('Inserisci username e password per effettuare il login.'),
+                                  content: const Text(
+                                      'Inserisci username e password per effettuare il login.'),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.of(context).pop(),
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
                                       child: const Text('OK'),
                                     ),
                                   ],
@@ -636,7 +637,7 @@ class LoginScreen extends StatelessWidget {
                               launchUrl(Uri.parse(
                                   '$urlSito/wp-login.php?action=lostpassword'));
                             },
-                            child: const Text('Cambio password'),
+                            child: const Text('Cambio\nPassword'),
                           ),
                         ],
                       ),
@@ -659,7 +660,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver {
+class _SplashScreenState extends State<SplashScreen>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -676,7 +678,7 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     if (state == AppLifecycleState.resumed) {
       debugPrint('App riattivata, verifica sessione...');
       _checkLogin();
@@ -690,10 +692,14 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
-    
-    if (savedToken != null && savedToken.isNotEmpty && isLoggedIn && username != null && password != null) {
+
+    if (savedToken != null &&
+        savedToken.isNotEmpty &&
+        isLoggedIn &&
+        username != null &&
+        password != null) {
       jwtToken = savedToken;
-      
+
       // Verifica se i cookie contengono una sessione valida
       if (jwtToken!.contains('wordpress_logged_in')) {
         debugPrint('Cookie di sessione valido, utente già loggato');
@@ -730,26 +736,27 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
   Future<void> _autoReLogin(String username, String password) async {
     try {
       debugPrint('Tentativo riautenticazione automatica per: $username');
-      
+
       // Effettua login automatico
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        body:
+            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
-      
+
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
-        
+
         if (cookies.contains('wordpress_logged_in')) {
           // Riautenticazione riuscita
           jwtToken = cookies;
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('jwtToken', jwtToken!);
           await prefs.setBool('isLoggedIn', true);
-          
+
           debugPrint('Riautenticazione automatica riuscita');
-          
+
           if (context.mounted) {
             Navigator.pushReplacement(
               context,
@@ -763,7 +770,8 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
             );
           }
         } else {
-          debugPrint('Riautenticazione automatica fallita - credenziali non valide');
+          debugPrint(
+              'Riautenticazione automatica fallita - credenziali non valide');
           await clearLoginData();
           if (context.mounted) {
             Navigator.pushReplacement(
@@ -773,7 +781,8 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
           }
         }
       } else {
-        debugPrint('Riautenticazione automatica fallita - nessun cookie ricevuto');
+        debugPrint(
+            'Riautenticazione automatica fallita - nessun cookie ricevuto');
         await clearLoginData();
         if (context.mounted) {
           Navigator.pushReplacement(
@@ -793,8 +802,6 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
       }
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -858,10 +865,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     });
   }
 
-
-
-
-
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
 
@@ -884,7 +887,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       };
       isLoadingUserData = false;
     });
-    
+
     debugPrint('Dati utente caricati: $userData');
   }
 
@@ -905,7 +908,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     if (state == AppLifecycleState.resumed) {
       debugPrint('App riattivata dalla pausa, verifica sessione...');
       _checkSessionAndReauth();
@@ -917,7 +920,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final savedToken = prefs.getString('jwtToken');
     final username = prefs.getString('username');
     final password = prefs.getString('password');
-    
+
     if (savedToken != null && username != null && password != null) {
       // Verifica se la sessione è ancora valida
       if (!savedToken.contains('wordpress_logged_in')) {
@@ -932,24 +935,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> _autoReLoginFromHome(String username, String password) async {
     try {
       debugPrint('Riautenticazione automatica dalla home per: $username');
-      
+
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        body:
+            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
-      
+
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
-        
+
         if (cookies.contains('wordpress_logged_in')) {
           jwtToken = cookies;
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('jwtToken', jwtToken!);
           await prefs.setBool('isLoggedIn', true);
-          
+
           debugPrint('Riautenticazione automatica dalla home riuscita');
-          
+
           // Ricarica i dati con la nuova sessione
           await _initializeData();
         } else {
@@ -985,7 +989,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         timer.cancel();
         return;
       }
-      
+
       if (jwtToken != null) {
         // Verifica se i cookie contengono ancora una sessione valida
         if (!jwtToken!.contains('wordpress_logged_in')) {
@@ -1020,7 +1024,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           wpMenuItems = data['items'] ?? [];
           isLoadingMenu = false;
         });
-        debugPrint('Menu caricato con successo: ${wpMenuItems.length} elementi');
+        debugPrint(
+            'Menu caricato con successo: ${wpMenuItems.length} elementi');
       } else {
         debugPrint('Errore caricamento menu: ${response.statusCode}');
         // Se il plugin wp-api-menus non è installato, usa un menu di default
@@ -1057,7 +1062,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       );
 
       debugPrint('Status code: ${response.statusCode}');
-      debugPrint('URL richiesta: $urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term&per_page=20&status=publish');
+      debugPrint(
+          'URL richiesta: $urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term&per_page=20&status=publish');
       debugPrint('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
@@ -1078,11 +1084,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           final excerpt = post['excerpt']['rendered'] ?? '';
 
           // Escludi post con contenuto restrittivo
-          final hasRestrictedTitle = title.contains('restricted') || title.contains('privato');
-          final hasRestrictedContent = content.contains('effettuare il login') ||
-              excerpt.contains('effettuare il login') ||
-              excerpt.contains('devi essere loggato') ||
-              content.trim().isEmpty;
+          final hasRestrictedTitle =
+              title.contains('restricted') || title.contains('privato');
+          final hasRestrictedContent =
+              content.contains('effettuare il login') ||
+                  excerpt.contains('effettuare il login') ||
+                  excerpt.contains('devi essere loggato') ||
+                  content.trim().isEmpty;
 
           return !hasRestrictedTitle && !hasRestrictedContent;
         }).toList();
@@ -1104,7 +1112,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       } else {
         debugPrint('Errore HTTP: ${response.statusCode}');
         debugPrint('Response body: ${response.body}');
-        
+
         // Se fallisce, prova con un endpoint alternativo
         await _fetchPostsAlternative();
       }
@@ -1118,7 +1126,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> _fetchPostsAlternative() async {
     try {
       debugPrint('Tentativo caricamento post alternativo...');
-      
+
       // Prova a caricare i post direttamente dalla pagina principale
       final response = await http.get(
         Uri.parse('$urlSito/'),
@@ -1156,7 +1164,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           userEmail: userData?['email'] ?? '',
         );
       case 2:
-        return posts.isNotEmpty 
+        return posts.isNotEmpty
             ? CategoryPostViewer(posts: posts)
             : const NoAccessMessage();
       case 3:
@@ -1165,8 +1173,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return Container();
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -1630,10 +1636,14 @@ class AppInfoScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildFeatureItem('🏠 Home', 'Visualizza le ultime comunicazioni e novità'),
-                    _buildFeatureItem('📞 Servizi', 'Contatta facilmente i servizi del porto'),
-                    _buildFeatureItem('📰 Articoli', 'Naviga tra le categorie di articoli'),
-                    _buildFeatureItem('📹 Webcam', 'Visualizza le webcam in tempo reale'),
+                    _buildFeatureItem('🏠 Home',
+                        'Visualizza le ultime comunicazioni e novità'),
+                    _buildFeatureItem('📞 Servizi',
+                        'Contatta facilmente i servizi del porto'),
+                    _buildFeatureItem(
+                        '📰 Articoli', 'Naviga tra le categorie di articoli'),
+                    _buildFeatureItem(
+                        '📹 Webcam', 'Visualizza le webcam in tempo reale'),
                     const SizedBox(height: 20),
                     const Text(
                       'Informazioni tecniche:',
@@ -1644,9 +1654,12 @@ class AppInfoScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildFeatureItem('🔐 Sicurezza', 'Autenticazione JWT sicura'),
-                    _buildFeatureItem('🔄 Sincronizzazione', 'Aggiornamenti automatici'),
-                    _buildFeatureItem('📱 Multi-piattaforma', 'Disponibile su Android e iOS'),
+                    _buildFeatureItem(
+                        '🔐 Sicurezza', 'Autenticazione JWT sicura'),
+                    _buildFeatureItem(
+                        '🔄 Sincronizzazione', 'Aggiornamenti automatici'),
+                    _buildFeatureItem(
+                        '📱 Multi-piattaforma', 'Disponibile su Android e iOS'),
                     const SizedBox(height: 20),
                     Container(
                       width: double.infinity,
