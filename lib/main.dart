@@ -8,6 +8,49 @@ import 'package:url_launcher/url_launcher.dart';
 
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
+String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
+
+// Funzione per creare l'autenticazione Basic Auth
+String createBasicAuth(String username, String password) {
+  final credentials = '$username:$password';
+  final encoded = base64Encode(utf8.encode(credentials));
+  return 'Basic $encoded';
+}
+
+// Funzione per ricaricare il token dalle SharedPreferences (utile per hot reload)
+Future<void> reloadTokenFromStorage() async {
+  try {
+    debugPrint('=== RICARICA TOKEN DA STORAGE ===');
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString('jwtToken');
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final username = prefs.getString('username');
+    final password = prefs.getString('password');
+
+    debugPrint('Dati salvati:');
+    debugPrint(
+        '- Token: ${savedToken != null ? "Presente (${savedToken.length} chars)" : "Mancante"}');
+    debugPrint('- isLoggedIn: $isLoggedIn');
+    debugPrint('- Username: ${username != null ? "Presente" : "Mancante"}');
+    debugPrint('- Password: ${password != null ? "Presente" : "Mancante"}');
+
+    if (savedToken != null && savedToken.isNotEmpty && isLoggedIn) {
+      jwtToken = savedToken;
+      debugPrint('Token ricaricato dalle SharedPreferences');
+      debugPrint('Token valido: ${jwtToken!.contains('wordpress_logged_in')}');
+    } else {
+      jwtToken = null;
+      debugPrint('Nessun token valido trovato nelle SharedPreferences');
+      if (savedToken == null) debugPrint('Motivo: Token null');
+      if (savedToken != null && savedToken.isEmpty)
+        debugPrint('Motivo: Token vuoto');
+      if (!isLoggedIn) debugPrint('Motivo: isLoggedIn = false');
+    }
+  } catch (e) {
+    debugPrint('Errore ricaricamento token: $e');
+    jwtToken = null;
+  }
+}
 
 Future<void> regenerateToken() async {
   final prefs = await SharedPreferences.getInstance();
@@ -17,21 +60,71 @@ Future<void> regenerateToken() async {
   if (username != null && password != null) {
     debugPrint('Rigenerazione cookie per: $username');
     try {
-      // Effettua nuovo login per ottenere cookie freschi
+      // Prima ottieni il nonce necessario per il login
+      final nonceResponse = await http.get(
+        Uri.parse('$urlSito/wp-login.php'),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      );
+
+      debugPrint('Nonce response status: ${nonceResponse.statusCode}');
+
+      // Estrai il nonce dalla risposta HTML
+      String nonce = '';
+      final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
+          .firstMatch(nonceResponse.body);
+      if (nonceMatch != null) {
+        nonce = nonceMatch.group(1)!;
+        debugPrint('Nonce estratto: $nonce');
+      }
+
+      // Effettua nuovo login con il nonce
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': '$urlSito/wp-login.php',
+        },
+        body: nonce.isNotEmpty
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
+
+      debugPrint(
+          'Regenerate token response status: ${loginResponse.statusCode}');
+      debugPrint('Regenerate token response headers: ${loginResponse.headers}');
 
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
+        debugPrint('Nuovi cookie ricevuti: $cookies');
+
+        // Verifica se il login è riuscito
+        if (loginResponse.statusCode == 302 ||
+            loginResponse.headers['location']?.contains('wp-admin') == true ||
+            loginResponse.body.contains('wp-admin') ||
+            cookies.contains('wordpress_logged_in')) {
         jwtToken = cookies;
         await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setBool('isLoggedIn', true);
         debugPrint('Cookie rigenerati con successo');
+
+          // Verifica che il login sia effettivamente riuscito
+          await _verifyLoginSuccess();
       } else {
-        debugPrint('Rigenerazione cookie fallita');
+          debugPrint('Rigenerazione cookie fallita - login non riuscito');
+          debugPrint('Response body: ${loginResponse.body}');
+          await clearLoginData();
+        }
+      } else {
+        debugPrint('Rigenerazione cookie fallita - nessun cookie ricevuto');
         await clearLoginData();
       }
     } catch (e) {
@@ -39,8 +132,36 @@ Future<void> regenerateToken() async {
       await clearLoginData();
     }
   } else {
-    debugPrint('Credenziali non trovate');
+    debugPrint('Credenziali non trovate per rigenerazione token');
     await clearLoginData();
+  }
+}
+
+Future<void> _verifyLoginSuccess() async {
+  try {
+    debugPrint('Verifica successo login...');
+
+    // Prova ad accedere a wp-admin per verificare il login
+    final adminResponse = await http.get(
+      Uri.parse('$urlSito/wp-admin/'),
+      headers: {
+        'Cookie': jwtToken!,
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    );
+
+    debugPrint('Admin access status: ${adminResponse.statusCode}');
+
+    if (adminResponse.statusCode == 200 &&
+        !adminResponse.body.contains('wp-login.php')) {
+      debugPrint('Login verificato con successo');
+    } else {
+      debugPrint(
+          'Login non verificato - potrebbe essere necessario un approccio diverso');
+    }
+  } catch (e) {
+    debugPrint('Errore verifica login: $e');
   }
 }
 
@@ -132,7 +253,7 @@ class CategoryPostViewer extends StatelessWidget {
   }
 }
 
-class CategoryPostsScreen extends StatelessWidget {
+class CategoryPostsScreen extends StatefulWidget {
   final String category;
   final List<dynamic> posts;
 
@@ -143,25 +264,84 @@ class CategoryPostsScreen extends StatelessWidget {
   });
 
   @override
+  State<CategoryPostsScreen> createState() => _CategoryPostsScreenState();
+}
+
+class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
+  late List<dynamic> currentPosts;
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    currentPosts = widget.posts;
+  }
+
+  Future<void> _refreshPosts() async {
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
+
+    try {
+      // Ricarica i post per questa categoria
+      await _MyHomePageState()
+          .fetchUserPostsByCategory(1); // Usa categoria di default
+
+      // In alternativa, ricarica tutti i post
+      await _MyHomePageState().fetchPosts();
+    } catch (e) {
+      debugPrint('Errore refresh post categoria: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(category),
+        title: Text(widget.category),
         backgroundColor: const Color(0xFFFFC107),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshPosts,
+            tooltip: 'Aggiorna post',
+          ),
+        ],
       ),
-      body: ListView.builder(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _refreshPosts,
+              child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: posts.length,
+                itemCount: currentPosts.length,
         itemBuilder: (context, index) {
-          final post = posts[index];
+                  final post = currentPosts[index];
           final title = post['title']['rendered'] ?? '';
           final excerpt = post['excerpt']['rendered'] ?? '';
+                  final authorId = post['author'] ?? 0;
+                  final status = post['status'] ?? '';
+                  final url = post['link'] ?? '';
 
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: status == 'private'
+                            ? Colors.orange.withValues(alpha: 0.5)
+                            : Colors.transparent,
+                        width: status == 'private' ? 2 : 0,
+                      ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
@@ -172,27 +352,59 @@ class CategoryPostsScreen extends StatelessWidget {
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.all(16),
-              title: Text(
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
                 title,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF2C3E50),
                 ),
+                            ),
+                          ),
+                          if (status == 'private')
+                            const Icon(
+                              Icons.lock,
+                              color: Colors.orange,
+                              size: 16,
+                            ),
+                        ],
               ),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
                   _removeHtmlTags(excerpt),
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.black54,
                   ),
                 ),
-              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Autore ID: $authorId | Status: $status',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () {
+                        if (url.isNotEmpty) {
+                          _openInAppBrowser(url);
+                        }
+                      },
             ),
           );
         },
+              ),
       ),
     );
   }
@@ -200,6 +412,20 @@ class CategoryPostsScreen extends StatelessWidget {
   String _removeHtmlTags(String htmlText) {
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
     return htmlText.replaceAll(regex, '');
+  }
+
+  Future<void> _openInAppBrowser(String url) async {
+    final Uri uri = Uri.parse(url);
+
+    if (!await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+      webViewConfiguration: const WebViewConfiguration(
+        enableJavaScript: true,
+      ),
+    )) {
+      throw Exception('Impossibile aprire $url');
+    }
   }
 }
 
@@ -431,23 +657,56 @@ class LoginScreen extends StatelessWidget {
   Future<void> handleLogin(
       BuildContext context, String username, String password) async {
     try {
-      // Step 1: Effettua login per ottenere i cookie
+      debugPrint('=== INIZIO LOGIN ===');
+      debugPrint('Username: $username');
+
+      // Step 1: Ottieni il nonce necessario per il login
+      final nonceResponse = await http.get(
+        Uri.parse('$urlSito/wp-login.php'),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      );
+
+      debugPrint('Nonce response status: ${nonceResponse.statusCode}');
+
+      // Estrai il nonce dalla risposta HTML
+      String nonce = '';
+      final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
+          .firstMatch(nonceResponse.body);
+      if (nonceMatch != null) {
+        nonce = nonceMatch.group(1)!;
+        debugPrint('Nonce estratto: $nonce');
+      }
+
+      // Step 2: Effettua login con il nonce
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': '$urlSito/wp-login.php',
+        },
+        body: nonce.isNotEmpty
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
 
       debugPrint('Login response status: ${loginResponse.statusCode}');
       debugPrint('Login response headers: ${loginResponse.headers}');
 
-      // Step 2: Verifica se il login è riuscito controllando i cookie
+      // Step 3: Verifica se il login è riuscito controllando i cookie
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
         debugPrint('Login cookies ricevuti: $cookies');
 
-        // Step 3: Verifica il login controllando se siamo reindirizzati
+        // Step 4: Verifica il login controllando se siamo reindirizzati
         // Se il login è riuscito, WordPress reindirizza a wp-admin
         if (loginResponse.statusCode == 302 ||
             loginResponse.headers['location']?.contains('wp-admin') == true ||
@@ -479,6 +738,7 @@ class LoginScreen extends StatelessWidget {
           }
         } else {
           debugPrint('Login failed - no valid session');
+          debugPrint('Response body: ${loginResponse.body}');
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -895,7 +1155,35 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeData();
+    _initializeWithTokenReload();
+  }
+
+  Future<void> _initializeWithTokenReload() async {
+    debugPrint('=== INIZIALIZZAZIONE CON RICARICA TOKEN ===');
+
+    // Ricarica il token dalle SharedPreferences (utile per hot reload)
+    await reloadTokenFromStorage();
+
+    debugPrint(
+        'Token dopo ricarica: ${jwtToken != null ? "Presente" : "Mancante"}');
+    if (jwtToken != null) {
+      debugPrint(
+          'Token contiene wordpress_logged_in: ${jwtToken!.contains('wordpress_logged_in')}');
+      debugPrint('Token length: ${jwtToken!.length}');
+    }
+
+    // Se il token è presente ma non valido, prova a rigenerarlo
+    if (jwtToken != null && !jwtToken!.contains('wordpress_logged_in')) {
+      debugPrint('Token presente ma non valido, tentativo di rigenerazione...');
+      await regenerateToken();
+
+      // Ricarica di nuovo dopo rigenerazione
+      await reloadTokenFromStorage();
+      debugPrint(
+          'Token dopo rigenerazione: ${jwtToken != null ? "Presente" : "Mancante"}');
+    }
+
+    await _initializeData();
   }
 
   @override
@@ -1054,72 +1342,638 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> fetchPosts() async {
     try {
-      // Prova prima senza autenticazione per i post pubblici
+      debugPrint('=== INIZIO DOWNLOAD POST ===');
+      debugPrint(
+          'JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
+
+      // Prima verifica che l'API REST sia accessibile
+      await _testWordPressAPI();
+      
+      // Usa sempre l'autenticazione se disponibile
+      if (jwtToken != null && jwtToken!.isNotEmpty) {
+        debugPrint(
+            'Caricamento post con autenticazione utente per WordPress 6.8.2');
+        await _tryFetchUserSpecificPosts();
+      } else {
+        debugPrint(
+            'Nessun token di autenticazione disponibile - prova senza auth');
+        await _tryFetchPostsWithoutAuth();
+      }
+
+      debugPrint('Post scaricati dopo primo tentativo: ${posts.length}');
+      
+      // Se non ha funzionato, prova endpoint alternativi
+      if (posts.isEmpty) {
+        debugPrint('Nessun post trovato, provo endpoint alternativi...');
+        await _tryFetchPostsAlternative();
+        debugPrint('Post scaricati dopo endpoint alternativi: ${posts.length}');
+      }
+      
+      debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
+    } catch (e) {
+      debugPrint('Errore caricamento post: $e');
+      await _fetchPostsAlternative();
+    }
+  }
+
+  Future<void> _testWordPressAPI() async {
+    try {
+      debugPrint('Test API WordPress 6.8.2...');
+      
+      // Test endpoint base
       final response = await http.get(
-        Uri.parse(
-          '$urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term&per_page=20&status=publish',
-        ),
+        Uri.parse('$urlSito/wp-json/wp/v2/'),
+        headers: {
+          'User-Agent': 'Flutter App/1.0',
+          'Accept': 'application/json',
+        },
+      );
+      
+      debugPrint('WordPress API Status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('WordPress API disponibile: ${data['name']}');
+        debugPrint('WordPress versione: ${data['version']}');
+
+        // Test se ci sono post disponibili
+        await _testPostsAvailability();
+      } else {
+        debugPrint('WordPress API non accessibile: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Errore test WordPress API: $e');
+    }
+  }
+
+  Future<void> _testPostsAvailability() async {
+    try {
+      debugPrint('Test disponibilità post...');
+
+      // Test endpoint post base
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp/v2/posts?per_page=5'),
+        headers: {
+          'User-Agent': 'Flutter App/1.0',
+          'Accept': 'application/json',
+        },
       );
 
-      debugPrint('Status code: ${response.statusCode}');
-      debugPrint(
-          'URL richiesta: $urlSito/wp-json/wp/v2/posts?orderby=date&order=desc&_embed=wp:term&per_page=20&status=publish');
-      debugPrint('Response body: ${response.body}');
+      debugPrint('Test post status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        debugPrint('Post ricevuti: ${data.length}');
+        debugPrint('Post disponibili (test): ${data.length}');
 
-        // Se non ci sono post, usa il fallback
-        if (data.isEmpty) {
-          debugPrint('Nessun post trovato, uso post di esempio');
-          await _fetchPostsAlternative();
-          return;
-        }
-
-        // Filtra i post per rimuovere quelli con contenuto restrittivo
-        final filtered = data.where((post) {
-          final title = post['title']['rendered']?.toLowerCase() ?? '';
-          final content = post['content']['rendered'] ?? '';
-          final excerpt = post['excerpt']['rendered'] ?? '';
-
-          // Escludi post con contenuto restrittivo
-          final hasRestrictedTitle =
-              title.contains('restricted') || title.contains('privato');
-          final hasRestrictedContent =
-              content.contains('effettuare il login') ||
-                  excerpt.contains('effettuare il login') ||
-                  excerpt.contains('devi essere loggato') ||
-                  content.trim().isEmpty;
-
-          return !hasRestrictedTitle && !hasRestrictedContent;
-        }).toList();
-
-        debugPrint('Post filtrati: ${filtered.length}');
-
-        // Se dopo il filtraggio non ci sono post, usa il fallback
-        if (filtered.isEmpty) {
-          debugPrint('Nessun post valido dopo filtraggio, uso post di esempio');
-          await _fetchPostsAlternative();
-          return;
-        }
-
-        if (mounted) {
-          setState(() {
-            posts = filtered;
-          });
+        if (data.isNotEmpty) {
+          debugPrint('Primo post: ${data[0]['title']['rendered']}');
+          debugPrint('Status primo post: ${data[0]['status']}');
         }
       } else {
-        debugPrint('Errore HTTP: ${response.statusCode}');
+        debugPrint('Errore test post: ${response.statusCode}');
         debugPrint('Response body: ${response.body}');
-
-        // Se fallisce, prova con un endpoint alternativo
-        await _fetchPostsAlternative();
       }
     } catch (e) {
-      debugPrint('Errore caricamento post: $e');
-      // Prova con un metodo alternativo
-      await _fetchPostsAlternative();
+      debugPrint('Errore test disponibilità post: $e');
+    }
+  }
+
+  Future<void> _testAdminAjax() async {
+    try {
+      debugPrint('=== TEST BASIC AUTH ===');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username');
+      
+      if (username == null) {
+        debugPrint('Username non trovato per test Basic Auth');
+        return;
+      }
+
+      final basicAuth = createBasicAuth(username, appPassword);
+      debugPrint('Test Basic Auth per utente: $username');
+
+      // Test endpoint base con Basic Auth
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp/v2/posts?per_page=5'),
+        headers: {
+          'Authorization': basicAuth,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Flutter App/1.0',
+          'Accept': 'application/json',
+        },
+      );
+
+      debugPrint('Basic Auth test status: ${response.statusCode}');
+      debugPrint('Basic Auth test response: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('Basic Auth test: SUCCESS - ${data.length} post trovati');
+      } else if (response.statusCode == 401) {
+        debugPrint('Basic Auth test: FAILED - credenziali non valide');
+      } else if (response.statusCode == 403) {
+        debugPrint('Basic Auth test: FAILED - permessi insufficienti');
+      }
+
+      debugPrint('=== TEST ADMIN-AJAX (fallback) ===');
+
+      if (jwtToken == null || jwtToken!.isEmpty) {
+        debugPrint('Nessun token disponibile per test admin-ajax');
+        return;
+      }
+
+      // Test diversi action di admin-ajax
+      final actions = [
+        'heartbeat',
+        'query_posts',
+        'get_posts',
+        'wp_ajax_get_posts',
+      ];
+
+      for (final action in actions) {
+        try {
+          debugPrint('Test admin-ajax action: $action');
+
+          final response = await http.post(
+            Uri.parse('$urlSito/wp-admin/admin-ajax.php'),
+            headers: {
+              'Cookie': jwtToken!,
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': '$urlSito/wp-admin/',
+            },
+            body: 'action=$action',
+          );
+
+          debugPrint('Admin-ajax $action status: ${response.statusCode}');
+          debugPrint(
+              'Admin-ajax $action response: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
+
+          if (response.statusCode == 200 && response.body.isNotEmpty) {
+            debugPrint('Admin-ajax $action: SUCCESS');
+          }
+        } catch (e) {
+          debugPrint('Errore admin-ajax $action: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore test admin-ajax: $e');
+    }
+  }
+
+  Future<void> _tryFetchPostsWithoutAuth() async {
+    try {
+      debugPrint('Tentativo 1: Caricamento post senza autenticazione');
+      
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish'),
+      );
+
+      debugPrint('Status code (no auth): ${response.statusCode}');
+      debugPrint('Response body (no auth): ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        debugPrint('Post ricevuti (no auth): ${data.length}');
+        
+        if (data.isNotEmpty) {
+          _processPosts(data);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore caricamento senza auth: $e');
+    }
+  }
+
+  Future<void> _tryFetchUserSpecificPosts() async {
+    try {
+      debugPrint('Caricamento post specifici per utente con Basic Auth');
+
+      // Prima prova con Basic Auth
+      await _tryFetchPostsWithBasicAuth();
+
+      // Se non funziona, prova con l'approccio precedente
+      if (posts.isEmpty) {
+        debugPrint('Basic Auth fallito, provo approccio precedente...');
+        await _verifyAuthentication();
+        final userId = await _getCurrentUserId();
+        await _tryFetchPostsViaAdminAjax();
+        
+        if (posts.isEmpty) {
+          await _tryFetchPostsViaREST(userId);
+        }
+      }
+
+      debugPrint('Post scaricati dopo primo tentativo: ${posts.length}');
+    } catch (e) {
+      debugPrint('Errore caricamento post specifici utente: $e');
+    }
+  }
+
+  Future<void> _tryFetchPostsWithBasicAuth() async {
+    try {
+      debugPrint('=== TENTATIVO CON BASIC AUTH ===');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username');
+      
+      if (username == null) {
+        debugPrint('Username non trovato per Basic Auth');
+        return;
+      }
+
+      final basicAuth = createBasicAuth(username, appPassword);
+      debugPrint('Basic Auth creata per utente: $username');
+
+      // Lista di endpoint da provare con Basic Auth
+      final endpoints = [
+        '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=20&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=20',
+      ];
+      
+      for (final endpoint in endpoints) {
+        try {
+          debugPrint('Provando Basic Auth con endpoint: $endpoint');
+          
+          final response = await http.get(
+            Uri.parse(endpoint),
+            headers: {
+              'Authorization': basicAuth,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Flutter App/1.0',
+              'Accept': 'application/json',
+            },
+          );
+
+          debugPrint('Basic Auth status code: ${response.statusCode}');
+          debugPrint('Basic Auth response body: ${response.body}');
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = json.decode(response.body);
+            debugPrint('Post ricevuti con Basic Auth: ${data.length}');
+            
+            if (data.isNotEmpty) {
+              _processPosts(data);
+              debugPrint('SUCCESS: Post caricati con Basic Auth!');
+              return;
+            }
+          } else if (response.statusCode == 401) {
+            debugPrint('Basic Auth fallita (401) - credenziali non valide');
+          } else if (response.statusCode == 403) {
+            debugPrint('Basic Auth fallita (403) - permessi insufficienti');
+          }
+        } catch (e) {
+          debugPrint('Errore Basic Auth con endpoint $endpoint: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore generale Basic Auth: $e');
+    }
+  }
+
+  Future<void> _tryFetchPostsViaAdminAjax() async {
+    try {
+      debugPrint('Tentativo di recupero post via wp-admin-ajax...');
+
+      final response = await http.post(
+        Uri.parse('$urlSito/wp-admin/admin-ajax.php'),
+        headers: {
+          'Cookie': jwtToken!,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Referer': '$urlSito/wp-admin/',
+        },
+        body:
+            'action=query_posts&post_type=post&post_status=publish,private&posts_per_page=20&orderby=date&order=desc',
+      );
+
+      debugPrint('Admin-ajax response status: ${response.statusCode}');
+      debugPrint('Admin-ajax response body: ${response.body}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        try {
+          final data = json.decode(response.body);
+          if (data is List && data.isNotEmpty) {
+            debugPrint('Post trovati via admin-ajax: ${data.length}');
+            _processPosts(data);
+          }
+        } catch (e) {
+          debugPrint('Errore parsing admin-ajax response: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore admin-ajax: $e');
+    }
+  }
+
+  Future<void> _tryFetchPostsViaREST(int? userId) async {
+    // Endpoint per post specifici dell'utente con autenticazione
+    List<String> endpoints = [];
+
+    if (userId != null) {
+      // Se abbiamo l'ID utente, prova prima i post specifici dell'utente
+      endpoints.addAll([
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&per_page=20&orderby=date&order=desc',
+      ]);
+    }
+
+    // Poi prova endpoint generali con autenticazione
+    endpoints.addAll([
+      '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish&_embed=wp:term&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=20&_embed=wp:term&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=20',
+    ]);
+
+    for (final endpoint in endpoints) {
+      try {
+        debugPrint('Provando endpoint specifico utente: $endpoint');
+          
+          final response = await http.get(
+            Uri.parse(endpoint),
+            headers: {
+              'Cookie': jwtToken!,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Flutter App/1.0',
+              'Accept': 'application/json',
+              'X-WP-Nonce': '', // Per WordPress 6.8.2
+            },
+          );
+
+        debugPrint('Status code (user specific): ${response.statusCode}');
+        debugPrint('Response body (user specific): ${response.body}');
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = json.decode(response.body);
+          debugPrint('Post ricevuti (user specific): ${data.length}');
+            
+            if (data.isNotEmpty) {
+              _processPosts(data);
+              return;
+            }
+          } else if (response.statusCode == 401) {
+          debugPrint(
+              'Errore 401: Token di autenticazione non valido per post utente');
+            // Prova a rigenerare il token
+            await regenerateToken();
+            continue;
+          }
+        } catch (e) {
+        debugPrint('Errore con endpoint utente $endpoint: $e');
+      }
+    }
+  }
+
+  Future<void> _verifyAuthentication() async {
+    try {
+      debugPrint('Verifica autenticazione...');
+
+      if (jwtToken == null || jwtToken!.isEmpty) {
+        debugPrint('Nessun token disponibile per verifica autenticazione');
+        return;
+      }
+
+      // Prova a verificare l'autenticazione con diversi endpoint
+      final endpoints = [
+        '$urlSito/wp-json/wp/v2/users/me',
+        '$urlSito/wp-admin/admin-ajax.php?action=heartbeat',
+        '$urlSito/wp-json/wp/v2/',
+      ];
+
+      for (final endpoint in endpoints) {
+        try {
+          debugPrint('Test autenticazione con: $endpoint');
+
+          final response = await http.get(
+            Uri.parse(endpoint),
+            headers: {
+              'Cookie': jwtToken!,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Flutter App/1.0',
+              'Accept': 'application/json',
+            },
+          );
+
+          debugPrint('Auth test status: ${response.statusCode}');
+
+          if (response.statusCode == 200) {
+            debugPrint('Autenticazione verificata con successo');
+            return;
+          } else if (response.statusCode == 401) {
+            debugPrint('Autenticazione fallita (401) - token non valido');
+          } else if (response.statusCode == 403) {
+            debugPrint('Accesso negato (403) - permessi insufficienti');
+      }
+    } catch (e) {
+          debugPrint('Errore test autenticazione $endpoint: $e');
+        }
+      }
+
+      debugPrint(
+          'Autenticazione non verificata - tentativo di rigenerazione token');
+      await regenerateToken();
+    } catch (e) {
+      debugPrint('Errore verifica autenticazione: $e');
+    }
+  }
+
+  Future<int?> _getCurrentUserId() async {
+    try {
+      debugPrint('Recupero ID utente corrente...');
+
+      if (jwtToken == null || jwtToken!.isEmpty) {
+        debugPrint('Nessun token disponibile per recupero ID utente');
+        return null;
+      }
+
+      // Endpoint per ottenere l'utente corrente
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
+        headers: {
+          'Cookie': jwtToken!,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Flutter App/1.0',
+          'Accept': 'application/json',
+        },
+      );
+
+      debugPrint('User me response status: ${response.statusCode}');
+      debugPrint('User me response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final userData = json.decode(response.body);
+        final userId = userData['id'];
+        debugPrint('ID utente recuperato: $userId');
+        return userId;
+      } else if (response.statusCode == 401) {
+        debugPrint(
+            'Token non valido per recupero ID utente - tentativo rigenerazione');
+        await regenerateToken();
+        return null;
+      } else {
+        debugPrint('Errore recupero ID utente: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Errore recupero ID utente: $e');
+      return null;
+    }
+  }
+
+  Future<void> _tryFetchPostsAlternative() async {
+    try {
+      debugPrint('Tentativo 3: Endpoint alternativi');
+      
+      // Prova endpoint diversi
+      final endpoints = [
+        '$urlSito/wp-json/wp/v2/posts',
+      ];
+      
+      for (final endpoint in endpoints) {
+        try {
+          debugPrint('Provando endpoint: $endpoint');
+          
+          final response = await http.get(Uri.parse(endpoint));
+          debugPrint('Status code per $endpoint: ${response.statusCode}');
+          
+          if (response.statusCode == 200) {
+            final List<dynamic> data = json.decode(response.body);
+            debugPrint('Post ricevuti da $endpoint: ${data.length}');
+            
+            if (data.isNotEmpty) {
+              _processPosts(data);
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Errore con endpoint $endpoint: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore endpoint alternativi: $e');
+    }
+  }
+
+  void _processPosts(List<dynamic> data) {
+    debugPrint('=== PROCESSAMENTO POST ===');
+    debugPrint('Post ricevuti da processare: ${data.length}');
+
+    if (data.isEmpty) {
+      debugPrint('Nessun post da processare');
+      return;
+    }
+
+    // Log di tutti i post ricevuti
+    for (int i = 0; i < data.length; i++) {
+      final post = data[i];
+      debugPrint(
+          'Post $i: "${post['title']['rendered']}" - Status: ${post['status']} - Author: ${post['author']}');
+    }
+    
+    // Con autenticazione, accetta tutti i post (pubblici e privati)
+    final filtered = data.where((post) {
+      final title = post['title']['rendered']?.toLowerCase() ?? '';
+      final content = post['content']['rendered'] ?? '';
+      final excerpt = post['excerpt']['rendered'] ?? '';
+      final status = post['status'] ?? '';
+      final authorId = post['author'] ?? 0;
+
+      // Escludi solo post con contenuto completamente vuoto o con errori
+      final hasEmptyContent = content.trim().isEmpty && excerpt.trim().isEmpty;
+      final hasErrorContent =
+          content.contains('error') || excerpt.contains('error');
+      final hasRestrictedTitle = title.contains('restricted');
+
+      final isValid =
+          !hasEmptyContent && !hasErrorContent && !hasRestrictedTitle;
+
+      if (!isValid) {
+        debugPrint(
+            'Post filtrato: "${post['title']['rendered']}" - Empty: $hasEmptyContent, Error: $hasErrorContent, Restricted: $hasRestrictedTitle');
+      }
+
+      return isValid;
+    }).toList();
+
+    debugPrint('Post filtrati: ${filtered.length}');
+    
+    // Log dettagliato dei post che verranno mostrati
+    for (int i = 0; i < filtered.length && i < 5; i++) {
+      final post = filtered[i];
+      debugPrint(
+          'Post finale ${i + 1}: "${post['title']['rendered']}" (${post['status']}) - Author: ${post['author']}');
+    }
+
+    if (mounted) {
+      setState(() {
+        posts = filtered;
+      });
+      debugPrint('=== POST AGGIORNATI NELLO STATE: ${posts.length} ===');
+    } else {
+      debugPrint('Widget non mounted, non aggiorno lo state');
+    }
+  }
+
+  Future<void> fetchUserPostsByCategory(int categoryId) async {
+    try {
+      debugPrint('Caricamento post utente per categoria: $categoryId');
+
+      if (jwtToken == null || jwtToken!.isEmpty) {
+        debugPrint('Nessun token disponibile per caricamento post categoria');
+        return;
+      }
+
+      // Prima ottieni l'ID dell'utente corrente
+      final userId = await _getCurrentUserId();
+
+      final endpoints = [
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+      ];
+
+      for (final endpoint in endpoints) {
+        try {
+          debugPrint('Provando endpoint categoria: $endpoint');
+
+          final response = await http.get(
+            Uri.parse(endpoint),
+            headers: {
+              'Cookie': jwtToken!,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Flutter App/1.0',
+              'Accept': 'application/json',
+            },
+          );
+
+          debugPrint('Status code (categoria): ${response.statusCode}');
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = json.decode(response.body);
+            debugPrint('Post categoria ricevuti: ${data.length}');
+
+            if (data.isNotEmpty) {
+              _processPosts(data);
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Errore con endpoint categoria $endpoint: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore caricamento post categoria: $e');
     }
   }
 
@@ -1389,8 +2243,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: visiblePosts.isNotEmpty
-                    ? visiblePosts.map((post) {
+                children: [
+                  
+                  if (visiblePosts.isNotEmpty)
+                    ...visiblePosts.map((post) {
                         final categories = post['_embedded']?['wp:term']?[0];
                         final categoryNames =
                             (categories != null && categories.isNotEmpty)
@@ -1405,6 +2261,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         final isUrgente = _isUrgent(post);
                         final url = post['link']; // Link al post WordPress
                         final title = post['title']['rendered'] ?? 'Post';
+                      final authorId = post['author'] ?? 0;
+                      final status = post['status'] ?? '';
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 24),
@@ -1420,8 +2278,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                 border: Border.all(
                                   color: isUrgente
                                       ? Colors.red
+                                    : status == 'private'
+                                        ? Colors.orange
                                       : Colors.transparent,
-                                  width: isUrgente ? 3 : 0,
+                                width: isUrgente
+                                    ? 3
+                                    : status == 'private'
+                                        ? 2
+                                        : 0,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
@@ -1449,13 +2313,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
                                             post['title']['rendered'],
                                             style: const TextStyle(
                                               fontSize: 20,
                                               fontWeight: FontWeight.bold,
                                               color: Color(0xFF01579B),
                                             ),
+                                              ),
+                                            ),
+                                            if (status == 'private')
+                                              const Icon(
+                                                Icons.lock,
+                                                color: Colors.orange,
+                                                size: 20,
+                                              ),
+                                          ],
                                           ),
                                           const SizedBox(height: 6),
                                           Text(
@@ -1464,6 +2340,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                               fontSize: 12,
                                               fontWeight: FontWeight.w500,
                                               color: Color(0xFF0277BD),
+                                          ),
+                                        ),
+                                        if (authorId > 0)
+                                          Text(
+                                            "Autore ID: $authorId | Status: $status",
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey,
                                             ),
                                           ),
                                           const SizedBox(height: 12),
@@ -1486,7 +2370,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           ),
                         );
                       }).toList()
-                    : const [NoAccessMessage()],
+                  else
+                    const NoAccessMessage(),
+                ],
               ),
             ),
           ),
@@ -1949,37 +2835,139 @@ class ContactOptionsScreen extends StatelessWidget {
         title: const Text("Contatta il Porto"),
         backgroundColor: const Color(0xFFFFC107),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildButton(context, "Bombole Gas", Icons.local_gas_station),
-            const SizedBox(height: 20),
-            _buildButton(context, "Rifiuti", Icons.delete),
-            const SizedBox(height: 20),
-            _buildButton(context, "Guasto", Icons.build),
-            const SizedBox(height: 20),
-            _buildButton(context, "Porto", Icons.anchor),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFFE0F7FA), // Azzurro mare
+              Color(0xFFF0F8FF), // Bianco azzurro
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'Seleziona il servizio',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF01579B),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                _buildButton(context, "Bombole Gas", Icons.local_gas_station),
+                _buildButton(context, "Rifiuti", Icons.delete),
+                _buildButton(context, "Guasto", Icons.build),
+                _buildButton(context, "Porto", Icons.anchor),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFFFC107).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Color(0xFF0277BD),
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'I messaggi verranno inviati direttamente al Porto',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF37474F),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildButton(BuildContext context, String label, IconData icon) {
-    return SizedBox(
+    // Colori specifici per ogni servizio
+    Color primaryColor;
+    Color secondaryColor;
+    
+    switch (label) {
+      case "Bombole Gas":
+        primaryColor = const Color(0xFFE91E63); // Rosa vibrante
+        secondaryColor = const Color(0xFFF06292);
+        break;
+      case "Rifiuti":
+        primaryColor = const Color(0xFF4CAF50); // Verde natura
+        secondaryColor = const Color(0xFF81C784);
+        break;
+      case "Guasto":
+        primaryColor = const Color(0xFFFF5722); // Arancione emergenza
+        secondaryColor = const Color(0xFFFF8A65);
+        break;
+      case "Porto":
+        primaryColor = const Color(0xFF2196F3); // Blu oceano
+        secondaryColor = const Color(0xFF64B5F6);
+        break;
+      default:
+        primaryColor = const Color(0xFF9C27B0); // Viola default
+        secondaryColor = const Color(0xFFBA68C8);
+    }
+
+    return Container(
       width: double.infinity,
-      height: 60,
-      child: ElevatedButton.icon(
-        icon: Icon(icon, color: Colors.white),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0288D1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+      height: 70,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primaryColor, secondaryColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
-          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ],
+      ),
+      child: ElevatedButton.icon(
+        icon: Icon(icon, color: Colors.white, size: 28),
+        label: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 0.5,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
         onPressed: () {
           Navigator.push(
