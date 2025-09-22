@@ -2028,6 +2028,232 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  Widget _buildModernMenuItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          color: Colors.white70,
+          size: 16,
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _showUsefulSections(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Sezioni Utili',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF01579B),
+                ),
+              ),
+            ),
+            _buildUsefulSectionItem(
+              context,
+              'Identità',
+              'Dove siamo e chi siamo',
+              Icons.location_on,
+              () => _openInAppBrowser('https://www.new.portobellodigallura.it/dove-siamo/'),
+            ),
+            _buildUsefulSectionItem(
+              context,
+              'Numeri Utili',
+              'Contatti e informazioni',
+              Icons.phone,
+              () => _openInAppBrowser('https://www.new.portobellodigallura.it/numeri-util/'),
+            ),
+            _buildUsefulSectionItem(
+              context,
+              'Servizi',
+              'Tutti i nostri servizi',
+              Icons.room_service,
+              () => _openInAppBrowser('https://www.new.portobellodigallura.it/servizi/'),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUsefulSectionItem(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0277BD).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFF0277BD),
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
+    );
+  }
+
+  void _showAccountInfo(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Account'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildAccountInfoRow('Nome', userData?['name'] ?? 'N/A'),
+            _buildAccountInfoRow('Email', userData?['email'] ?? 'N/A'),
+            _buildAccountInfoRow('ID', userData?['id']?.toString() ?? 'N/A'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.security, color: Colors.blue, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Autenticazione attiva',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Chiudi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoadingUserData) {
@@ -2038,65 +2264,114 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     return Scaffold(
       endDrawer: Drawer(
         child: Container(
-          color: const Color(0xFFE0F7FA), // Azzurro mare
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
                 decoration: const BoxDecoration(
-                  color: Color(0xFF0288D1), // Blu mare
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF1E3C72), // Blu scuro
+                Color(0xFF2A5298), // Blu medio
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
                   children: [
-                    Image.asset('assets/logo.png', height: 48),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Porto Bello\ndi Gallura',
+                // Header moderno
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Image.asset('assets/logo.png', height: 60),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Porto Bello di Gallura',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          userData?['name'] ?? 'Utente',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w500,
+                          ),
                       ),
                     ),
                   ],
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.article, color: Colors.black87),
-                title: const Text('Identità'),
+                
+                // Menu items
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        _buildModernMenuItem(
+                          context,
+                          icon: Icons.link,
+                          title: 'Sezioni Utili',
+                          subtitle: 'Link e risorse',
+                          color: const Color(0xFF4CAF50),
                 onTap: () {
                   Navigator.pop(context);
-
-                  _openInAppBrowser(
-                      'https://www.new.portobellodigallura.it/dove-siamo/');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.article, color: Colors.black87),
-                title: const Text('Numeri utili'),
+                            _showUsefulSections(context);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildModernMenuItem(
+                          context,
+                          icon: Icons.contact_mail,
+                          title: 'Contatti',
+                          subtitle: 'Contatta il porto',
+                          color: const Color(0xFF2196F3),
                 onTap: () {
                   Navigator.pop(context);
-                  _openInAppBrowser(
-                      'https://www.new.portobellodigallura.it/numeri-util/');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.article, color: Colors.black87),
-                title: const Text('Servizi'),
+                            _onItemTapped(1); // Vai alla sezione servizi
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildModernMenuItem(
+                          context,
+                          icon: Icons.person,
+                          title: 'Account',
+                          subtitle: 'Gestisci il tuo account',
+                          color: const Color(0xFF9C27B0),
                 onTap: () {
                   Navigator.pop(context);
-                  _openInAppBrowser(
-                    'https://www.new.portobellodigallura.it/servizi/',
-                  );
-                },
-              ),
-              const Divider(color: Color(0xFF0288D1), height: 1),
-              ListTile(
-                leading: const Icon(Icons.info, color: Colors.black87),
-                title: const Text('Informazioni App'),
+                            _showAccountInfo(context);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildModernMenuItem(
+                          context,
+                          icon: Icons.info_outline,
+                          title: 'Informazioni App',
+                          subtitle: 'Versione e dettagli',
+                          color: const Color(0xFFFF9800),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -2107,10 +2382,39 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   );
                 },
               ),
-              const Divider(color: Color(0xFF0288D1), height: 1),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.black87),
-                title: const Text('Logout'),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Logout button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE91E63), Color(0xFFF06292)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE91E63).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.white, size: 24),
+                      title: const Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                 onTap: () async {
                   await clearLoginData();
                   if (context.mounted) {
@@ -2123,8 +2427,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     );
                   }
                 },
+                    ),
+                  ),
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -2849,9 +3156,9 @@ class ContactOptionsScreen extends StatelessWidget {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
                 const Text(
                   'Seleziona il servizio',
                   style: TextStyle(
@@ -2861,42 +3168,12 @@ class ContactOptionsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-                _buildButton(context, "Bombole Gas", Icons.local_gas_station),
-                _buildButton(context, "Rifiuti", Icons.delete),
-                _buildButton(context, "Guasto", Icons.build),
-                _buildButton(context, "Porto", Icons.anchor),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFFC107).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Color(0xFF0277BD),
-                        size: 20,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'I messaggi verranno inviati direttamente al Porto',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF37474F),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            _buildButton(context, "Bombole Gas", Icons.local_gas_station),
+            _buildButton(context, "Rifiuti", Icons.delete),
+            _buildButton(context, "Guasto", Icons.build),
+            _buildButton(context, "Porto", Icons.anchor),
+                
+          ],
             ),
           ),
         ),
