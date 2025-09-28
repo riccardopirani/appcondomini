@@ -8,6 +8,29 @@ import 'package:url_launcher/url_launcher.dart';
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
 String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
+
+// Funzione per inviare email tramite url_launcher
+Future<void> sendEmail({
+  required String to,
+  String? subject,
+  String? body,
+}) async {
+  final uri = Uri(
+    scheme: 'mailto',
+    path: to,
+    queryParameters: {
+      if (subject != null) 'subject': subject,
+      if (body != null) 'body': body,
+      // cc/bcc possibili: 'cc': 'a@b.com,c@d.com', 'bcc': '...'
+    },
+  );
+
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else {
+    // mostra un messaggio all'utente
+  }
+}
 // Funzione per creare l'autenticazione Basic Auth
 String createBasicAuth(String username, String password) {
   final credentials = '$username:$password';
@@ -18,7 +41,7 @@ String createBasicAuth(String username, String password) {
 // Funzione per decodificare le entità HTML nei testi
 String decodeHtmlEntities(String htmlString) {
   if (htmlString.isEmpty) return htmlString;
-
+  
   // Mappa delle entità HTML più comuni
   final Map<String, String> htmlEntities = {
     '&amp;': '&',
@@ -275,14 +298,14 @@ String decodeHtmlEntities(String htmlString) {
     '&#8702;': '⇾', // rightwards white arrow in wall bracket
     '&#8703;': '⇿', // rightwards white arrow in wall bracket
   };
-
+  
   String result = htmlString;
-
+  
   // Decodifica le entità HTML
   htmlEntities.forEach((entity, char) {
     result = result.replaceAll(entity, char);
   });
-
+  
   // Gestisce le entità numeriche come &#8211; (en dash)
   result = result.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
     final code = int.tryParse(match.group(1) ?? '');
@@ -291,7 +314,7 @@ String decodeHtmlEntities(String htmlString) {
     }
     return match.group(0) ?? '';
   });
-
+  
   // Gestisce le entità esadecimali come &#x2013; (en dash)
   result = result.replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (match) {
     final code = int.tryParse(match.group(1) ?? '', radix: 16);
@@ -300,7 +323,7 @@ String decodeHtmlEntities(String htmlString) {
     }
     return match.group(0) ?? '';
   });
-
+  
   return result;
 }
 
@@ -398,14 +421,14 @@ Future<void> regenerateToken() async {
             loginResponse.headers['location']?.contains('wp-admin') == true ||
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
-          jwtToken = cookies;
-          await prefs.setString('jwtToken', jwtToken!);
+        jwtToken = cookies;
+        await prefs.setString('jwtToken', jwtToken!);
           await prefs.setBool('isLoggedIn', true);
-          debugPrint('Cookie rigenerati con successo');
+        debugPrint('Cookie rigenerati con successo');
 
           // Verifica che il login sia effettivamente riuscito
           await _verifyLoginSuccess();
-        } else {
+      } else {
           debugPrint('Rigenerazione cookie fallita - login non riuscito');
           debugPrint('Response body: ${loginResponse.body}');
           await clearLoginData();
@@ -1346,9 +1369,9 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
           : RefreshIndicator(
               onRefresh: _refreshPosts,
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
                 itemCount: currentPosts.length,
-                itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
                   final post = currentPosts[index];
                   final title =
                       decodeHtmlEntities(post['title']['rendered'] ?? '');
@@ -1358,189 +1381,189 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                   final status = post['status'] ?? '';
                   final url = post['link'] ?? '';
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      borderRadius: BorderRadius.circular(20),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () {
-                          if (url.isNotEmpty) {
-                            _openInAppBrowser(url);
-                          }
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            gradient: status == 'private'
-                                ? const LinearGradient(
+          return Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  if (url.isNotEmpty) {
+                    _openInAppBrowser(url);
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: status == 'private'
+                        ? const LinearGradient(
                                     colors: [
                                       Color(0xFFFFF3E0),
                                       Color(0xFFFFE0B2)
                                     ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  )
-                                : const LinearGradient(
-                                    colors: [Colors.white, Color(0xFFFAFAFA)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                            border: status == 'private'
-                                ? Border.all(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Colors.white, Color(0xFFFAFAFA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    border: status == 'private'
+                        ? Border.all(
                                     color: const Color(0xFFFF9800)
                                         .withOpacity(0.3),
-                                    width: 1.5,
-                                  )
-                                : null,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: status == 'private'
+                            width: 1.5,
+                          )
+                        : null,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: status == 'private'
                                             ? const Color(0xFFFF9800)
                                                 .withOpacity(0.1)
                                             : const Color(0xFF2196F3)
                                                 .withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(
-                                        status == 'private'
-                                            ? Icons.lock_rounded
-                                            : Icons.article_rounded,
-                                        color: status == 'private'
-                                            ? const Color(0xFFFF9800)
-                                            : const Color(0xFF2196F3),
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        title,
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: status == 'private'
-                                              ? const Color(0xFFE65100)
-                                              : const Color(0xFF2C3E50),
-                                          height: 1.3,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(
-                                        Icons.arrow_forward_ios_rounded,
-                                        size: 14,
-                                        color: Color(0xFF7F8C8D),
-                                      ),
-                                    ),
-                                  ],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                status == 'private'
+                                    ? Icons.lock_rounded
+                                    : Icons.article_rounded,
+                                color: status == 'private'
+                                    ? const Color(0xFFFF9800)
+                                    : const Color(0xFF2196F3),
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                title,
+                                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                                  color: status == 'private'
+                                      ? const Color(0xFFE65100)
+                                      : const Color(0xFF2C3E50),
+                                  height: 1.3,
                                 ),
-                                if (excerpt.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _removeHtmlTags(excerpt),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: status == 'private'
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: Color(0xFF7F8C8D),
+                              ),
+                            ),
+                        ],
+              ),
+                        if (excerpt.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                            Text(
+                  _removeHtmlTags(excerpt),
+                            style: TextStyle(
+                    fontSize: 14,
+                              color: status == 'private'
                                           ? const Color(0xFFBF360C)
                                               .withOpacity(0.8)
-                                          : const Color(0xFF7F8C8D),
-                                      height: 1.4,
-                                    ),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: status == 'private'
+                                  : const Color(0xFF7F8C8D),
+                              height: 1.4,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: status == 'private'
                                             ? const Color(0xFFFF9800)
                                                 .withOpacity(0.1)
                                             : const Color(0xFF4CAF50)
                                                 .withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
                                         status == 'private'
                                             ? 'Privato'
                                             : 'Pubblico',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: status == 'private'
-                                              ? const Color(0xFFFF9800)
-                                              : const Color(0xFF4CAF50),
-                                        ),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      'ID: $authorId',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF95A5A6),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: status == 'private'
+                                      ? const Color(0xFFFF9800)
+                                      : const Color(0xFF4CAF50),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                            const Spacer(),
+                            Text(
+                              'ID: $authorId',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF95A5A6),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                      ],
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
+          );
+        },
+              ),
+      ),
     );
   }
 
   String _removeHtmlTags(String htmlText) {
     if (htmlText.isEmpty) return htmlText;
-
+    
     // Prima decodifica le entità HTML
     final decodedText = decodeHtmlEntities(htmlText);
-
+    
     // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
     return decodedText.replaceAll(regex, '');
@@ -1595,9 +1618,9 @@ class WebcamScreen extends StatelessWidget {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Column(
+        child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          children: [
                 const SizedBox(height: 20),
                 const Text(
                   'Monitoraggio in Tempo Reale',
@@ -1630,12 +1653,12 @@ class WebcamScreen extends StatelessWidget {
                           colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
                         ),
                         onTap: () {
-                          _openInAppBrowser(
-                            'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
+                _openInAppBrowser(
+                  'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
+                );
+              },
+            ),
+            const SizedBox(height: 20),
                       _buildWebcamCard(
                         context,
                         icon: Icons.landscape_rounded,
@@ -1646,12 +1669,12 @@ class WebcamScreen extends StatelessWidget {
                           colors: [Color(0xFF27AE60), Color(0xFF229954)],
                         ),
                         onTap: () {
-                          _openInAppBrowser(
-                            'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
+                _openInAppBrowser(
+                  'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
+                );
+              },
+            ),
+            const SizedBox(height: 20),
                       _buildWebcamCard(
                         context,
                         icon: Icons.wb_sunny_rounded,
@@ -1663,12 +1686,12 @@ class WebcamScreen extends StatelessWidget {
                           colors: [Color(0xFFE67E22), Color(0xFFD35400)],
                         ),
                         onTap: () {
-                          _openInAppBrowser(
-                            'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
-                          );
-                        },
-                      ),
-                    ],
+                _openInAppBrowser(
+                  'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
+                );
+              },
+            ),
+          ],
                   ),
                 ),
               ],
@@ -1848,8 +1871,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
+        child: Column(
+          children: [
               // Indicatore di pagina
               Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -1861,8 +1884,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       width: _currentPage == index ? 24 : 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: _currentPage == index
-                            ? Colors.white
+                        color: _currentPage == index 
+                            ? Colors.white 
                             : Colors.white.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -1870,78 +1893,78 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   }),
                 ),
               ),
-
+              
               // PageView
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
+            Expanded(
+              child: PageView(
+                controller: _pageController,
                   onPageChanged: (index) {
                     setState(() {
                       _currentPage = index;
                     });
                   },
-                  children: [
-                    _buildOnboardingPage(
+                children: [
+                  _buildOnboardingPage(
                       Icons.home_rounded,
                       'Benvenuto nell\'app del condominio!',
                       'Gestisci facilmente tutte le informazioni relative al tuo condominio in modo semplice e intuitivo.',
                       const Color(0xFF3498DB),
-                    ),
-                    _buildOnboardingPage(
+                  ),
+                  _buildOnboardingPage(
                       Icons.notifications_rounded,
                       'Rimani sempre aggiornato!',
                       'Visualizza le ultime novità, comunicazioni e aggiornamenti riguardanti il tuo condominio.',
                       const Color(0xFFE74C3C),
-                    ),
-                    _buildOnboardingPage(
+                  ),
+                  _buildOnboardingPage(
                       Icons.people_rounded,
                       'Connettiti con i vicini',
                       'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini e l\'amministrazione.',
                       const Color(0xFF2ECC71),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
+            ),
+              
               // Pulsante di azione
-              Padding(
+            Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   children: [
                     // Pulsante principale
                     SizedBox(
-                      width: double.infinity,
+                width: double.infinity,
                       height: 56,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
                               builder: (context) => const LoginScreen(),
                             ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFC107),
                           foregroundColor: Colors.white,
                           elevation: 8,
                           shadowColor: const Color(0xFFFFC107).withOpacity(0.3),
-                          shape: RoundedRectangleBorder(
+                    shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
+                    ),
+                  ),
+                  child: const Text(
                           'Inizia ora',
-                          style: TextStyle(
+                    style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-
+                  ),
+                ),
+              ),
+            ),
+                    
                     const SizedBox(height: 16),
-
+                    
                     // Pulsante skip
                     TextButton(
                       onPressed: () {
@@ -1958,10 +1981,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           color: Colors.white70,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                ),
+              ),
+            ),
+          ],
                 ),
               ),
             ],
@@ -1975,9 +1998,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       IconData icon, String title, String description, Color accentColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40),
-      child: Column(
+        child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+          children: [
           // Icona principale
           Container(
             width: 120,
@@ -1999,34 +2022,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: Colors.white,
             ),
           ),
-
+          
           const SizedBox(height: 48),
-
+          
           // Titolo
-          Text(
-            title,
+            Text(
+              title,
             style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
               color: Colors.white,
               height: 1.2,
             ),
-            textAlign: TextAlign.center,
-          ),
-
+              textAlign: TextAlign.center,
+            ),
+          
           const SizedBox(height: 24),
-
+          
           // Descrizione
-          Text(
-            description,
+            Text(
+              description,
             style: TextStyle(
               fontSize: 16,
               color: Colors.white.withOpacity(0.9),
               height: 1.5,
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+              textAlign: TextAlign.center,
+            ),
+          ],
       ),
     );
   }
@@ -2046,11 +2069,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> handleLogin(String username, String password) async {
     if (_isLoading) return;
-
+    
     setState(() {
       _isLoading = true;
     });
-
+    
     try {
       debugPrint('=== INIZIO LOGIN ===');
       debugPrint('Username: $username');
@@ -2177,7 +2200,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+            decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -2194,10 +2217,10 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(24.0),
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 400),
-                child: Card(
+              child: Card(
                   elevation: 20,
                   shadowColor: Colors.black.withOpacity(0.3),
-                  shape: RoundedRectangleBorder(
+                shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Container(
@@ -2208,12 +2231,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         end: Alignment.bottomRight,
                         colors: [Colors.white, Color(0xFFFAFAFA)],
                       ),
-                    ),
-                    child: Padding(
+                ),
+                child: Padding(
                       padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                           // Logo e titolo
                           Container(
                             padding: const EdgeInsets.all(20),
@@ -2222,8 +2245,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Image.asset(
-                              "assets/logo.png",
-                              width: 80,
+                              "assets/logo.png", 
+                              width: 80, 
                               height: 80,
                             ),
                           ),
@@ -2245,7 +2268,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 40),
-
+                          
                           // Campo username
                           Container(
                             decoration: BoxDecoration(
@@ -2260,8 +2283,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: TextField(
                               controller: _usernameController,
-                              decoration: InputDecoration(
-                                labelText: 'Nome utente',
+                        decoration: InputDecoration(
+                          labelText: 'Nome utente',
                                 hintText: 'Inserisci il tuo username',
                                 prefixIcon: Container(
                                   margin: const EdgeInsets.all(8),
@@ -2277,7 +2300,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     size: 20,
                                   ),
                                 ),
-                                border: OutlineInputBorder(
+                          border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide.none,
                                 ),
@@ -2288,10 +2311,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   vertical: 16,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                          
                           // Campo password
                           Container(
                             decoration: BoxDecoration(
@@ -2306,9 +2329,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: TextField(
                               controller: _passwordController,
-                              obscureText: true,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
                                 hintText: 'Inserisci la tua password',
                                 prefixIcon: Container(
                                   margin: const EdgeInsets.all(8),
@@ -2324,7 +2347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     size: 20,
                                   ),
                                 ),
-                                border: OutlineInputBorder(
+                          border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: BorderSide.none,
                                 ),
@@ -2338,7 +2361,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 32),
-
+                          
                           // Pulsante login
                           SizedBox(
                             width: double.infinity,
@@ -2354,19 +2377,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
                                       if (username.isEmpty ||
                                           password.isEmpty) {
-                                        _showErrorDialog('Campi mancanti',
-                                            'Inserisci username e password per effettuare il login.');
-                                      } else {
-                                        handleLogin(username, password);
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFFC107),
-                                foregroundColor: Colors.white,
+                                  _showErrorDialog('Campi mancanti', 
+                                    'Inserisci username e password per effettuare il login.');
+                          } else {
+                                  handleLogin(username, password);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFC107),
+                          foregroundColor: Colors.white,
                                 elevation: 8,
                                 shadowColor:
                                     const Color(0xFFFFC107).withOpacity(0.3),
-                                shape: RoundedRectangleBorder(
+                          shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
@@ -2389,16 +2412,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 24),
-
+                          
                           // Link di supporto
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              TextButton(
-                                onPressed: () {
-                                  launchUrl(Uri.parse(
-                                      '$urlSito/wp-login.php?action=register'));
-                                },
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              launchUrl(Uri.parse(
+                                  '$urlSito/wp-login.php?action=register'));
+                            },
                                 child: const Text(
                                   'Registrati',
                                   style: TextStyle(
@@ -2406,12 +2429,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  launchUrl(Uri.parse(
-                                      '$urlSito/wp-login.php?action=lostpassword'));
-                                },
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              launchUrl(Uri.parse(
+                                  '$urlSito/wp-login.php?action=lostpassword'));
+                            },
                                 child: const Text(
                                   'Password\ndimenticata?',
                                   style: TextStyle(
@@ -2419,15 +2442,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ),
-                            ],
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
+            ),
+          ),
             ),
           ),
         ),
@@ -2526,23 +2549,23 @@ class _SplashScreenState extends State<SplashScreen>
       // Verifica se i cookie contengono una sessione valida
       if (jwtToken!.contains('wordpress_logged_in')) {
         debugPrint('Cookie di sessione valido, utente già loggato');
-
+        
         // Verifica aggiuntiva: testa se la sessione è ancora attiva
         final isValid = await _verifySessionValidity();
         if (isValid) {
           debugPrint('Sessione verificata e valida, vai alla home');
-          // Vai direttamente alla home
-          if (context.mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MyHomePage(
-                  title: '',
-                  userEmail: '',
-                  userName: '',
-                ),
+        // Vai direttamente alla home
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MyHomePage(
+                title: '',
+                userEmail: '',
+                userName: '',
               ),
-            );
+            ),
+          );
           }
         } else {
           debugPrint('Sessione non valida, riautenticazione automatica');
@@ -2568,7 +2591,7 @@ class _SplashScreenState extends State<SplashScreen>
   Future<bool> _verifySessionValidity() async {
     try {
       debugPrint('Verifica validità sessione...');
-
+      
       // Prova ad accedere a un endpoint che richiede autenticazione
       final response = await http.get(
         Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
@@ -2578,9 +2601,9 @@ class _SplashScreenState extends State<SplashScreen>
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
       );
-
+      
       debugPrint('Verifica sessione status: ${response.statusCode}');
-
+      
       if (response.statusCode == 200) {
         debugPrint('Sessione valida');
         return true;
@@ -2949,13 +2972,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     debugPrint('=== INIZIALIZZAZIONE DATI ===');
 
     try {
-      await fetchWpMenu();
-      await fetchPosts();
-      await fetchUserData();
+    await fetchWpMenu();
+    await fetchPosts();
+    await fetchUserData();
 
-      if (mounted) {
-        startUrgentNotificationWatcher(context, posts);
-        startTokenRefreshTimer();
+    if (mounted) {
+      startUrgentNotificationWatcher(context, posts);
+      startTokenRefreshTimer();
       }
 
       debugPrint('Inizializzazione completata');
@@ -3193,18 +3216,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
           final response = await http.get(
             Uri.parse(endpoint),
-            headers: {
+        headers: {
               'Authorization': basicAuth,
-              'Content-Type': 'application/json',
+          'Content-Type': 'application/json',
               'User-Agent': 'Flutter App/1.0',
               'Accept': 'application/json',
-            },
-          );
+        },
+      );
 
           debugPrint('Basic Auth status code: ${response.statusCode}');
           debugPrint('Basic Auth response body: ${response.body}');
 
-          if (response.statusCode == 200) {
+      if (response.statusCode == 200) {
             final List<dynamic> data = json.decode(response.body);
             debugPrint('Post ricevuti con Basic Auth: ${data.length}');
 
@@ -3217,8 +3240,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             debugPrint('Basic Auth fallita (401) - credenziali non valide');
           } else if (response.statusCode == 403) {
             debugPrint('Basic Auth fallita (403) - permessi insufficienti');
-          }
-        } catch (e) {
+      }
+    } catch (e) {
           debugPrint('Errore Basic Auth con endpoint $endpoint: $e');
         }
       }
@@ -3250,19 +3273,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         try {
           debugPrint('Provando endpoint categoria: $endpoint');
 
-          final response = await http.get(
+      final response = await http.get(
             Uri.parse(endpoint),
-            headers: {
+        headers: {
               'Cookie': jwtToken!,
-              'Content-Type': 'application/json',
+          'Content-Type': 'application/json',
               'User-Agent': 'Flutter App/1.0',
               'Accept': 'application/json',
-            },
-          );
+        },
+      );
 
           debugPrint('Status code (categoria): ${response.statusCode}');
 
-          if (response.statusCode == 200) {
+      if (response.statusCode == 200) {
             final List<dynamic> data = json.decode(response.body);
             debugPrint('Post categoria ricevuti: ${data.length}');
 
@@ -3558,7 +3581,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
 
     if (mounted) {
-      setState(() {
+        setState(() {
         posts = filtered;
       });
       debugPrint('=== POST AGGIORNATI NELLO STATE: ${posts.length} ===');
@@ -3947,7 +3970,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           ? categories
                               .map<String>((c) => (c['name'] ?? '') as String)
                               .join(', ')
-                          : 'Senza categoria';
+                      : 'Senza categoria';
 
                   final imageUrl =
                       post['_embedded']?['wp:featuredmedia']?[0]?['source_url'];
@@ -3963,13 +3986,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           : const Color(0xFF2196F3));
 
                   return Padding(
-                      padding: const EdgeInsets.only(bottom: 28),
-                      child: Material(
+                    padding: const EdgeInsets.only(bottom: 28),
+                    child: Material(
+                      borderRadius: BorderRadius.circular(24),
+                      elevation: 0,
+                      color: Colors.transparent,
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(24),
-                        elevation: 0,
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(24),
                           onTap: () {
                             Navigator.push(
                               context,
@@ -3982,228 +4005,228 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                               ),
                             );
                           },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
-                              gradient: isUrgente
-                                  ? const LinearGradient(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            gradient: isUrgente
+                                ? const LinearGradient(
                                       colors: [
                                         Color(0xFFFFEBEE),
                                         Color(0xFFFFCDD2)
                                       ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : status == 'private'
-                                      ? const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : status == 'private'
+                                    ? const LinearGradient(
                                           colors: [
                                             Color(0xFFFFF3E0),
                                             Color(0xFFFFE0B2)
                                           ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        )
-                                      : const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                    : const LinearGradient(
                                           colors: [
                                             Colors.white,
                                             Color(0xFFFAFAFA)
                                           ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                              border: isUrgente
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                            border: isUrgente
                                   ? Border.all(
                                       color: const Color(0xFFE53935)
                                           .withOpacity(0.3),
                                       width: 2)
-                                  : (status == 'private'
+                                : (status == 'private'
                                       ? Border.all(
                                           color: const Color(0xFFFF9800)
                                               .withOpacity(0.3),
                                           width: 1.5)
-                                      : null),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isUrgente
-                                      ? Colors.red.withOpacity(0.2)
-                                      : Colors.black.withOpacity(0.08),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (imageUrl != null)
-                                    Stack(
-                                      children: [
-                                        Image.network(
-                                          imageUrl,
-                                          height: 180,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                        ),
-                                        Positioned.fill(
-                                          child: DecoratedBox(
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
+                                    : null),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isUrgente
+                                    ? Colors.red.withOpacity(0.2)
+                                    : Colors.black.withOpacity(0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (imageUrl != null)
+                                  Stack(
+                                    children: [
+                                      Image.network(
+                                        imageUrl,
+                                        height: 180,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned.fill(
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
                                                 colors: [
                                                   Colors.transparent,
                                                   Colors.black.withOpacity(0.3)
                                                 ],
-                                              ),
                                             ),
                                           ),
                                         ),
-                                        if (isUrgente)
-                                          Positioned(
-                                            top: 12,
-                                            left: 12,
-                                            child: Container(
+                                      ),
+                                      if (isUrgente)
+                                        Positioned(
+                                          top: 12,
+                                          left: 12,
+                                          child: Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 12,
                                                       vertical: 6),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFE53935),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE53935),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
-                                              ),
-                                              child: const Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
                                                   Icon(
                                                       Icons
                                                           .priority_high_rounded,
                                                       color: Colors.white,
                                                       size: 16),
-                                                  SizedBox(width: 4),
-                                                  Text(
-                                                    'URGENTE',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 12,
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'URGENTE',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                    ),
                                                   ),
-                                                ],
-                                              ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        if (status == 'private')
-                                          Positioned(
-                                            top: 12,
-                                            right: 12,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFFF9800),
+                                        ),
+                                      if (status == 'private')
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFF9800),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
-                                              ),
+                                            ),
                                               child: const Icon(
                                                   Icons.lock_rounded,
                                                   color: Colors.white,
                                                   size: 16),
-                                            ),
                                           ),
-                                      ],
-                                    ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Column(
+                                        ),
+                                    ],
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
                                                 color:
                                                     badgeColor.withOpacity(0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
-                                              ),
-                                              child: Icon(
-                                                isUrgente
+                                            ),
+                                            child: Icon(
+                                              isUrgente
                                                     ? Icons
                                                         .priority_high_rounded
-                                                    : (status == 'private'
-                                                        ? Icons.lock_rounded
+                                                  : (status == 'private'
+                                                      ? Icons.lock_rounded
                                                         : Icons
                                                             .article_rounded),
-                                                color: badgeColor,
-                                                size: 20,
-                                              ),
+                                              color: badgeColor,
+                                              size: 20,
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
                                                 decodeHtmlEntities(post['title']
                                                         ?['rendered'] ??
                                                     ''),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isUrgente
-                                                      ? const Color(0xFFC62828)
-                                                      : (status == 'private'
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: isUrgente
+                                                    ? const Color(0xFFC62828)
+                                                    : (status == 'private'
                                                           ? const Color(
                                                               0xFFE65100)
                                                           : const Color(
                                                               0xFF2C3E50)),
-                                                  height: 1.3,
-                                                ),
+                                                height: 1.3,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Container(
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Container(
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 12, vertical: 6),
-                                          decoration: BoxDecoration(
+                                        decoration: BoxDecoration(
                                             color: const Color(0xFF2196F3)
                                                 .withOpacity(0.1),
                                             borderRadius:
                                                 BorderRadius.circular(16),
-                                          ),
-                                          child: Text(
-                                            categoryNames,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF1976D2),
-                                            ),
+                                        ),
+                                        child: Text(
+                                          categoryNames,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF1976D2),
                                           ),
                                         ),
-                                        const SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Container(
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 10,
                                                       vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: isUrgente
+                                            decoration: BoxDecoration(
+                                              color: isUrgente
                                                     ? const Color(0xFFE53935)
                                                         .withOpacity(0.1)
-                                                    : (status == 'private'
+                                                  : (status == 'private'
                                                         ? const Color(
                                                                 0xFFFF9800)
                                                             .withOpacity(0.1)
@@ -4212,101 +4235,101 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                             .withOpacity(0.1)),
                                                 borderRadius:
                                                     BorderRadius.circular(12),
-                                              ),
-                                              child: Text(
-                                                isUrgente
-                                                    ? 'Urgente'
+                                            ),
+                                            child: Text(
+                                              isUrgente
+                                                  ? 'Urgente'
                                                     : (status == 'private'
                                                         ? 'Privato'
                                                         : 'Pubblico'),
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: isUrgente
-                                                      ? const Color(0xFFE53935)
-                                                      : (status == 'private'
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: isUrgente
+                                                    ? const Color(0xFFE53935)
+                                                    : (status == 'private'
                                                           ? const Color(
                                                               0xFFFF9800)
                                                           : const Color(
                                                               0xFF4CAF50)),
-                                                ),
                                               ),
                                             ),
-                                            const Spacer(),
-                                            if (authorId is int && authorId > 0)
-                                              const Text(
-                                                'Autore',
+                                          ),
+                                          const Spacer(),
+                                          if (authorId is int && authorId > 0)
+                                            const Text(
+                                              'Autore',
                                                 style: TextStyle(
                                                     fontSize: 10,
                                                     color: Colors.grey),
-                                              ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
                                           _removeHtmlTags(post['excerpt']
                                                   ?['rendered'] ??
                                               ''),
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            color: Color(0xFF555555),
-                                            height: 1.5,
-                                          ),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          color: Color(0xFF555555),
+                                          height: 1.5,
                                         ),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
+                                      ),
+                                      const SizedBox(height: 16),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
                                                 builder: (context) =>
                                                     PostDetailScreen(
-                                                  post: post,
+                                                post: post,
                                                   userName: userData?['name'] ??
                                                       'Utente',
                                                   userEmail:
                                                       userData?['email'] ?? '',
-                                                ),
                                               ),
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: badgeColor,
-                                            foregroundColor: Colors.white,
+                                            ),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: badgeColor,
+                                          foregroundColor: Colors.white,
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 24, vertical: 12),
                                             shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(16)),
-                                            elevation: 4,
+                                          elevation: 4,
                                             shadowColor:
                                                 badgeColor.withOpacity(0.3),
-                                          ),
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
                                               Text('Leggi tutto',
                                                   style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.w600,
                                                       fontSize: 14)),
-                                              SizedBox(width: 8),
+                                            SizedBox(width: 8),
                                               Icon(Icons.arrow_forward_rounded,
                                                   size: 16),
-                                            ],
-                                          ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ));
+                      ),
+                    ));
                 }).toList(),
               if (visiblePosts.isEmpty)
                 Column(
@@ -4866,10 +4889,10 @@ class PostTab extends StatelessWidget {
 
   String _removeHtmlTags(String htmlText) {
     if (htmlText.isEmpty) return htmlText;
-
+    
     // Prima decodifica le entità HTML
     final decodedText = decodeHtmlEntities(htmlText);
-
+    
     // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
     return decodedText.replaceAll(regex, '');
@@ -5012,9 +5035,9 @@ class ContactOptionsScreen extends StatelessWidget {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
                 const Text(
                   'Seleziona il servizio',
                   style: TextStyle(
@@ -5040,7 +5063,7 @@ class ContactOptionsScreen extends StatelessWidget {
     // Colori specifici per ogni servizio
     Color primaryColor;
     Color secondaryColor;
-
+    
     switch (label) {
       case "Bombole Gas":
         primaryColor = const Color(0xFFE91E63); // Rosa vibrante
@@ -5156,24 +5179,67 @@ class _EmailFormTabState extends State<EmailFormTab> {
     super.dispose();
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     final email = _emailController.text.trim();
     final name = _nameController.text.trim();
-    final message = _messageController.text.trim();
+    final phone = _phoneController.text.trim();
+    final messageText = _messageController.text.trim();
 
-    if (email.isEmpty || message.isEmpty || name.isEmpty) {
+    if (email.isEmpty || messageText.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Compila tutti i campi obbligatori')),
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Messaggio inviato!')),
-    );
+    try {
+      // Prepara il corpo dell'email
+      final emailBody = '''
+Nome: $name
+Email: $email
+Telefono: ${phone.isNotEmpty ? phone : 'Non fornito'}
+Oggetto: ${widget.subject}
 
-    _phoneController.clear();
-    _messageController.clear();
+Messaggio:
+$messageText
+
+---
+Inviato dall'app Porto Bello di Gallura
+      ''';
+
+      // Apri l'app email del dispositivo
+      await sendEmail(
+        to: 'webmaster@portobellodigallura.it',
+        subject: '${widget.subject} - $name',
+        body: emailBody,
+      );
+
+      // Mostra messaggio di successo
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('App email aperta con successo!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Pulisci i campi
+        _emailController.clear();
+        _nameController.clear();
+        _phoneController.clear();
+        _messageController.clear();
+      }
+    } catch (e) {
+      // Mostra messaggio di errore
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore nell\'apertura dell\'app email: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -5374,7 +5440,7 @@ class PostDetailScreen extends StatelessWidget {
                             status == 'private' ? Colors.orange : Colors.green,
                       ),
                       const SizedBox(width: 8),
-                      Text(
+            Text(
                         status == 'private' ? 'Privato' : 'Pubblico',
                         style: TextStyle(
                           fontSize: 12,
