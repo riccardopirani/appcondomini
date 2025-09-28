@@ -3721,7 +3721,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             color: const Color(0xFF2196F3),
                             onTap: () {
                               Navigator.pop(context);
-                              _onItemTapped(1);
+                              _openInAppBrowser(
+                                  'https://www.new.portobellodigallura.it/numeri-util/');
                             },
                           ),
                           const SizedBox(height: 12),
