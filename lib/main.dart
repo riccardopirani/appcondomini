@@ -1,15 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
 String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
-
 // Funzione per creare l'autenticazione Basic Auth
 String createBasicAuth(String username, String password) {
   final credentials = '$username:$password';
@@ -17,6 +14,294 @@ String createBasicAuth(String username, String password) {
   return 'Basic $encoded';
 }
 
+// Funzione per decodificare le entità HTML nei testi
+String decodeHtmlEntities(String htmlString) {
+  if (htmlString.isEmpty) return htmlString;
+  
+  // Mappa delle entità HTML più comuni
+  final Map<String, String> htmlEntities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&ndash;': '–',
+    '&mdash;': '—',
+    '&hellip;': '…',
+    '&lsquo;': ''',
+    '&rsquo;': ''',
+    '&ldquo;': '"',
+    '&rdquo;': '"',
+    '&bull;': '•',
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™',
+    '&euro;': '€',
+    '&pound;': '£',
+    '&yen;': '¥',
+    '&cent;': '¢',
+    '&sect;': '§',
+    '&para;': '¶',
+    '&middot;': '·',
+    '&deg;': '°',
+    '&plusmn;': '±',
+    '&times;': '×',
+    '&divide;': '÷',
+    '&frac14;': '¼',
+    '&frac12;': '½',
+    '&frac34;': '¾',
+    '&sup1;': '¹',
+    '&sup2;': '²',
+    '&sup3;': '³',
+    '&ordm;': 'º',
+    '&ordf;': 'ª',
+    '&alpha;': 'α',
+    '&beta;': 'β',
+    '&gamma;': 'γ',
+    '&delta;': 'δ',
+    '&epsilon;': 'ε',
+    '&zeta;': 'ζ',
+    '&eta;': 'η',
+    '&theta;': 'θ',
+    '&iota;': 'ι',
+    '&kappa;': 'κ',
+    '&lambda;': 'λ',
+    '&mu;': 'μ',
+    '&nu;': 'ν',
+    '&xi;': 'ξ',
+    '&omicron;': 'ο',
+    '&pi;': 'π',
+    '&rho;': 'ρ',
+    '&sigma;': 'σ',
+    '&tau;': 'τ',
+    '&upsilon;': 'υ',
+    '&phi;': 'φ',
+    '&chi;': 'χ',
+    '&psi;': 'ψ',
+    '&omega;': 'ω',
+    '&Agrave;': 'À',
+    '&Aacute;': 'Á',
+    '&Acirc;': 'Â',
+    '&Atilde;': 'Ã',
+    '&Auml;': 'Ä',
+    '&Aring;': 'Å',
+    '&AElig;': 'Æ',
+    '&Ccedil;': 'Ç',
+    '&Egrave;': 'È',
+    '&Eacute;': 'É',
+    '&Ecirc;': 'Ê',
+    '&Euml;': 'Ë',
+    '&Igrave;': 'Ì',
+    '&Iacute;': 'Í',
+    '&Icirc;': 'Î',
+    '&Iuml;': 'Ï',
+    '&ETH;': 'Ð',
+    '&Ntilde;': 'Ñ',
+    '&Ograve;': 'Ò',
+    '&Oacute;': 'Ó',
+    '&Ocirc;': 'Ô',
+    '&Otilde;': 'Õ',
+    '&Ouml;': 'Ö',
+    '&Oslash;': 'Ø',
+    '&Ugrave;': 'Ù',
+    '&Uacute;': 'Ú',
+    '&Ucirc;': 'Û',
+    '&Uuml;': 'Ü',
+    '&Yacute;': 'Ý',
+    '&THORN;': 'Þ',
+    '&szlig;': 'ß',
+    '&agrave;': 'à',
+    '&aacute;': 'á',
+    '&acirc;': 'â',
+    '&atilde;': 'ã',
+    '&auml;': 'ä',
+    '&aring;': 'å',
+    '&aelig;': 'æ',
+    '&ccedil;': 'ç',
+    '&egrave;': 'è',
+    '&eacute;': 'é',
+    '&ecirc;': 'ê',
+    '&euml;': 'ë',
+    '&igrave;': 'ì',
+    '&iacute;': 'í',
+    '&icirc;': 'î',
+    '&iuml;': 'ï',
+    '&eth;': 'ð',
+    '&ntilde;': 'ñ',
+    '&ograve;': 'ò',
+    '&oacute;': 'ó',
+    '&ocirc;': 'ô',
+    '&otilde;': 'õ',
+    '&ouml;': 'ö',
+    '&oslash;': 'ø',
+    '&ugrave;': 'ù',
+    '&uacute;': 'ú',
+    '&ucirc;': 'û',
+    '&uuml;': 'ü',
+    '&yacute;': 'ý',
+    '&thorn;': 'þ',
+    '&yuml;': 'ÿ',
+    // Entità specifiche per i post del condominio
+    '&#8211;': '–', // en dash
+    '&#8212;': '—', // em dash
+    '&#8216;': ''', // left single quotation mark
+    '&#8217;': ''', // right single quotation mark
+    '&#8218;': '‚', // single low-9 quotation mark
+    '&#8219;': '‛', // single high-reversed-9 quotation mark
+    '&#8220;': '"', // left double quotation mark
+    '&#8221;': '"', // right double quotation mark
+    '&#8222;': '„', // double low-9 quotation mark
+    '&#8226;': '•', // bullet
+    '&#8230;': '…', // horizontal ellipsis
+    '&#8242;': '′', // prime
+    '&#8243;': '″', // double prime
+    '&#8249;': '‹', // single left-pointing angle quotation mark
+    '&#8250;': '›', // single right-pointing angle quotation mark
+    '&#8364;': '€', // euro sign
+    '&#8482;': '™', // trade mark sign
+    '&#8592;': '←', // leftwards arrow
+    '&#8593;': '↑', // upwards arrow
+    '&#8594;': '→', // rightwards arrow
+    '&#8595;': '↓', // downwards arrow
+    '&#8596;': '↔', // left right arrow
+    '&#8597;': '↕', // up down arrow
+    '&#8598;': '↖', // north west arrow
+    '&#8599;': '↗', // north east arrow
+    '&#8600;': '↘', // south east arrow
+    '&#8601;': '↙', // south west arrow
+    '&#8602;': '↚', // leftwards arrow with stroke
+    '&#8603;': '↛', // rightwards arrow with stroke
+    '&#8604;': '↜', // leftwards wave arrow
+    '&#8605;': '↝', // rightwards wave arrow
+    '&#8606;': '↞', // leftwards two headed arrow
+    '&#8607;': '↟', // upwards two headed arrow
+    '&#8608;': '↠', // rightwards two headed arrow
+    '&#8609;': '↡', // downwards two headed arrow
+    '&#8610;': '↢', // leftwards arrow with tail
+    '&#8611;': '↣', // rightwards arrow with tail
+    '&#8612;': '↤', // leftwards arrow from bar
+    '&#8613;': '↥', // upwards arrow from bar
+    '&#8614;': '↦', // rightwards arrow from bar
+    '&#8615;': '↧', // downwards arrow from bar
+    '&#8616;': '↨', // up down arrow with base
+    '&#8617;': '↩', // leftwards arrow with hook
+    '&#8618;': '↪', // rightwards arrow with hook
+    '&#8619;': '↫', // leftwards arrow with loop
+    '&#8620;': '↬', // rightwards arrow with loop
+    '&#8621;': '↭', // left right wave arrow
+    '&#8622;': '↮', // left right arrow with stroke
+    '&#8623;': '↯', // downwards zigzag arrow
+    '&#8624;': '↰', // upwards arrow with tip leftwards
+    '&#8625;': '↱', // upwards arrow with tip rightwards
+    '&#8626;': '↲', // downwards arrow with tip leftwards
+    '&#8627;': '↳', // downwards arrow with tip rightwards
+    '&#8628;': '↴', // rightwards arrow with corner downwards
+    '&#8629;': '↵', // downwards arrow with corner leftwards
+    '&#8630;': '↶', // anticlockwise top semicircle arrow
+    '&#8631;': '↷', // clockwise top semicircle arrow
+    '&#8632;': '↸', // north west arrow to long bar
+    '&#8633;': '↹', // leftwards arrow to bar over rightwards arrow to bar
+    '&#8634;': '↺', // anticlockwise open circle arrow
+    '&#8635;': '↻', // clockwise open circle arrow
+    '&#8636;': '↼', // leftwards harpoon with barb upwards
+    '&#8637;': '↽', // leftwards harpoon with barb downwards
+    '&#8638;': '↾', // upwards harpoon with barb rightwards
+    '&#8639;': '↿', // upwards harpoon with barb leftwards
+    '&#8640;': '⇀', // rightwards harpoon with barb upwards
+    '&#8641;': '⇁', // rightwards harpoon with barb downwards
+    '&#8642;': '⇂', // downwards harpoon with barb rightwards
+    '&#8643;': '⇃', // downwards harpoon with barb leftwards
+    '&#8644;': '⇄', // rightwards arrow over leftwards arrow
+    '&#8645;': '⇅', // upwards arrow leftwards of downwards arrow
+    '&#8646;': '⇆', // leftwards arrow over rightwards arrow
+    '&#8647;': '⇇', // leftwards paired arrows
+    '&#8648;': '⇈', // upwards paired arrows
+    '&#8649;': '⇉', // rightwards paired arrows
+    '&#8650;': '⇊', // downwards paired arrows
+    '&#8651;': '⇋', // leftwards harpoon over rightwards harpoon
+    '&#8652;': '⇌', // rightwards harpoon over leftwards harpoon
+    '&#8653;': '⇍', // leftwards double arrow with stroke
+    '&#8654;': '⇎', // left right double arrow with stroke
+    '&#8655;': '⇏', // rightwards double arrow with stroke
+    '&#8656;': '⇐', // leftwards double arrow
+    '&#8657;': '⇑', // upwards double arrow
+    '&#8658;': '⇒', // rightwards double arrow
+    '&#8659;': '⇓', // downwards double arrow
+    '&#8660;': '⇔', // left right double arrow
+    '&#8661;': '⇕', // up down double arrow
+    '&#8662;': '⇖', // north west double arrow
+    '&#8663;': '⇗', // north east double arrow
+    '&#8664;': '⇘', // south east double arrow
+    '&#8665;': '⇙', // south west double arrow
+    '&#8666;': '⇚', // leftwards triple arrow
+    '&#8667;': '⇛', // rightwards triple arrow
+    '&#8668;': '⇜', // leftwards squiggle arrow
+    '&#8669;': '⇝', // rightwards squiggle arrow
+    '&#8670;': '⇞', // upwards arrow with double stroke
+    '&#8671;': '⇟', // downwards arrow with double stroke
+    '&#8672;': '⇠', // leftwards dashed arrow
+    '&#8673;': '⇡', // upwards dashed arrow
+    '&#8674;': '⇢', // rightwards dashed arrow
+    '&#8675;': '⇣', // downwards dashed arrow
+    '&#8676;': '⇤', // leftwards arrow to bar
+    '&#8677;': '⇥', // rightwards arrow to bar
+    '&#8678;': '⇦', // leftwards white arrow
+    '&#8679;': '⇧', // upwards white arrow
+    '&#8680;': '⇨', // rightwards white arrow
+    '&#8681;': '⇩', // downwards white arrow
+    '&#8682;': '⇪', // upwards white arrow from bar
+    '&#8683;': '⇫', // upwards white arrow on pedestal
+    '&#8684;': '⇬', // rightwards white arrow on pedestal
+    '&#8685;': '⇭', // rightwards white arrow in wall bracket
+    '&#8686;': '⇮', // rightwards white arrow in wall bracket
+    '&#8687;': '⇯', // rightwards white arrow in wall bracket
+    '&#8688;': '⇰', // rightwards white arrow in wall bracket
+    '&#8689;': '⇱', // rightwards white arrow in wall bracket
+    '&#8690;': '⇲', // rightwards white arrow in wall bracket
+    '&#8691;': '⇳', // rightwards white arrow in wall bracket
+    '&#8692;': '⇴', // rightwards white arrow in wall bracket
+    '&#8693;': '⇵', // rightwards white arrow in wall bracket
+    '&#8694;': '⇶', // rightwards white arrow in wall bracket
+    '&#8695;': '⇷', // rightwards white arrow in wall bracket
+    '&#8696;': '⇸', // rightwards white arrow in wall bracket
+    '&#8697;': '⇹', // rightwards white arrow in wall bracket
+    '&#8698;': '⇺', // rightwards white arrow in wall bracket
+    '&#8699;': '⇻', // rightwards white arrow in wall bracket
+    '&#8700;': '⇼', // rightwards white arrow in wall bracket
+    '&#8701;': '⇽', // rightwards white arrow in wall bracket
+    '&#8702;': '⇾', // rightwards white arrow in wall bracket
+    '&#8703;': '⇿', // rightwards white arrow in wall bracket
+  };
+  
+  String result = htmlString;
+  
+  // Decodifica le entità HTML
+  htmlEntities.forEach((entity, char) {
+    result = result.replaceAll(entity, char);
+  });
+  
+  // Gestisce le entità numeriche come &#8211; (en dash)
+  result = result.replaceAllMapped(RegExp(r'&#(\d+);'), (match) {
+    final code = int.tryParse(match.group(1) ?? '');
+    if (code != null && code >= 32 && code <= 0x10FFFF) {
+      return String.fromCharCode(code);
+    }
+    return match.group(0) ?? '';
+  });
+  
+  // Gestisce le entità esadecimali come &#x2013; (en dash)
+  result = result.replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (match) {
+    final code = int.tryParse(match.group(1) ?? '', radix: 16);
+    if (code != null && code >= 32 && code <= 0x10FFFF) {
+      return String.fromCharCode(code);
+    }
+    return match.group(0) ?? '';
+  });
+  
+  return result;
+}
 // Funzione per ricaricare il token dalle SharedPreferences (utile per hot reload)
 Future<void> reloadTokenFromStorage() async {
   try {
@@ -325,82 +610,170 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                 itemCount: currentPosts.length,
         itemBuilder: (context, index) {
                   final post = currentPosts[index];
-          final title = post['title']['rendered'] ?? '';
-          final excerpt = post['excerpt']['rendered'] ?? '';
+          final title = decodeHtmlEntities(post['title']['rendered'] ?? '');
+          final excerpt = decodeHtmlEntities(post['excerpt']['rendered'] ?? '');
                   final authorId = post['author'] ?? 0;
                   final status = post['status'] ?? '';
                   final url = post['link'] ?? '';
 
           return Container(
-            margin: const EdgeInsets.only(bottom: 16),
+            margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: status == 'private'
-                            ? Colors.orange.withValues(alpha: 0.5)
-                            : Colors.transparent,
-                        width: status == 'private' ? 2 : 0,
-                      ),
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(16),
-                      title: Row(
+            child: Material(
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  if (url.isNotEmpty) {
+                    _openInAppBrowser(url);
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: status == 'private'
+                        ? const LinearGradient(
+                            colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Colors.white, Color(0xFFFAFAFA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    border: status == 'private'
+                        ? Border.all(
+                            color: const Color(0xFFFF9800).withOpacity(0.3),
+                            width: 1.5,
+                          )
+                        : null,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: status == 'private'
+                                    ? const Color(0xFFFF9800).withOpacity(0.1)
+                                    : const Color(0xFF2196F3).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                status == 'private'
+                                    ? Icons.lock_rounded
+                                    : Icons.article_rounded,
+                                color: status == 'private'
+                                    ? const Color(0xFFFF9800)
+                                    : const Color(0xFF2196F3),
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                 title,
-                style: const TextStyle(
+                                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
-                ),
+                                  color: status == 'private'
+                                      ? const Color(0xFFE65100)
+                                      : const Color(0xFF2C3E50),
+                                  height: 1.3,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                          if (status == 'private')
-                            const Icon(
-                              Icons.lock,
-                              color: Colors.orange,
-                              size: 16,
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: Color(0xFF7F8C8D),
+                              ),
                             ),
                         ],
               ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                        if (excerpt.isNotEmpty) ...[
+                          const SizedBox(height: 12),
                             Text(
                   _removeHtmlTags(excerpt),
-                  style: const TextStyle(
+                            style: TextStyle(
                     fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-                            const SizedBox(height: 4),
+                              color: status == 'private'
+                                  ? const Color(0xFFBF360C).withOpacity(0.8)
+                                  : const Color(0xFF7F8C8D),
+                              height: 1.4,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: status == 'private'
+                                    ? const Color(0xFFFF9800).withOpacity(0.1)
+                                    : const Color(0xFF4CAF50).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                status == 'private' ? 'Privato' : 'Pubblico',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: status == 'private'
+                                      ? const Color(0xFFFF9800)
+                                      : const Color(0xFF4CAF50),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
                             Text(
-                              'Autore ID: $authorId | Status: $status',
+                              'ID: $authorId',
                               style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                                fontSize: 11,
+                                color: Color(0xFF95A5A6),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () {
-                        if (url.isNotEmpty) {
-                          _openInAppBrowser(url);
-                        }
-                      },
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           );
         },
@@ -410,8 +783,14 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
   }
 
   String _removeHtmlTags(String htmlText) {
+    if (htmlText.isEmpty) return htmlText;
+    
+    // Prima decodifica le entità HTML
+    final decodedText = decodeHtmlEntities(htmlText);
+    
+    // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return htmlText.replaceAll(regex, '');
+    return decodedText.replaceAll(regex, '');
   }
 
   Future<void> _openInAppBrowser(String url) async {
@@ -435,60 +814,209 @@ class WebcamScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Webcam Live'),
+        title: const Text(
+          'Webcam Live',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         backgroundColor: const Color(0xFFFFC107),
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFFC107),
+              Color(0xFFF8F9FA),
+            ],
+            stops: [0.0, 0.3],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.videocam),
-              label: const Text('Webcam Porto'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 60),
-              ),
-              onPressed: () {
+                const SizedBox(height: 20),
+                const Text(
+                  'Monitoraggio in Tempo Reale',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C3E50),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Visualizza le webcam e i dati meteo del Porto',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF7F8C8D),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildWebcamCard(
+                        context,
+                        icon: Icons.videocam_rounded,
+                        title: 'Webcam Porto',
+                        subtitle: 'Vista diretta del porto',
+                        description: 'Monitora l\'attività del porto in tempo reale',
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
+                        ),
+                        onTap: () {
                 _openInAppBrowser(
                   'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
                 );
               },
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.landscape),
-              label: const Text('Webcam Panoramica'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 60),
-              ),
-              onPressed: () {
+                      _buildWebcamCard(
+                        context,
+                        icon: Icons.landscape_rounded,
+                        title: 'Webcam Panoramica',
+                        subtitle: 'Vista a 360° del territorio',
+                        description: 'Goditi la vista panoramica del paesaggio',
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF27AE60), Color(0xFF229954)],
+                        ),
+                        onTap: () {
                 _openInAppBrowser(
                   'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
                 );
               },
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.cloud),
-              label: const Text('Stazione Meteo'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 60),
-              ),
-              onPressed: () {
+                      _buildWebcamCard(
+                        context,
+                        icon: Icons.wb_sunny_rounded,
+                        title: 'Stazione Meteo',
+                        subtitle: 'Dati meteorologici',
+                        description: 'Consulta temperatura, vento e condizioni meteo',
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFE67E22), Color(0xFFD35400)],
+                        ),
+                        onTap: () {
                 _openInAppBrowser(
                   'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
                 );
               },
             ),
           ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebcamCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String description,
+    required Gradient gradient,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: gradient,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 32,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.9),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -547,115 +1075,227 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
+  int _currentPage = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF2E86C1), // Blu mare come sfondo
-      body: SafeArea(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF2E86C1),
+              Color(0xFF3498DB),
+              Color(0xFF5DADE2),
+            ],
+          ),
+        ),
+        child: SafeArea(
         child: Column(
           children: [
+              // Indicatore di pagina
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: _currentPage == index ? 24 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _currentPage == index 
+                            ? Colors.white 
+                            : Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+              
+              // PageView
             Expanded(
               child: PageView(
                 controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
                 children: [
                   _buildOnboardingPage(
-                    'Benvenuto nell\'app per il condominio!',
-                    'Gestisci facilmente tutte le informazioni relative al tuo condominio.',
-                    'assets/condominio.jpeg',
+                      Icons.home_rounded,
+                      'Benvenuto nell\'app del condominio!',
+                      'Gestisci facilmente tutte le informazioni relative al tuo condominio in modo semplice e intuitivo.',
+                      const Color(0xFF3498DB),
                   ),
                   _buildOnboardingPage(
-                    'Tieniti aggiornato!',
-                    'Visualizza le ultime novità e aggiornamenti riguardanti il tuo condominio.',
-                    'assets/2.jpeg',
+                      Icons.notifications_rounded,
+                      'Rimani sempre aggiornato!',
+                      'Visualizza le ultime novità, comunicazioni e aggiornamenti riguardanti il tuo condominio.',
+                      const Color(0xFFE74C3C),
                   ),
                   _buildOnboardingPage(
-                    'Contatta i vicini',
-                    'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini.',
-                    'assets/3.jpg',
+                      Icons.people_rounded,
+                      'Connettiti con i vicini',
+                      'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini e l\'amministrazione.',
+                      const Color(0xFF2ECC71),
                   ),
                 ],
               ),
             ),
+              
+              // Pulsante di azione
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    // Pulsante principale
+                    SizedBox(
                 width: double.infinity,
+                      height: 56,
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const LoginScreen()),
+                              builder: (context) => const LoginScreen(),
+                            ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor:
-                        const Color(0xFFFFC107), // Giallo sole per il pulsante
+                          backgroundColor: const Color(0xFFFFC107),
+                          foregroundColor: Colors.white,
+                          elevation: 8,
+                          shadowColor: const Color(0xFFFFC107).withOpacity(0.3),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(16),
                     ),
-                    textStyle: const TextStyle(fontSize: 18),
                   ),
                   child: const Text(
-                    'Inizia',
+                          'Inizia ora',
                     style: TextStyle(
-                        color: Colors.white), // Testo bianco per contrasto
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Pulsante skip
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LoginScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        'Salta',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
           ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildOnboardingPage(
-      String title, String description, String imagePath) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+      IconData icon, String title, String description, Color accentColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40),
         child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.asset(
-                imagePath,
-                height: 300,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+          // Icona principale
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(60),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
+            child: Icon(
+              icon,
+              size: 60,
+              color: Colors.white,
+            ),
+          ),
+          
+          const SizedBox(height: 48),
+          
+          // Titolo
             Text(
               title,
-              style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+            style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white), // Testo bianco per i titoli
+              color: Colors.white,
+              height: 1.2,
+            ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+          
+          const SizedBox(height: 24),
+          
+          // Descrizione
             Text(
               description,
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  fontSize: 16, color: Colors.white70), // Testo bianco chiaro
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.9),
+              height: 1.5,
+            ),
               textAlign: TextAlign.center,
             ),
           ],
-        ),
       ),
     );
   }
 }
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
-  Future<void> handleLogin(
-      BuildContext context, String username, String password) async {
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> handleLogin(String username, String password) async {
+    if (_isLoading) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
       debugPrint('=== INIZIO LOGIN ===');
       debugPrint('Username: $username');
@@ -761,7 +1401,7 @@ class LoginScreen extends StatelessWidget {
       }
     } catch (err) {
       debugPrint('Login error: $err');
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Errore di connessione. Riprova.'),
@@ -769,135 +1409,253 @@ class LoginScreen extends StatelessWidget {
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final usernameController = TextEditingController();
-    final passwordController = TextEditingController();
-
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(
+      body: Container(
             decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/2.jpeg"),
-                fit: BoxFit.cover,
-              ),
-            ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF2E86C1),
+              Color(0xFF3498DB),
+              Color(0xFF5DADE2),
+            ],
           ),
-          Center(
+        ),
+        child: SafeArea(
+          child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
               child: Card(
-                color: Colors.white.withValues(alpha: 0.95),
-                elevation: 10,
+                  elevation: 20,
+                  shadowColor: Colors.black.withOpacity(0.3),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Colors.white, Color(0xFFFAFAFA)],
+                      ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                      padding: const EdgeInsets.all(32.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset("assets/logo.png", width: 80, height: 80),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Login',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium!
-                            .copyWith(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                          // Logo e titolo
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2196F3).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                      ),
-                      const SizedBox(height: 30),
-                      TextField(
-                        controller: usernameController,
+                            child: Image.asset(
+                              "assets/logo.png", 
+                              width: 80, 
+                              height: 80,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Benvenuto',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2C3E50),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Accedi al tuo account',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF7F8C8D),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                          
+                          // Campo username
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _usernameController,
                         decoration: InputDecoration(
                           labelText: 'Nome utente',
-                          labelStyle: const TextStyle(color: Colors.black),
+                                hintText: 'Inserisci il tuo username',
+                                prefixIcon: Container(
+                                  margin: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2196F3).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.person_rounded,
+                                    color: Color(0xFF2196F3),
+                                    size: 20,
+                                  ),
+                                ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          prefixIcon:
-                              const Icon(Icons.person, color: Colors.blue),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.withOpacity(0.05),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 16,
+                                ),
+                              ),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      TextField(
-                        controller: passwordController,
+                          
+                          // Campo password
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _passwordController,
                         obscureText: true,
                         decoration: InputDecoration(
                           labelText: 'Password',
-                          labelStyle: const TextStyle(color: Colors.black),
+                                hintText: 'Inserisci la tua password',
+                                prefixIcon: Container(
+                                  margin: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2196F3).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.lock_rounded,
+                                    color: Color(0xFF2196F3),
+                                    size: 20,
+                                  ),
+                                ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.withOpacity(0.05),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 16,
+                                ),
+                              ),
+                            ),
                           ),
-                          prefixIcon:
-                              const Icon(Icons.lock, color: Colors.blue),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      ElevatedButton(
-                        onPressed: () {
-                          final username = usernameController.text;
-                          final password = passwordController.text;
-                          if (username.isEmpty || password.isEmpty) {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return AlertDialog(
-                                  title: const Text('Campi mancanti'),
-                                  content: const Text(
-                                      'Inserisci username e password per effettuare il login.'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: const Text('OK'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
+                          const SizedBox(height: 32),
+                          
+                          // Pulsante login
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : () {
+                                final username = _usernameController.text.trim();
+                                final password = _passwordController.text.trim();
+                                
+                                if (username.isEmpty || password.isEmpty) {
+                                  _showErrorDialog('Campi mancanti', 
+                                    'Inserisci username e password per effettuare il login.');
                           } else {
-                            handleLogin(context, username, password);
+                                  handleLogin(username, password);
                           }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFC107),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 14, horizontal: 40),
+                                elevation: 8,
+                                shadowColor: const Color(0xFFFFC107).withOpacity(0.3),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Accedi',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
                           ),
-                          textStyle: const TextStyle(fontSize: 16),
-                        ),
-                        child: const Text('Login'),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          const SizedBox(height: 24),
+                          
+                          // Link di supporto
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           TextButton(
                             onPressed: () {
                               launchUrl(Uri.parse(
                                   '$urlSito/wp-login.php?action=register'));
                             },
-                            child: const Text('Crea nuovo utente'),
+                                child: const Text(
+                                  'Registrati',
+                                  style: TextStyle(
+                                    color: Color(0xFF2196F3),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                           ),
                           TextButton(
                             onPressed: () {
                               launchUrl(Uri.parse(
                                   '$urlSito/wp-login.php?action=lostpassword'));
                             },
-                            child: const Text('Cambio\nPassword'),
+                                child: const Text(
+                                  'Password\ndimenticata?',
+                                  style: TextStyle(
+                                    color: Color(0xFF2196F3),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                           ),
                         ],
                       ),
@@ -907,8 +1665,43 @@ class LoginScreen extends StatelessWidget {
               ),
             ),
           ),
-        ],
+            ),
+          ),
+        ),
       ),
+    );
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2C3E50),
+            ),
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  color: Color(0xFF2196F3),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -953,6 +1746,12 @@ class _SplashScreenState extends State<SplashScreen>
     final username = prefs.getString('username');
     final password = prefs.getString('password');
 
+    debugPrint('Dati salvati:');
+    debugPrint('- Token: ${savedToken != null ? "Presente (${savedToken.length} chars)" : "Assente"}');
+    debugPrint('- isLoggedIn: $isLoggedIn');
+    debugPrint('- Username: ${username != null ? "Presente" : "Assente"}');
+    debugPrint('- Password: ${password != null ? "Presente" : "Assente"}');
+
     if (savedToken != null &&
         savedToken.isNotEmpty &&
         isLoggedIn &&
@@ -963,6 +1762,11 @@ class _SplashScreenState extends State<SplashScreen>
       // Verifica se i cookie contengono una sessione valida
       if (jwtToken!.contains('wordpress_logged_in')) {
         debugPrint('Cookie di sessione valido, utente già loggato');
+        
+        // Verifica aggiuntiva: testa se la sessione è ancora attiva
+        final isValid = await _verifySessionValidity();
+        if (isValid) {
+          debugPrint('Sessione verificata e valida, vai alla home');
         // Vai direttamente alla home
         if (context.mounted) {
           Navigator.pushReplacement(
@@ -975,6 +1779,10 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           );
+          }
+        } else {
+          debugPrint('Sessione non valida, riautenticazione automatica');
+          await _autoReLogin(username, password);
         }
       } else {
         debugPrint('Cookie di sessione scaduto, riautenticazione automatica');
@@ -982,8 +1790,8 @@ class _SplashScreenState extends State<SplashScreen>
         await _autoReLogin(username, password);
       }
     } else {
-      debugPrint('Nessun token salvato, mostra login');
-      // Mostra la login
+      debugPrint('Nessun token salvato, mostra onboarding');
+      // Mostra l'onboarding che porta al login
       if (context.mounted) {
         Navigator.pushReplacement(
           context,
@@ -993,26 +1801,93 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
+  Future<bool> _verifySessionValidity() async {
+    try {
+      debugPrint('Verifica validità sessione...');
+      
+      // Prova ad accedere a un endpoint che richiede autenticazione
+      final response = await http.get(
+        Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
+        headers: {
+          'Cookie': jwtToken!,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      );
+      
+      debugPrint('Verifica sessione status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        debugPrint('Sessione valida');
+        return true;
+      } else {
+        debugPrint('Sessione non valida - status: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Errore verifica sessione: $e');
+      return false;
+    }
+  }
+
   Future<void> _autoReLogin(String username, String password) async {
     try {
       debugPrint('Tentativo riautenticazione automatica per: $username');
 
-      // Effettua login automatico
+      // Prima ottieni il nonce necessario per il login
+      final nonceResponse = await http.get(
+        Uri.parse('$urlSito/wp-login.php'),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      );
+
+      debugPrint('Nonce response status: ${nonceResponse.statusCode}');
+
+      // Estrai il nonce dalla risposta HTML
+      String nonce = '';
+      final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
+          .firstMatch(nonceResponse.body);
+      if (nonceMatch != null) {
+        nonce = nonceMatch.group(1)!;
+        debugPrint('Nonce estratto: $nonce');
+      }
+
+      // Effettua login automatico con il nonce
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': '$urlSito/wp-login.php',
+        },
+        body: nonce.isNotEmpty
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
+
+      debugPrint('Auto re-login response status: ${loginResponse.statusCode}');
+      debugPrint('Auto re-login response headers: ${loginResponse.headers}');
 
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
 
-        if (cookies.contains('wordpress_logged_in')) {
+        // Verifica se il login è riuscito
+        if (loginResponse.statusCode == 302 ||
+            loginResponse.headers['location']?.contains('wp-admin') == true ||
+            loginResponse.body.contains('wp-admin') ||
+            cookies.contains('wordpress_logged_in')) {
           // Riautenticazione riuscita
           jwtToken = cookies;
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setString('username', username);
+          await prefs.setString('password', password);
           await prefs.setBool('isLoggedIn', true);
 
           debugPrint('Riautenticazione automatica riuscita');
@@ -1031,33 +1906,34 @@ class _SplashScreenState extends State<SplashScreen>
           }
         } else {
           debugPrint(
-              'Riautenticazione automatica fallita - credenziali non valide');
-          await clearLoginData();
+              'Riautenticazione automatica fallita - login non riuscito');
+          debugPrint('Response body: ${loginResponse.body}');
+          // Non cancellare i dati, mostra direttamente il login
           if (context.mounted) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
             );
           }
         }
       } else {
         debugPrint(
             'Riautenticazione automatica fallita - nessun cookie ricevuto');
-        await clearLoginData();
+        // Non cancellare i dati, mostra direttamente il login
         if (context.mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
           );
         }
       }
     } catch (e) {
       debugPrint('Errore riautenticazione automatica: $e');
-      await clearLoginData();
+      // Non cancellare i dati, mostra direttamente il login
       if (context.mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
       }
     }
@@ -1071,7 +1947,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 }
-
 class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late List<dynamic> posts = [];
   bool isLoggedIn = false;
@@ -1081,14 +1956,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final Set<int> _notifiedUrgentPostIds = {};
   Timer? _notificationTimer;
 
+  List<dynamic> wpMenuItems = [];
+  bool isLoadingMenu = true;
+
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
-  void startUrgentNotificationWatcher(
-      BuildContext context, List<dynamic> posts) {
+  void startUrgentNotificationWatcher(BuildContext context, List<dynamic> posts) {
+    _notificationTimer?.cancel();
     _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       final urgentPosts = posts.where((post) {
         final isUrgente = _isUrgent(post);
@@ -1099,8 +1975,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (urgentPosts.isNotEmpty && context.mounted) {
         final latest = urgentPosts.first;
         final id = latest['id'];
-
-        _notifiedUrgentPostIds.add(id); // Segna come notificato
+        _notifiedUrgentPostIds.add(id);
 
         showDialog(
           context: context,
@@ -1113,9 +1988,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 child: const Text('Chiudi'),
               ),
               TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                },
+                onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text('Apri'),
               ),
             ],
@@ -1124,9 +1997,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
     });
   }
-
-  List<dynamic> wpMenuItems = [];
-  bool isLoadingMenu = true;
 
   Future<void> fetchUserData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1138,7 +2008,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       isLoggedIn = true;
     }
 
-    // Usa i dati salvati invece di fare una chiamata API
     setState(() {
       userData = {
         'name': username ?? 'Utente',
@@ -1160,27 +2029,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> _initializeWithTokenReload() async {
     debugPrint('=== INIZIALIZZAZIONE CON RICARICA TOKEN ===');
-
-    // Ricarica il token dalle SharedPreferences (utile per hot reload)
     await reloadTokenFromStorage();
 
-    debugPrint(
-        'Token dopo ricarica: ${jwtToken != null ? "Presente" : "Mancante"}');
+    debugPrint('Token dopo ricarica: ${jwtToken != null ? "Presente" : "Mancante"}');
     if (jwtToken != null) {
-      debugPrint(
-          'Token contiene wordpress_logged_in: ${jwtToken!.contains('wordpress_logged_in')}');
+      debugPrint('Token contiene wordpress_logged_in: ${jwtToken!.contains('wordpress_logged_in')}');
       debugPrint('Token length: ${jwtToken!.length}');
     }
 
-    // Se il token è presente ma non valido, prova a rigenerarlo
     if (jwtToken != null && !jwtToken!.contains('wordpress_logged_in')) {
       debugPrint('Token presente ma non valido, tentativo di rigenerazione...');
       await regenerateToken();
-
-      // Ricarica di nuovo dopo rigenerazione
       await reloadTokenFromStorage();
-      debugPrint(
-          'Token dopo rigenerazione: ${jwtToken != null ? "Presente" : "Mancante"}');
+      debugPrint('Token dopo rigenerazione: ${jwtToken != null ? "Presente" : "Mancante"}');
     }
 
     await _initializeData();
@@ -1196,7 +2057,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-
     if (state == AppLifecycleState.resumed) {
       debugPrint('App riattivata dalla pausa, verifica sessione...');
       _checkSessionAndReauth();
@@ -1210,7 +2070,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final password = prefs.getString('password');
 
     if (savedToken != null && username != null && password != null) {
-      // Verifica se la sessione è ancora valida
       if (!savedToken.contains('wordpress_logged_in')) {
         debugPrint('Sessione scaduta durante la pausa, riautenticazione...');
         await _autoReLoginFromHome(username, password);
@@ -1224,155 +2083,121 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     try {
       debugPrint('Riautenticazione automatica dalla home per: $username');
 
+      // Prima ottieni il nonce necessario per il login
+      final nonceResponse = await http.get(
+        Uri.parse('$urlSito/wp-login.php'),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      );
+
+      debugPrint('Nonce response status: ${nonceResponse.statusCode}');
+
+      // Estrai il nonce dalla risposta HTML
+      String nonce = '';
+      final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
+          .firstMatch(nonceResponse.body);
+      if (nonceMatch != null) {
+        nonce = nonceMatch.group(1)!;
+        debugPrint('Nonce estratto: $nonce');
+      }
+
+      // Effettua login automatico con il nonce
       final loginResponse = await http.post(
         Uri.parse('$urlSito/wp-login.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': '$urlSito/wp-login.php',
+        },
+        body: nonce.isNotEmpty
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
       );
+
+      debugPrint('Home re-login response status: ${loginResponse.statusCode}');
+      debugPrint('Home re-login response headers: ${loginResponse.headers}');
 
       if (loginResponse.headers['set-cookie'] != null) {
         final cookies = loginResponse.headers['set-cookie']!;
-
-        if (cookies.contains('wordpress_logged_in')) {
+        
+        // Verifica se il login è riuscito
+        if (loginResponse.statusCode == 302 ||
+            loginResponse.headers['location']?.contains('wp-admin') == true ||
+            loginResponse.body.contains('wp-admin') ||
+            cookies.contains('wordpress_logged_in')) {
           jwtToken = cookies;
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setString('username', username);
+          await prefs.setString('password', password);
           await prefs.setBool('isLoggedIn', true);
 
           debugPrint('Riautenticazione automatica dalla home riuscita');
-
-          // Ricarica i dati con la nuova sessione
           await _initializeData();
         } else {
           debugPrint('Riautenticazione automatica dalla home fallita');
-          await clearLoginData();
+          debugPrint('Response body: ${loginResponse.body}');
+          // Non cancellare i dati, mostra direttamente il login
           if (mounted) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
             );
           }
+        }
+      } else {
+        debugPrint('Riautenticazione automatica dalla home fallita - nessun cookie ricevuto');
+        // Non cancellare i dati, mostra direttamente il login
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
         }
       }
     } catch (e) {
       debugPrint('Errore riautenticazione automatica dalla home: $e');
+      // Non cancellare i dati, mostra direttamente il login
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
     }
   }
 
   Future<void> _initializeData() async {
-    await fetchWpMenu();
-    await fetchPosts();
-    await fetchUserData();
-    if (mounted) {
-      startUrgentNotificationWatcher(context, posts);
-      startTokenRefreshTimer();
-    }
-  }
-
-  void startTokenRefreshTimer() {
-    // Verifica la validità del token ogni 30 minuti
-    Timer.periodic(const Duration(minutes: 30), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      if (jwtToken != null) {
-        // Verifica se i cookie contengono ancora una sessione valida
-        if (!jwtToken!.contains('wordpress_logged_in')) {
-          debugPrint('Cookie di sessione scaduto, rigenerazione automatica');
-          await regenerateToken();
-        }
-      }
-    });
-  }
-
-  Future<void> fetchWpMenu() async {
+    debugPrint('=== INIZIALIZZAZIONE DATI ===');
+    
     try {
-      // Prepara gli headers con autenticazione se disponibile
-      final Map<String, String> headers = {};
-      if (jwtToken != null && jwtToken!.isNotEmpty) {
-        headers['Cookie'] = jwtToken!;
+      await fetchWpMenu();
+      await fetchPosts();
+      await fetchUserData();
+      
+      if (mounted) {
+        startUrgentNotificationWatcher(context, posts);
+        startTokenRefreshTimer();
       }
-
-      final response = await http.get(
-        Uri.parse(
-          '$urlSito/wp-json/wp-api-menus/v2/menus/1',
-        ), // 1 è l'ID del menu primario, cambia se serve
-        headers: headers,
-      );
-
-      debugPrint('Menu response status: ${response.statusCode}');
-      debugPrint('Menu response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          wpMenuItems = data['items'] ?? [];
-          isLoadingMenu = false;
-        });
-        debugPrint(
-            'Menu caricato con successo: ${wpMenuItems.length} elementi');
-      } else {
-        debugPrint('Errore caricamento menu: ${response.statusCode}');
-        // Se il plugin wp-api-menus non è installato, usa un menu di default
-        setState(() {
-          wpMenuItems = [
-            {'title': 'Home', 'url': '$urlSito/'},
-            {'title': 'Servizi', 'url': '$urlSito/servizi/'},
-            {'title': 'Contatti', 'url': '$urlSito/contatti/'},
-          ];
-          isLoadingMenu = false;
-        });
-      }
+      
+      debugPrint('Inizializzazione completata');
     } catch (e) {
-      debugPrint('Errore fetchWpMenu: $e');
-      // In caso di errore, usa un menu di default
-      setState(() {
-        wpMenuItems = [
-          {'title': 'Home', 'url': '$urlSito/'},
-          {'title': 'Servizi', 'url': '$urlSito/servizi/'},
-          {'title': 'Contatti', 'url': '$urlSito/contatti/'},
-        ];
-        isLoadingMenu = false;
-      });
-    }
-  }
-
-  Future<void> fetchPosts() async {
-    try {
-      debugPrint('=== INIZIO DOWNLOAD POST ===');
-      debugPrint(
-          'JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
-
-      // Prima verifica che l'API REST sia accessibile
-      await _testWordPressAPI();
-      
-      // Usa sempre l'autenticazione se disponibile
-      if (jwtToken != null && jwtToken!.isNotEmpty) {
-        debugPrint(
-            'Caricamento post con autenticazione utente per WordPress 6.8.2');
-        await _tryFetchUserSpecificPosts();
-      } else {
-        debugPrint(
-            'Nessun token di autenticazione disponibile - prova senza auth');
-        await _tryFetchPostsWithoutAuth();
+      debugPrint('Errore durante inizializzazione: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore caricamento dati: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-
-      debugPrint('Post scaricati dopo primo tentativo: ${posts.length}');
-      
-      // Se non ha funzionato, prova endpoint alternativi
-      if (posts.isEmpty) {
-        debugPrint('Nessun post trovato, provo endpoint alternativi...');
-        await _tryFetchPostsAlternative();
-        debugPrint('Post scaricati dopo endpoint alternativi: ${posts.length}');
-      }
-      
-      debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
-    } catch (e) {
-      debugPrint('Errore caricamento post: $e');
-      await _fetchPostsAlternative();
     }
   }
 
@@ -1438,88 +2263,82 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _testAdminAjax() async {
-    try {
-      debugPrint('=== TEST BASIC AUTH ===');
-      
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('username');
-      
-      if (username == null) {
-        debugPrint('Username non trovato per test Basic Auth');
+  void startTokenRefreshTimer() {
+    Timer.periodic(const Duration(minutes: 30), (timer) async {
+      if (!mounted) {
+        timer.cancel();
         return;
       }
+      if (jwtToken != null && !jwtToken!.contains('wordpress_logged_in')) {
+        debugPrint('Cookie di sessione scaduto, rigenerazione automatica');
+        await regenerateToken();
+      }
+    });
+  }
 
-      final basicAuth = createBasicAuth(username, appPassword);
-      debugPrint('Test Basic Auth per utente: $username');
+  // ------- fetchWpMenu / fetchPosts / helper: invariati dal tuo codice -------
 
-      // Test endpoint base con Basic Auth
+  Future<void> fetchWpMenu() async {
+    try {
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/posts?per_page=5'),
+        Uri.parse('$urlSito/wp-json/wp/v2/menu-items'),
         headers: {
-          'Authorization': basicAuth,
+          'Authorization': createBasicAuth('condominio', appPassword),
           'Content-Type': 'application/json',
-          'User-Agent': 'Flutter App/1.0',
-          'Accept': 'application/json',
         },
       );
 
-      debugPrint('Basic Auth test status: ${response.statusCode}');
-      debugPrint('Basic Auth test response: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
-
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        debugPrint('Basic Auth test: SUCCESS - ${data.length} post trovati');
-      } else if (response.statusCode == 401) {
-        debugPrint('Basic Auth test: FAILED - credenziali non valide');
-      } else if (response.statusCode == 403) {
-        debugPrint('Basic Auth test: FAILED - permessi insufficienti');
-      }
-
-      debugPrint('=== TEST ADMIN-AJAX (fallback) ===');
-
-      if (jwtToken == null || jwtToken!.isEmpty) {
-        debugPrint('Nessun token disponibile per test admin-ajax');
-        return;
-      }
-
-      // Test diversi action di admin-ajax
-      final actions = [
-        'heartbeat',
-        'query_posts',
-        'get_posts',
-        'wp_ajax_get_posts',
-      ];
-
-      for (final action in actions) {
-        try {
-          debugPrint('Test admin-ajax action: $action');
-
-          final response = await http.post(
-            Uri.parse('$urlSito/wp-admin/admin-ajax.php'),
-            headers: {
-              'Cookie': jwtToken!,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Referer': '$urlSito/wp-admin/',
-            },
-            body: 'action=$action',
-          );
-
-          debugPrint('Admin-ajax $action status: ${response.statusCode}');
-          debugPrint(
-              'Admin-ajax $action response: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
-
-          if (response.statusCode == 200 && response.body.isNotEmpty) {
-            debugPrint('Admin-ajax $action: SUCCESS');
-          }
-        } catch (e) {
-          debugPrint('Errore admin-ajax $action: $e');
-        }
+        final List<dynamic> menuData = json.decode(response.body);
+        setState(() {
+          wpMenuItems = menuData;
+          isLoadingMenu = false;
+        });
+      } else {
+        setState(() {
+          isLoadingMenu = false;
+        });
       }
     } catch (e) {
-      debugPrint('Errore test admin-ajax: $e');
+      setState(() {
+        isLoadingMenu = false;
+      });
+    }
+  }
+
+  Future<void> fetchPosts() async {
+    try {
+      debugPrint('=== INIZIO DOWNLOAD POST ===');
+      debugPrint(
+          'JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
+
+      // Prima verifica che l'API REST sia accessibile
+      await _testWordPressAPI();
+      
+      // Usa sempre l'autenticazione se disponibile
+      if (jwtToken != null && jwtToken!.isNotEmpty) {
+        debugPrint(
+            'Caricamento post con autenticazione utente per WordPress 6.8.2');
+        await _tryFetchUserSpecificPosts();
+      } else {
+        debugPrint(
+            'Nessun token di autenticazione disponibile - prova senza auth');
+        await _tryFetchPostsWithoutAuth();
+      }
+
+      debugPrint('Post scaricati dopo primo tentativo: ${posts.length}');
+      
+      // Se non ha funzionato, prova endpoint alternativi
+      if (posts.isEmpty) {
+        debugPrint('Nessun post trovato, provo endpoint alternativi...');
+        await _tryFetchPostsAlternative();
+        debugPrint('Post scaricati dopo endpoint alternativi: ${posts.length}');
+      }
+      
+      debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
+    } catch (e) {
+      debugPrint('Errore caricamento post: $e');
+      await _fetchPostsAlternative();
     }
   }
 
@@ -1634,6 +2453,59 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('Errore generale Basic Auth: $e');
+    }
+  }
+
+  Future<void> fetchUserPostsByCategory(int categoryId) async {
+    try {
+      debugPrint('Caricamento post utente per categoria: $categoryId');
+
+      if (jwtToken == null || jwtToken!.isEmpty) {
+        debugPrint('Nessun token disponibile per caricamento post categoria');
+        return;
+      }
+
+      // Prima ottieni l'ID dell'utente corrente
+      final userId = await _getCurrentUserId();
+
+      final endpoints = [
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+      ];
+
+      for (final endpoint in endpoints) {
+        try {
+          debugPrint('Provando endpoint categoria: $endpoint');
+
+          final response = await http.get(
+            Uri.parse(endpoint),
+            headers: {
+              'Cookie': jwtToken!,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Flutter App/1.0',
+              'Accept': 'application/json',
+            },
+          );
+
+          debugPrint('Status code (categoria): ${response.statusCode}');
+
+          if (response.statusCode == 200) {
+            final List<dynamic> data = json.decode(response.body);
+            debugPrint('Post categoria ricevuti: ${data.length}');
+
+            if (data.isNotEmpty) {
+              _processPosts(data);
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Errore con endpoint categoria $endpoint: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Errore caricamento post categoria: $e');
     }
   }
 
@@ -1924,59 +2796,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> fetchUserPostsByCategory(int categoryId) async {
-    try {
-      debugPrint('Caricamento post utente per categoria: $categoryId');
-
-      if (jwtToken == null || jwtToken!.isEmpty) {
-        debugPrint('Nessun token disponibile per caricamento post categoria');
-        return;
-      }
-
-      // Prima ottieni l'ID dell'utente corrente
-      final userId = await _getCurrentUserId();
-
-      final endpoints = [
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
-      ];
-
-      for (final endpoint in endpoints) {
-        try {
-          debugPrint('Provando endpoint categoria: $endpoint');
-
-          final response = await http.get(
-            Uri.parse(endpoint),
-            headers: {
-              'Cookie': jwtToken!,
-              'Content-Type': 'application/json',
-              'User-Agent': 'Flutter App/1.0',
-              'Accept': 'application/json',
-            },
-          );
-
-          debugPrint('Status code (categoria): ${response.statusCode}');
-
-          if (response.statusCode == 200) {
-            final List<dynamic> data = json.decode(response.body);
-            debugPrint('Post categoria ricevuti: ${data.length}');
-
-            if (data.isNotEmpty) {
-              _processPosts(data);
-              return;
-            }
-          }
-        } catch (e) {
-          debugPrint('Errore con endpoint categoria $endpoint: $e');
-        }
-      }
-    } catch (e) {
-      debugPrint('Errore caricamento post categoria: $e');
-    }
-  }
-
   Future<void> _fetchPostsAlternative() async {
     try {
       debugPrint('Tentativo caricamento post alternativo...');
@@ -2008,6 +2827,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  // ---------------------------------------------------------------------------
+
   Widget _getBody() {
     switch (_selectedIndex) {
       case 0:
@@ -2018,16 +2839,619 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           userEmail: userData?['email'] ?? '',
         );
       case 2:
-        return posts.isNotEmpty
-            ? CategoryPostViewer(posts: posts)
-            : const NoAccessMessage();
+        return posts.isNotEmpty ? CategoryPostViewer(posts: posts) : const NoAccessMessage();
       case 3:
         return const WebcamScreen();
       default:
-        return Container();
+        return const SizedBox.shrink();
     }
   }
 
+  @override
+  Widget build(BuildContext context) {
+    if (isLoadingUserData) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final String displayName =
+        (userData?['name'] as String?)?.trim().isNotEmpty == true ? userData!['name'] as String : 'Utente';
+
+    return Scaffold(
+      endDrawer: Drawer(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                        ),
+                        child: Image.asset('assets/logo.png', height: 60),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Porto Bello di Gallura',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          displayName,
+                          style: const TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Menu scrollabile
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildModernMenuItem(
+                            context,
+                            icon: Icons.link,
+                            title: 'Sezioni Utili',
+                            subtitle: 'Link e risorse',
+                            color: const Color(0xFF4CAF50),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _showUsefulSections(context);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildModernMenuItem(
+                            context,
+                            icon: Icons.contact_mail,
+                            title: 'Contatti',
+                            subtitle: 'Contatta il porto',
+                            color: const Color(0xFF2196F3),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _onItemTapped(1);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildModernMenuItem(
+                            context,
+                            icon: Icons.person,
+                            title: 'Account',
+                            subtitle: 'Gestisci il tuo account',
+                            color: const Color(0xFF9C27B0),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _showAccountInfo(context);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildModernMenuItem(
+                            context,
+                            icon: Icons.info_outline,
+                            title: 'Informazioni App',
+                            subtitle: 'Versione e dettagli',
+                            color: const Color(0xFFFF9800),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const AppInfoScreen()),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Logout
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFE91E63), Color(0xFFF06292)]),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE91E63).withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.white, size: 24),
+                      title: const Text(
+                        'Logout',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      onTap: () async {
+                        await clearLoginData();
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (context) => const MyApp()),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Builder(
+          builder: (ctx) => AppBar(
+            backgroundColor: const Color(0xFFFFC107),
+            elevation: 8,
+            automaticallyImplyLeading: false,
+            titleSpacing: 0,
+            title: Row(
+              children: [
+                const SizedBox(width: 12),
+                Image.asset('assets/logo.png', height: 40),
+                const SizedBox(width: 12),
+                const Text(
+                  'Porto di Gallura',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white),
+                onPressed: () => Scaffold.of(ctx).openEndDrawer(),
+                tooltip: 'Menu',
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      body: _getBody(),
+
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFFFFC107),
+        selectedItemColor: const Color(0xFF1565C0),
+        unselectedItemColor: Colors.black54,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.contact_mail), label: 'Servizi'),
+          BottomNavigationBarItem(icon: Icon(Icons.room_service), label: 'Articoli'),
+          BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'WebCam'),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // UTIL
+  String _removeHtmlTags(String htmlText) {
+    if (htmlText.isEmpty) return htmlText;
+    final decodedText = decodeHtmlEntities(htmlText);
+    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
+    return decodedText.replaceAll(regex, '');
+  }
+
+  bool _isUrgent(dynamic post) {
+    final categories = post['_embedded']?['wp:term']?[0];
+    if (categories == null) return false;
+    if (categories is! List) return false;
+    return categories.any((c) => (c['name'] as String?)?.toLowerCase().contains('urgenti') ?? false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // HOME CONTENT
+  Widget _homeContent() {
+    // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
+    if (posts.isEmpty && isLoadingUserData) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Caricamento post...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF666666),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final visiblePosts = posts.where((post) {
+      final title = decodeHtmlEntities(post['title']?['rendered'] ?? '').toLowerCase();
+      final content = decodeHtmlEntities(post['content']?['rendered'] ?? '');
+      final excerpt = decodeHtmlEntities(post['excerpt']?['rendered'] ?? '');
+
+      final hasRestrictedTitle = title.contains('restricted');
+      final hasRestrictedContent = content.contains('effettuare il login') ||
+          excerpt.contains('effettuare il login') ||
+          excerpt.contains('devi essere loggato') ||
+          content.trim().isEmpty;
+
+      return !hasRestrictedTitle && !hasRestrictedContent;
+    }).toList();
+
+    // Urgenti in alto
+    visiblePosts.sort((a, b) {
+      final aUrg = _isUrgent(a) ? 1 : 0;
+      final bUrg = _isUrgent(b) ? 1 : 0;
+      return bUrg.compareTo(aUrg);
+    });
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF81D4FA), Color(0xFFE1F5FE)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (visiblePosts.isNotEmpty)
+                ...visiblePosts.map((post) {
+                  final categories = post['_embedded']?['wp:term']?[0];
+                  final categoryNames = (categories is List && categories.isNotEmpty)
+                      ? categories.map<String>((c) => (c['name'] ?? '') as String).join(', ')
+                      : 'Senza categoria';
+
+                  final imageUrl = post['_embedded']?['wp:featuredmedia']?[0]?['source_url'];
+                  final isUrgente = _isUrgent(post);
+                  final url = post['link'];
+                  final authorId = post['author'] ?? 0;
+                  final status = post['status'] ?? '';
+
+                  final Color badgeColor = isUrgente
+                      ? const Color(0xFFE53935)
+                      : (status == 'private' ? const Color(0xFFFF9800) : const Color(0xFF2196F3));
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 28),
+                    child: Material(
+                      borderRadius: BorderRadius.circular(24),
+                      elevation: 0,
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: () => _openInAppBrowser(url),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            gradient: isUrgente
+                                ? const LinearGradient(
+                                    colors: [Color(0xFFFFEBEE), Color(0xFFFFCDD2)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : status == 'private'
+                                    ? const LinearGradient(
+                                        colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                    : const LinearGradient(
+                                        colors: [Colors.white, Color(0xFFFAFAFA)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                            border: isUrgente
+                                ? Border.all(color: const Color(0xFFE53935).withOpacity(0.3), width: 2)
+                                : (status == 'private'
+                                    ? Border.all(color: const Color(0xFFFF9800).withOpacity(0.3), width: 1.5)
+                                    : null),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isUrgente
+                                    ? Colors.red.withOpacity(0.2)
+                                    : Colors.black.withOpacity(0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (imageUrl != null)
+                                  Stack(
+                                    children: [
+                                      Image.network(
+                                        imageUrl,
+                                        height: 180,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned.fill(
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [Colors.transparent, Colors.black.withOpacity(0.3)],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (isUrgente)
+                                        Positioned(
+                                          top: 12,
+                                          left: 12,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE53935),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.priority_high_rounded, color: Colors.white, size: 16),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  'URGENTE',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      if (status == 'private')
+                                        Positioned(
+                                          top: 12,
+                                          right: 12,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFF9800),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: const Icon(Icons.lock_rounded, color: Colors.white, size: 16),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: badgeColor.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Icon(
+                                              isUrgente
+                                                  ? Icons.priority_high_rounded
+                                                  : (status == 'private'
+                                                      ? Icons.lock_rounded
+                                                      : Icons.article_rounded),
+                                              color: badgeColor,
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              decodeHtmlEntities(post['title']?['rendered'] ?? ''),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: isUrgente
+                                                    ? const Color(0xFFC62828)
+                                                    : (status == 'private'
+                                                        ? const Color(0xFFE65100)
+                                                        : const Color(0xFF2C3E50)),
+                                                height: 1.3,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF2196F3).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Text(
+                                          categoryNames,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF1976D2),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: isUrgente
+                                                  ? const Color(0xFFE53935).withOpacity(0.1)
+                                                  : (status == 'private'
+                                                      ? const Color(0xFFFF9800).withOpacity(0.1)
+                                                      : const Color(0xFF4CAF50).withOpacity(0.1)),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              isUrgente
+                                                  ? 'Urgente'
+                                                  : (status == 'private' ? 'Privato' : 'Pubblico'),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: isUrgente
+                                                    ? const Color(0xFFE53935)
+                                                    : (status == 'private'
+                                                        ? const Color(0xFFFF9800)
+                                                        : const Color(0xFF4CAF50)),
+                                              ),
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          if (authorId is int && authorId > 0)
+                                            const Text(
+                                              'Autore',
+                                              style: TextStyle(fontSize: 10, color: Colors.grey),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        _removeHtmlTags(post['excerpt']?['rendered'] ?? ''),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          color: Color(0xFF555555),
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => PostDetailScreen(
+                                                post: post,
+                                                userName: userData?['name'] ?? 'Utente',
+                                                userEmail: userData?['email'] ?? '',
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: badgeColor,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                          elevation: 4,
+                                          shadowColor: badgeColor.withOpacity(0.3),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text('Leggi tutto', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                            SizedBox(width: 8),
+                                            Icon(Icons.arrow_forward_rounded, size: 16),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ));
+                }).toList(),
+              if (visiblePosts.isEmpty)
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Nessun articolo disponibile',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await fetchPosts();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Ricarica'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFC107),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- i builder di item/menu/account restano invariati dal tuo codice originale ---
   Widget _buildModernMenuItem(
     BuildContext context, {
     required IconData icon,
@@ -2040,44 +3464,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
       ),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 24,
-          ),
+          decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.link, color: Colors.white, size: 24),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          color: Colors.white70,
-          size: 16,
-        ),
+        title: Text(title,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
         onTap: onTap,
       ),
     );
@@ -2099,20 +3497,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               width: 40,
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
             ),
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text(
                 'Sezioni Utili',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF01579B),
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF01579B)),
               ),
             ),
             _buildUsefulSectionItem(
@@ -2157,19 +3548,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           color: const Color(0xFF0277BD).withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          icon,
-          color: const Color(0xFF0277BD),
-          size: 20,
-        ),
+        child: Icon(icon, color: const Color(0xFF0277BD), size: 20),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: () {
@@ -2195,10 +3576,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
+              decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
               child: const Row(
                 children: [
                   Icon(Icons.security, color: Colors.blue, size: 20),
@@ -2206,10 +3584,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   Expanded(
                     child: Text(
                       'Autenticazione attiva',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -2218,10 +3593,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Chiudi'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Chiudi')),
         ],
       ),
     );
@@ -2237,454 +3609,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             width: 80,
             child: Text(
               '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ],
       ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (isLoadingUserData) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-    return Scaffold(
-      endDrawer: Drawer(
-        child: Container(
-                decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFF1E3C72), // Blu scuro
-                Color(0xFF2A5298), // Blu medio
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-                  children: [
-                // Header moderno
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                            width: 1,
-                          ),
-                        ),
-                        child: Image.asset('assets/logo.png', height: 60),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Porto Bello di Gallura',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          userData?['name'] ?? 'Utente',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w500,
-                          ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-                
-                // Menu items
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        _buildModernMenuItem(
-                          context,
-                          icon: Icons.link,
-                          title: 'Sezioni Utili',
-                          subtitle: 'Link e risorse',
-                          color: const Color(0xFF4CAF50),
-                onTap: () {
-                  Navigator.pop(context);
-                            _showUsefulSections(context);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildModernMenuItem(
-                          context,
-                          icon: Icons.contact_mail,
-                          title: 'Contatti',
-                          subtitle: 'Contatta il porto',
-                          color: const Color(0xFF2196F3),
-                onTap: () {
-                  Navigator.pop(context);
-                            _onItemTapped(1); // Vai alla sezione servizi
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildModernMenuItem(
-                          context,
-                          icon: Icons.person,
-                          title: 'Account',
-                          subtitle: 'Gestisci il tuo account',
-                          color: const Color(0xFF9C27B0),
-                onTap: () {
-                  Navigator.pop(context);
-                            _showAccountInfo(context);
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildModernMenuItem(
-                          context,
-                          icon: Icons.info_outline,
-                          title: 'Informazioni App',
-                          subtitle: 'Versione e dettagli',
-                          color: const Color(0xFFFF9800),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AppInfoScreen(),
-                    ),
-                  );
-                },
-              ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Logout button
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFE91E63), Color(0xFFF06292)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE91E63).withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.white, size: 24),
-                      title: const Text(
-                        'Logout',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                onTap: () async {
-                  await clearLoginData();
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MyApp(),
-                      ),
-                    );
-                  }
-                },
-                    ),
-                  ),
-              ),
-            ],
-            ),
-          ),
-        ),
-      ),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: Builder(
-          builder: (context) => AppBar(
-            backgroundColor: const Color(0xFFFFC107), // Giallo sole
-            elevation: 8,
-            automaticallyImplyLeading: false,
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Logo a sinistra
-                Row(
-                  children: [
-                    Image.asset(
-                      'assets/logo.png',
-                      height: 40,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Porto di Gallura',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: _getBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFFFFC107),
-        selectedItemColor: const Color(0xFF1565C0),
-        unselectedItemColor: Colors.black54,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.contact_mail),
-            label: 'Servizi',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.room_service),
-            label: 'Articoli',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt),
-            label: 'WebCam',
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _removeHtmlTags(String htmlText) {
-    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return htmlText.replaceAll(regex, '');
-  }
-
-  bool _isUrgent(dynamic post) {
-    final categories = post['_embedded']?['wp:term']?[0];
-    if (categories == null) return false;
-    return categories.any((c) =>
-        (c['name'] as String?)?.toLowerCase().contains('urgenti') ?? false);
-  }
-
-  Widget _homeContent() {
-    final visiblePosts = posts.where((post) {
-      final title = post['title']['rendered']?.toLowerCase() ?? '';
-      final content = post['content']['rendered'] ?? '';
-      final excerpt = post['excerpt']['rendered'] ?? '';
-
-      final hasRestrictedTitle = title.contains('restricted');
-      final hasRestrictedContent = content.contains('effettuare il login') ||
-          excerpt.contains('effettuare il login') ||
-          excerpt.contains('devi essere loggato') ||
-          content.trim().isEmpty;
-
-      return !hasRestrictedTitle && !hasRestrictedContent;
-    }).toList();
-
-    // Ordina: prima i post urgenti
-    visiblePosts.sort((a, b) {
-      bool aUrgent = _isUrgent(a);
-      bool bUrgent = _isUrgent(b);
-      return bUrgent.toString().compareTo(aUrgent.toString());
-    });
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFF81D4FA), // Azzurro mare
-                Color(0xFFE1F5FE), // Celeste chiaro
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  
-                  if (visiblePosts.isNotEmpty)
-                    ...visiblePosts.map((post) {
-                        final categories = post['_embedded']?['wp:term']?[0];
-                        final categoryNames =
-                            (categories != null && categories.isNotEmpty)
-                                ? categories
-                                    .map<String>((c) => c['name'] as String)
-                                    .join(', ')
-                                : 'Senza categoria';
-
-                        final imageUrl = post['_embedded']?['wp:featuredmedia']
-                            ?[0]?['source_url'];
-
-                        final isUrgente = _isUrgent(post);
-                        final url = post['link']; // Link al post WordPress
-                        final title = post['title']['rendered'] ?? 'Post';
-                      final authorId = post['author'] ?? 0;
-                      final status = post['status'] ?? '';
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          child: GestureDetector(
-                            onTap: () {
-                              _openInAppBrowser(url);
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: isUrgente
-                                      ? Colors.red
-                                    : status == 'private'
-                                        ? Colors.orange
-                                      : Colors.transparent,
-                                width: isUrgente
-                                    ? 3
-                                    : status == 'private'
-                                        ? 2
-                                        : 0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(24),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (imageUrl != null)
-                                      Image.network(
-                                        imageUrl,
-                                        width: double.infinity,
-                                        height: 150,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                            post['title']['rendered'],
-                                            style: const TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF01579B),
-                                            ),
-                                              ),
-                                            ),
-                                            if (status == 'private')
-                                              const Icon(
-                                                Icons.lock,
-                                                color: Colors.orange,
-                                                size: 20,
-                                              ),
-                                          ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            "Categorie: $categoryNames",
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: Color(0xFF0277BD),
-                                          ),
-                                        ),
-                                        if (authorId > 0)
-                                          Text(
-                                            "Autore ID: $authorId | Status: $status",
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            _removeHtmlTags(
-                                              post['excerpt']['rendered'] ?? '',
-                                            ),
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Color(0xFF37474F),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList()
-                  else
-                    const NoAccessMessage(),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -3017,14 +3947,20 @@ class PostTab extends StatelessWidget {
   const PostTab({super.key, required this.posts});
 
   String _removeHtmlTags(String htmlText) {
+    if (htmlText.isEmpty) return htmlText;
+    
+    // Prima decodifica le entità HTML
+    final decodedText = decodeHtmlEntities(htmlText);
+    
+    // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return htmlText.replaceAll(regex, '');
+    return decodedText.replaceAll(regex, '');
   }
 
   @override
   Widget build(BuildContext context) {
     final visiblePosts = posts.where((post) {
-      final title = post['title']['rendered']?.toLowerCase() ?? '';
+      final title = decodeHtmlEntities(post['title']['rendered'] ?? '').toLowerCase();
       return !title.contains('restricted');
     }).toList();
 
@@ -3086,7 +4022,7 @@ class PostTab extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                post['title']['rendered'],
+                                decodeHtmlEntities(post['title']['rendered'] ?? ''),
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -3168,12 +4104,11 @@ class ContactOptionsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-            _buildButton(context, "Bombole Gas", Icons.local_gas_station),
-            _buildButton(context, "Rifiuti", Icons.delete),
-            _buildButton(context, "Guasto", Icons.build),
-            _buildButton(context, "Porto", Icons.anchor),
-                
-          ],
+                _buildButton(context, "Bombole Gas", Icons.local_gas_station),
+                _buildButton(context, "Rifiuti", Icons.delete),
+                _buildButton(context, "Guasto", Icons.build),
+                _buildButton(context, "Porto", Icons.anchor),
+              ],
             ),
           ),
         ),
@@ -3433,6 +4368,202 @@ class _EmailFormTabState extends State<EmailFormTab> {
         ),
         filled: true,
         fillColor: Colors.grey[100],
+      ),
+    );
+  }
+}
+
+class PostDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> post;
+  final String userName;
+  final String userEmail;
+
+  const PostDetailScreen({
+    super.key,
+    required this.post,
+    required this.userName,
+    required this.userEmail,
+  });
+
+  String _removeHtmlTags(String htmlText) {
+    if (htmlText.isEmpty) return htmlText;
+    
+    // Prima decodifica le entità HTML
+    final decodedText = decodeHtmlEntities(htmlText);
+    
+    // Poi rimuovi i tag HTML rimanenti
+    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
+    return decodedText.replaceAll(regex, '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = decodeHtmlEntities(post['title']?['rendered'] ?? 'Titolo non disponibile');
+    final content = _removeHtmlTags(post['content']?['rendered'] ?? 'Contenuto non disponibile');
+    final excerpt = _removeHtmlTags(post['excerpt']?['rendered'] ?? '');
+    final authorId = post['author'] ?? 0;
+    final status = post['status'] ?? '';
+    final date = post['date'] ?? '';
+    final categories = post['_embedded']?['wp:term']?[0];
+    final categoryNames = (categories != null && categories.isNotEmpty)
+        ? categories.map<String>((c) => (c['name'] ?? '') as String).join(', ')
+        : 'Senza categoria';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dettaglio Post'),
+        backgroundColor: const Color(0xFF01579B),
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Titolo
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF01579B),
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Informazioni del post
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        status == 'private' ? Icons.lock : Icons.public,
+                        size: 16,
+                        color: status == 'private' ? Colors.orange : Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        status == 'private' ? 'Privato' : 'Pubblico',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: status == 'private' ? Colors.orange : Colors.green,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (authorId > 0)
+                        Text(
+                          'Autore: $authorId',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Categorie: $categoryNames',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  if (date.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Data: ${DateTime.tryParse(date)?.toString().split(' ')[0] ?? date}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Excerpt se disponibile
+            if (excerpt.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF2196F3).withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Anteprima:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1976D2),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      excerpt,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF424242),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            
+            // Contenuto principale
+            const Text(
+              'Contenuto:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF01579B),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                content,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF424242),
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
