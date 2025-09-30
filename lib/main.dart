@@ -9,7 +9,6 @@ String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
 String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
 
-// Funzione per inviare email tramite url_launcher
 Future<void> sendEmail({
   required String to,
   String? subject,
@@ -21,7 +20,7 @@ Future<void> sendEmail({
     queryParameters: {
       if (subject != null) 'subject': subject,
       if (body != null) 'body': body,
-      // cc/bcc possibili: 'cc': 'a@b.com,c@d.com', 'bcc': '...'
+
     },
   );
 
