@@ -3094,6 +3094,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  @override
+  void dispose() {
+    languageProvider.removeListener(_onLanguageChanged);
+    _notificationTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   Future<void> _initializeWithTokenReload() async {
     debugPrint('=== INIZIALIZZAZIONE CON RICARICA TOKEN ===');
     await reloadTokenFromStorage();
