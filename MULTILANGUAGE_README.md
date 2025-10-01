@@ -40,8 +40,16 @@ L'app è stata completamente aggiornata per supportare 4 lingue:
 
 2. **Visualizzare Post Tradotti:**
    - Quando selezioni una lingua diversa dall'italiano
-   - I post vengono automaticamente tradotti
-   - Potrebbe esserci un breve caricamento la prima volta
+   - I post vengono automaticamente tradotti (2-5 secondi)
+   - La lingua selezionata viene salvata e persiste al riavvio
+   - Traduzioni successive sono istantanee (cache attiva)
+
+3. **Caratteristiche della Traduzione:**
+   - ✅ Traduzione all'avvio se lingua salvata ≠ italiano
+   - ✅ Tutti i titoli, estratti e contenuti tradotti
+   - ✅ Categorie tradotte
+   - ✅ Interfaccia completa nella lingua selezionata
+   - ✅ Sistema di cache per performance ottimali
 
 ### Per gli Sviluppatori:
 

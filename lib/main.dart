@@ -5,7 +5,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:translator/translator.dart';
 import 'l10n/app_localizations.dart';
 import 'language_provider.dart';
 
@@ -15,15 +14,18 @@ String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
-final GoogleTranslator _translator = GoogleTranslator();
 
-// Funzione per tradurre il testo
+// MyMemory Translation API - Gratuita, 10.000 caratteri/giorno
+// Documentazione: https://mymemory.translated.net/doc/spec.php
+const String _translationApiUrl = 'https://api.mymemory.translated.net/get';
+
+// Funzione per tradurre il testo usando MyMemory Translation API
 Future<String> translateText(String text, String targetLanguage) async {
   // Se la lingua target è italiano, ritorna il testo originale
   if (targetLanguage == 'it') {
     return text;
   }
-  
+
   // Controlla se la traduzione è già in cache
   if (_translationCache.containsKey(targetLanguage) &&
       _translationCache[targetLanguage]!.containsKey(text)) {
@@ -36,23 +38,51 @@ Future<String> translateText(String text, String targetLanguage) async {
         .replaceAll(RegExp(r'<[^>]*>'), '')
         .replaceAll(RegExp(r'&[a-z]+;'), '')
         .trim();
-    
+
     if (cleanText.isEmpty) return text;
 
-    // Traduci il testo
-    final translation = await _translator.translate(
-      cleanText,
-      from: 'it',
-      to: targetLanguage,
-    );
-
-    // Salva in cache
-    if (!_translationCache.containsKey(targetLanguage)) {
-      _translationCache[targetLanguage] = {};
+    // Limita la lunghezza del testo per evitare timeout (max 5000 caratteri)
+    if (cleanText.length > 5000) {
+      cleanText = cleanText.substring(0, 5000);
     }
-    _translationCache[targetLanguage]![text] = translation.text;
 
-    return translation.text;
+    // Chiamata API MyMemory (GET request)
+    final uri = Uri.parse(_translationApiUrl).replace(queryParameters: {
+      'q': cleanText,
+      'langpair': 'it|$targetLanguage',
+    });
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      
+      // MyMemory ritorna responseData.translatedText
+      // responseStatus può essere int o String
+      final responseStatus = data['responseStatus'];
+      final statusOk = responseStatus == 200 || responseStatus == '200';
+      
+      if (statusOk && data['responseData'] != null && data['responseData']['translatedText'] != null) {
+        final translatedText = data['responseData']['translatedText'] as String;
+        
+        // Debug per verificare la traduzione
+        debugPrint('Tradotto: "${text.substring(0, text.length > 50 ? 50 : text.length)}" → "${translatedText.substring(0, translatedText.length > 50 ? 50 : translatedText.length)}"');
+
+        // Salva in cache
+        if (!_translationCache.containsKey(targetLanguage)) {
+          _translationCache[targetLanguage] = {};
+        }
+        _translationCache[targetLanguage]![text] = translatedText;
+
+        return translatedText;
+      } else {
+        debugPrint('Errore traduzione MyMemory: status=$responseStatus, details=${data['responseDetails']}');
+        return text;
+      }
+    } else {
+      debugPrint('Errore API MyMemory: ${response.statusCode} - ${response.body}');
+      return text;
+    }
   } catch (e) {
     debugPrint('Errore traduzione: $e');
     // In caso di errore, ritorna il testo originale
@@ -73,7 +103,8 @@ Future<Map<String, dynamic>> translatePost(
     // Traduci il titolo
     if (post['title']?['rendered'] != null) {
       final originalTitle = decodeHtmlEntities(post['title']['rendered']);
-      final translatedTitle = await translateText(originalTitle, targetLanguage);
+      final translatedTitle =
+          await translateText(originalTitle, targetLanguage);
       translatedPost['title'] = {'rendered': translatedTitle};
     }
 
@@ -630,7 +661,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     super.initState();
     translatedPosts = widget.posts;
     currentLanguage = languageProvider.locale.languageCode;
-    
+
     // Traduci i post all'inizializzazione se la lingua non è italiano
     if (currentLanguage != 'it') {
       _translatePostsOnInit();
@@ -638,22 +669,27 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       _buildCategoryMap();
       filteredPosts = widget.posts;
     }
-    
+
     languageProvider.addListener(_onLanguageChanged);
   }
-  
+
   Future<void> _translatePostsOnInit() async {
+    debugPrint('🌍 Inizio traduzione ${widget.posts.length} post in $currentLanguage');
     setState(() {
       isLoading = true;
     });
 
     final translated = <dynamic>[];
+    int count = 0;
     for (final post in widget.posts) {
+      count++;
+      debugPrint('📝 Traduco post $count/${widget.posts.length}...');
       final translatedPost = await translatePost(post, currentLanguage);
       translated.add(translatedPost);
     }
 
     if (mounted) {
+      debugPrint('✅ Traduzione completata! ${translated.length} post tradotti');
       setState(() {
         translatedPosts = translated;
         isLoading = false;
@@ -671,19 +707,28 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
 
   Future<void> _onLanguageChanged() async {
     final newLanguage = languageProvider.locale.languageCode;
+    debugPrint('🔄 Cambio lingua da $currentLanguage a $newLanguage');
+    
     if (newLanguage != currentLanguage) {
       setState(() {
         isLoading = true;
         currentLanguage = newLanguage;
       });
 
+      debugPrint('🌍 Inizio traduzione ${widget.posts.length} post in $newLanguage');
+      
       // Traduci tutti i post
       final translated = <dynamic>[];
+      int count = 0;
       for (final post in widget.posts) {
+        count++;
+        debugPrint('📝 Traduco post $count/${widget.posts.length}...');
         final translatedPost = await translatePost(post, newLanguage);
         translated.add(translatedPost);
       }
 
+      debugPrint('✅ Traduzione completata! ${translated.length} post tradotti');
+      
       setState(() {
         translatedPosts = translated;
         isLoading = false;
@@ -820,7 +865,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: Text(
-          showCategories ? 'Categorie Articoli' : currentCategory,
+          showCategories
+              ? AppLocalizations.of(context).articleCategories
+              : currentCategory,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -927,7 +974,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '$postCount articoli',
+                              '$postCount ${AppLocalizations.of(context).articles.toLowerCase()}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -1009,11 +1056,15 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         ),
                         items: [
                           DropdownMenuItem(
-                              value: 'Tutti', child: Text(AppLocalizations.of(context).all)),
+                              value: 'Tutti',
+                              child: Text(AppLocalizations.of(context).all)),
                           DropdownMenuItem(
-                              value: 'Pubblico', child: Text(AppLocalizations.of(context).public)),
+                              value: 'Pubblico',
+                              child: Text(AppLocalizations.of(context).public)),
                           DropdownMenuItem(
-                              value: 'Privato', child: Text(AppLocalizations.of(context).private)),
+                              value: 'Privato',
+                              child:
+                                  Text(AppLocalizations.of(context).private)),
                         ],
                         onChanged: (value) {
                           setState(() {
@@ -1984,6 +2035,8 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      key: ValueKey(languageProvider
+          .locale.languageCode), // Forza rebuild quando cambia lingua
       navigatorKey: navigatorKey,
       title: 'Condominio App',
       theme: ThemeData(
@@ -3919,7 +3972,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             context,
                             icon: Icons.link,
                             title: AppLocalizations.of(context).usefulSections,
-                            subtitle: AppLocalizations.of(context).linksAndResources,
+                            subtitle:
+                                AppLocalizations.of(context).linksAndResources,
                             color: const Color(0xFF4CAF50),
                             onTap: () {
                               Navigator.pop(context);
@@ -3931,7 +3985,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             context,
                             icon: Icons.contact_mail,
                             title: AppLocalizations.of(context).contacts,
-                            subtitle: AppLocalizations.of(context).contactThePort,
+                            subtitle:
+                                AppLocalizations.of(context).contactThePort,
                             color: const Color(0xFF2196F3),
                             onTap: () {
                               Navigator.pop(context);
@@ -3944,7 +3999,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             context,
                             icon: Icons.person,
                             title: AppLocalizations.of(context).account,
-                            subtitle: AppLocalizations.of(context).manageYourAccount,
+                            subtitle:
+                                AppLocalizations.of(context).manageYourAccount,
                             color: const Color(0xFF9C27B0),
                             onTap: () {
                               Navigator.pop(context);
@@ -3956,7 +4012,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             context,
                             icon: Icons.info_outline,
                             title: AppLocalizations.of(context).appInfo,
-                            subtitle: AppLocalizations.of(context).versionAndDetails,
+                            subtitle:
+                                AppLocalizations.of(context).versionAndDetails,
                             color: const Color(0xFFFF9800),
                             onTap: () {
                               Navigator.pop(context);
@@ -4074,11 +4131,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home), label: AppLocalizations.of(context).home),
           BottomNavigationBarItem(
-              icon: const Icon(Icons.contact_mail), label: AppLocalizations.of(context).services),
+              icon: const Icon(Icons.home),
+              label: AppLocalizations.of(context).home),
           BottomNavigationBarItem(
-              icon: const Icon(Icons.room_service), label: AppLocalizations.of(context).articles),
+              icon: const Icon(Icons.contact_mail),
+              label: AppLocalizations.of(context).services),
+          BottomNavigationBarItem(
+              icon: const Icon(Icons.room_service),
+              label: AppLocalizations.of(context).articles),
           const BottomNavigationBarItem(
               icon: Icon(Icons.camera_alt), label: 'WebCam'),
         ],
@@ -4773,16 +4834,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: languages.map((lang) {
-            final isSelected = languageProvider.locale.languageCode == lang['code'];
+            final isSelected =
+                languageProvider.locale.languageCode == lang['code'];
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF00BCD4) : Colors.grey[300]!,
+                  color:
+                      isSelected ? const Color(0xFF00BCD4) : Colors.grey[300]!,
                   width: isSelected ? 2 : 1,
                 ),
-                color: isSelected ? const Color(0xFF00BCD4).withOpacity(0.05) : Colors.white,
+                color: isSelected
+                    ? const Color(0xFF00BCD4).withOpacity(0.05)
+                    : Colors.white,
               ),
               child: ListTile(
                 leading: Text(
@@ -4792,8 +4857,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 title: Text(
                   lang['name']!,
                   style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? const Color(0xFF00BCD4) : Colors.black87,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color:
+                        isSelected ? const Color(0xFF00BCD4) : Colors.black87,
                   ),
                 ),
                 trailing: isSelected
