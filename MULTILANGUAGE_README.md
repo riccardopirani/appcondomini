@@ -16,17 +16,20 @@ L'app è stata completamente aggiornata per supportare 4 lingue:
 - La lingua selezionata viene salvata e persiste tra le sessioni
 
 ### 2. **Traduzione Automatica dei Post**
-- Tutti i post dal backend vengono tradotti automaticamente quando si cambia lingua
+- Tutti i post dal backend vengono tradotti automaticamente usando **MyMemory Translation API**
+- Traduzione in parallelo (2 post alla volta) per performance ottimali
 - Se la lingua è diversa dall'italiano, i titoli, estratti e contenuti vengono tradotti in tempo reale
-- Sistema di cache per ottimizzare le prestazioni e ridurre le chiamate API
+- Sistema di cache intelligente per ottimizzare le prestazioni
 
-### 3. **Interfaccia Multilingua**
-- Tutte le stringhe principali dell'interfaccia sono tradotte:
-  - Navigation bar
-  - Drawer menu
-  - Titoli e sottotitoli
-  - Pulsanti e messaggi
-  - Categorie e filtri
+### 3. **Interfaccia Multilingua Completa**
+Tutte le stringhe dell'interfaccia sono tradotte in tutte le schermate:
+  - ✅ **Home**: Tutte le stringhe UI tradotte
+  - ✅ **Servizi**: Form contatti, pulsanti, messaggi
+  - ✅ **Articoli**: Categorie, filtri, ricerca, post
+  - ✅ **WebCam**: Titoli, descrizioni, labels
+  - ✅ **Navigation bar**: Home, Servizi, Articoli, WebCam
+  - ✅ **Drawer menu**: Tutte le voci e sottotitoli
+  - ✅ **Login**: Form e messaggi
 
 ## 🛠️ Come Utilizzare
 
