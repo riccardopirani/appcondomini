@@ -1799,9 +1799,9 @@ class WebcamScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text(
-          'Webcam Live',
-          style: TextStyle(
+        title: Text(
+          AppLocalizations.of(context).webcamLive,
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
@@ -1829,18 +1829,18 @@ class WebcamScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                const Text(
-                  'Monitoraggio in Tempo Reale',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).realtimeMonitoring,
+                  style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2C3E50),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Visualizza le webcam e i dati meteo del Porto',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).viewWebcamsWeather,
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Color(0xFF7F8C8D),
                   ),
@@ -1852,10 +1852,9 @@ class WebcamScreen extends StatelessWidget {
                       _buildWebcamCard(
                         context,
                         icon: Icons.videocam_rounded,
-                        title: 'Webcam Porto',
-                        subtitle: 'Vista diretta del porto',
-                        description:
-                            'Monitora l\'attività del porto in tempo reale',
+                        title: AppLocalizations.of(context).portWebcam,
+                        subtitle: AppLocalizations.of(context).directPortView,
+                        description: AppLocalizations.of(context).monitorPortActivity,
                         gradient: const LinearGradient(
                           colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
                         ),
@@ -1869,9 +1868,9 @@ class WebcamScreen extends StatelessWidget {
                       _buildWebcamCard(
                         context,
                         icon: Icons.landscape_rounded,
-                        title: 'Webcam Panoramica',
-                        subtitle: 'Vista a 360° del territorio',
-                        description: 'Goditi la vista panoramica del paesaggio',
+                        title: AppLocalizations.of(context).panoramicWebcam,
+                        subtitle: AppLocalizations.of(context).panoramic360View,
+                        description: AppLocalizations.of(context).enjoyPanoramicView,
                         gradient: const LinearGradient(
                           colors: [Color(0xFF27AE60), Color(0xFF229954)],
                         ),
@@ -1885,10 +1884,9 @@ class WebcamScreen extends StatelessWidget {
                       _buildWebcamCard(
                         context,
                         icon: Icons.wb_sunny_rounded,
-                        title: 'Stazione Meteo',
-                        subtitle: 'Dati meteorologici',
-                        description:
-                            'Consulta temperatura, vento e condizioni meteo',
+                        title: AppLocalizations.of(context).weatherStation,
+                        subtitle: AppLocalizations.of(context).weatherData,
+                        description: AppLocalizations.of(context).checkWeatherConditions,
                         gradient: const LinearGradient(
                           colors: [Color(0xFFE67E22), Color(0xFFD35400)],
                         ),
@@ -3072,16 +3070,26 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (newLanguage != currentLanguage && posts.isNotEmpty) {
       currentLanguage = newLanguage;
       
-      debugPrint('🏠 Home: Traduco ${posts.length} post in $newLanguage');
+      debugPrint('🏠 Home: Traduco ${posts.length} post in $newLanguage (2 alla volta)');
       
-      // Traduci tutti i post
+      // Traduci 2 post alla volta in parallelo
       final translated = <dynamic>[];
-      int count = 0;
-      for (final post in posts) {
-        count++;
-        debugPrint('📝 Home: Traduco post $count/${posts.length}...');
-        final translatedPost = await translatePost(post, newLanguage);
-        translated.add(translatedPost);
+      for (int i = 0; i < posts.length; i += 2) {
+        final batch = <Future<Map<String, dynamic>>>[];
+        
+        // Primo post del batch
+        batch.add(translatePost(posts[i], newLanguage));
+        
+        // Secondo post del batch (se esiste)
+        if (i + 1 < posts.length) {
+          batch.add(translatePost(posts[i + 1], newLanguage));
+        }
+        
+        // Attendi che entrambi i post siano tradotti
+        final results = await Future.wait(batch);
+        translated.addAll(results);
+        
+        debugPrint('📝 Home: Tradotti ${translated.length}/${posts.length} post');
       }
 
       debugPrint('✅ Home: Traduzione completata! ${translated.length} post tradotti');
@@ -3409,14 +3417,29 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
       
-      // Traduci i post se la lingua non è italiano
+      // Traduci i post se la lingua non è italiano (2 alla volta)
       if (currentLanguage != 'it' && posts.isNotEmpty) {
-        debugPrint('🏠 Home: Traduco ${posts.length} post all\'avvio in $currentLanguage');
+        debugPrint('🏠 Home: Traduco ${posts.length} post all\'avvio in $currentLanguage (2 alla volta)');
         final translated = <dynamic>[];
-        for (final post in posts) {
-          final translatedPost = await translatePost(post, currentLanguage);
-          translated.add(translatedPost);
+        
+        for (int i = 0; i < posts.length; i += 2) {
+          final batch = <Future<Map<String, dynamic>>>[];
+          
+          // Primo post del batch
+          batch.add(translatePost(posts[i], currentLanguage));
+          
+          // Secondo post del batch (se esiste)
+          if (i + 1 < posts.length) {
+            batch.add(translatePost(posts[i + 1], currentLanguage));
+          }
+          
+          // Attendi che entrambi i post siano tradotti
+          final results = await Future.wait(batch);
+          translated.addAll(results);
+          
+          debugPrint('📝 Home: Tradotti ${translated.length}/${posts.length} post all\'avvio');
         }
+        
         if (mounted) {
           setState(() {
             translatedPosts = translated;
@@ -5415,7 +5438,7 @@ class ContactOptionsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFE0F7FA), // Azzurro mare
       appBar: AppBar(
-        title: const Text("Contatta il Porto"),
+        title: Text(AppLocalizations.of(context).contactPort),
         backgroundColor: const Color(0xFFFFC107),
       ),
       body: Container(
@@ -5435,19 +5458,19 @@ class ContactOptionsScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Seleziona il servizio',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).selectService,
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF01579B),
                   ),
                 ),
                 const SizedBox(height: 30),
-                _buildButton(context, "Bombole Gas", Icons.local_gas_station),
-                _buildButton(context, "Rifiuti", Icons.delete),
-                _buildButton(context, "Guasto", Icons.build),
-                _buildButton(context, "Porto", Icons.anchor),
+                _buildButton(context, AppLocalizations.of(context).gasCylinders, Icons.local_gas_station),
+                _buildButton(context, AppLocalizations.of(context).waste, Icons.delete),
+                _buildButton(context, AppLocalizations.of(context).malfunction, Icons.build),
+                _buildButton(context, AppLocalizations.of(context).port, Icons.anchor),
               ],
             ),
           ),
@@ -5460,27 +5483,23 @@ class ContactOptionsScreen extends StatelessWidget {
     // Colori specifici per ogni servizio
     Color primaryColor;
     Color secondaryColor;
+    final l10n = AppLocalizations.of(context);
 
-    switch (label) {
-      case "Bombole Gas":
-        primaryColor = const Color(0xFFE91E63); // Rosa vibrante
-        secondaryColor = const Color(0xFFF06292);
-        break;
-      case "Rifiuti":
-        primaryColor = const Color(0xFF4CAF50); // Verde natura
-        secondaryColor = const Color(0xFF81C784);
-        break;
-      case "Guasto":
-        primaryColor = const Color(0xFFFF5722); // Arancione emergenza
-        secondaryColor = const Color(0xFFFF8A65);
-        break;
-      case "Porto":
-        primaryColor = const Color(0xFF2196F3); // Blu oceano
-        secondaryColor = const Color(0xFF64B5F6);
-        break;
-      default:
-        primaryColor = const Color(0xFF9C27B0); // Viola default
-        secondaryColor = const Color(0xFFBA68C8);
+    if (label == l10n.gasCylinders) {
+      primaryColor = const Color(0xFFE91E63); // Rosa vibrante
+      secondaryColor = const Color(0xFFF06292);
+    } else if (label == l10n.waste) {
+      primaryColor = const Color(0xFF4CAF50); // Verde natura
+      secondaryColor = const Color(0xFF81C784);
+    } else if (label == l10n.malfunction) {
+      primaryColor = const Color(0xFFFF5722); // Arancione emergenza
+      secondaryColor = const Color(0xFFFF8A65);
+    } else if (label == l10n.port) {
+      primaryColor = const Color(0xFF2196F3); // Blu oceano
+      secondaryColor = const Color(0xFF64B5F6);
+    } else {
+      primaryColor = const Color(0xFF9C27B0); // Viola default
+      secondaryColor = const Color(0xFFBA68C8);
     }
 
     return Container(
@@ -5584,7 +5603,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
 
     if (email.isEmpty || messageText.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Compila tutti i campi obbligatori')),
+        SnackBar(content: Text(AppLocalizations.of(context).fillRequiredFields)),
       );
       return;
     }

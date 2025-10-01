@@ -72,6 +72,34 @@ class AppLocalizations {
       'english': 'Inglese',
       'french': 'Francese',
       'chinese': 'Cinese',
+      
+      // WebCam
+      'webcam_live': 'Webcam Live',
+      'realtime_monitoring': 'Monitoraggio in Tempo Reale',
+      'view_webcams_weather': 'Visualizza le webcam e i dati meteo del Porto',
+      'port_webcam': 'Webcam Porto',
+      'direct_port_view': 'Vista diretta del porto',
+      'monitor_port_activity': 'Monitora l\'attività del porto in tempo reale',
+      'panoramic_webcam': 'Webcam Panoramica',
+      'panoramic_360_view': 'Vista a 360° del territorio',
+      'enjoy_panoramic_view': 'Goditi la vista panoramica del paesaggio',
+      'weather_station': 'Stazione Meteo',
+      'weather_data': 'Dati meteorologici',
+      'check_weather_conditions': 'Consulta temperatura, vento e condizioni meteo',
+      
+      // Servizi
+      'contact_port': 'Contatta il Porto',
+      'select_service': 'Seleziona il servizio',
+      'gas_cylinders': 'Bombole Gas',
+      'waste': 'Rifiuti',
+      'malfunction': 'Guasto',
+      'port': 'Porto',
+      'fill_required_fields': 'Compila tutti i campi obbligatori',
+      'name': 'Nome',
+      'email': 'Email',
+      'phone': 'Telefono',
+      'subject': 'Oggetto',
+      'message': 'Messaggio',
     },
     'en': {
       'app_title': 'Condo App',
@@ -132,6 +160,34 @@ class AppLocalizations {
       'english': 'English',
       'french': 'French',
       'chinese': 'Chinese',
+      
+      // WebCam
+      'webcam_live': 'Live Webcam',
+      'realtime_monitoring': 'Real-Time Monitoring',
+      'view_webcams_weather': 'View the webcams and weather data of the Port',
+      'port_webcam': 'Port Webcam',
+      'direct_port_view': 'Direct view of the port',
+      'monitor_port_activity': 'Monitor port activity in real time',
+      'panoramic_webcam': 'Panoramic Webcam',
+      'panoramic_360_view': '360° view of the territory',
+      'enjoy_panoramic_view': 'Enjoy the panoramic view of the landscape',
+      'weather_station': 'Weather Station',
+      'weather_data': 'Weather data',
+      'check_weather_conditions': 'Check temperature, wind and weather conditions',
+      
+      // Services
+      'contact_port': 'Contact the Port',
+      'select_service': 'Select service',
+      'gas_cylinders': 'Gas Cylinders',
+      'waste': 'Waste',
+      'malfunction': 'Malfunction',
+      'port': 'Port',
+      'fill_required_fields': 'Fill all required fields',
+      'name': 'Name',
+      'email': 'Email',
+      'phone': 'Phone',
+      'subject': 'Subject',
+      'message': 'Message',
     },
     'fr': {
       'app_title': 'App Condominium',
@@ -192,6 +248,34 @@ class AppLocalizations {
       'english': 'Anglais',
       'french': 'Français',
       'chinese': 'Chinois',
+      
+      // WebCam
+      'webcam_live': 'Webcam en Direct',
+      'realtime_monitoring': 'Surveillance en Temps Réel',
+      'view_webcams_weather': 'Visualisez les webcams et les données météo du Port',
+      'port_webcam': 'Webcam du Port',
+      'direct_port_view': 'Vue directe du port',
+      'monitor_port_activity': 'Surveillez l\'activité du port en temps réel',
+      'panoramic_webcam': 'Webcam Panoramique',
+      'panoramic_360_view': 'Vue à 360° du territoire',
+      'enjoy_panoramic_view': 'Profitez de la vue panoramique du paysage',
+      'weather_station': 'Station Météo',
+      'weather_data': 'Données météorologiques',
+      'check_weather_conditions': 'Consultez la température, le vent et les conditions météo',
+      
+      // Services
+      'contact_port': 'Contacter le Port',
+      'select_service': 'Sélectionner le service',
+      'gas_cylinders': 'Bouteilles de Gaz',
+      'waste': 'Déchets',
+      'malfunction': 'Panne',
+      'port': 'Port',
+      'fill_required_fields': 'Remplir tous les champs obligatoires',
+      'name': 'Nom',
+      'email': 'Email',
+      'phone': 'Téléphone',
+      'subject': 'Objet',
+      'message': 'Message',
     },
     'zh': {
       'app_title': '公寓应用',
@@ -252,6 +336,34 @@ class AppLocalizations {
       'english': '英语',
       'french': '法语',
       'chinese': '中文',
+      
+      // 网络摄像头
+      'webcam_live': '实时网络摄像头',
+      'realtime_monitoring': '实时监控',
+      'view_webcams_weather': '查看港口的网络摄像头和天气数据',
+      'port_webcam': '港口摄像头',
+      'direct_port_view': '港口直接视图',
+      'monitor_port_activity': '实时监控港口活动',
+      'panoramic_webcam': '全景摄像头',
+      'panoramic_360_view': '360°领土视图',
+      'enjoy_panoramic_view': '欣赏全景风景',
+      'weather_station': '气象站',
+      'weather_data': '气象数据',
+      'check_weather_conditions': '查看温度、风力和天气状况',
+      
+      // 服务
+      'contact_port': '联系港口',
+      'select_service': '选择服务',
+      'gas_cylinders': '煤气瓶',
+      'waste': '垃圾',
+      'malfunction': '故障',
+      'port': '港口',
+      'fill_required_fields': '填写所有必填字段',
+      'name': '姓名',
+      'email': '电子邮件',
+      'phone': '电话',
+      'subject': '主题',
+      'message': '消息',
     },
   };
 
@@ -306,6 +418,34 @@ class AppLocalizations {
   String get english => translate('english');
   String get french => translate('french');
   String get chinese => translate('chinese');
+  
+  // WebCam
+  String get webcamLive => translate('webcam_live');
+  String get realtimeMonitoring => translate('realtime_monitoring');
+  String get viewWebcamsWeather => translate('view_webcams_weather');
+  String get portWebcam => translate('port_webcam');
+  String get directPortView => translate('direct_port_view');
+  String get monitorPortActivity => translate('monitor_port_activity');
+  String get panoramicWebcam => translate('panoramic_webcam');
+  String get panoramic360View => translate('panoramic_360_view');
+  String get enjoyPanoramicView => translate('enjoy_panoramic_view');
+  String get weatherStation => translate('weather_station');
+  String get weatherData => translate('weather_data');
+  String get checkWeatherConditions => translate('check_weather_conditions');
+  
+  // Services
+  String get contactPort => translate('contact_port');
+  String get selectService => translate('select_service');
+  String get gasCylinders => translate('gas_cylinders');
+  String get waste => translate('waste');
+  String get malfunction => translate('malfunction');
+  String get port => translate('port');
+  String get fillRequiredFields => translate('fill_required_fields');
+  String get name => translate('name');
+  String get email => translate('email');
+  String get phone => translate('phone');
+  String get subject => translate('subject');
+  String get message => translate('message');
 }
 
 class _AppLocalizationsDelegate
