@@ -11,6 +11,10 @@ dependencies:
   flutter_mailer: any
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  translator: ^1.0.0
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.2
   connectivity_plus: ^6.1.4
