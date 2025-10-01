@@ -3097,8 +3097,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     languageProvider.removeListener(_onLanguageChanged);
-    _notificationTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    _notificationTimer?.cancel();
     super.dispose();
   }
 
@@ -3123,13 +3123,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
 
     await _initializeData();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _notificationTimer?.cancel();
-    super.dispose();
   }
 
   @override
