@@ -2982,6 +2982,8 @@ class _SplashScreenState extends State<SplashScreen>
 
 class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late List<dynamic> posts = [];
+  late List<dynamic> translatedPosts = []; // Post tradotti
+  String currentLanguage = 'it';
   bool isLoggedIn = false;
   int _selectedIndex = 0;
   Map<String, dynamic>? userData;
@@ -3058,7 +3060,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    currentLanguage = languageProvider.locale.languageCode;
+    languageProvider.addListener(_onLanguageChanged);
     _initializeWithTokenReload();
+  }
+
+  Future<void> _onLanguageChanged() async {
+    final newLanguage = languageProvider.locale.languageCode;
+    debugPrint('🏠 Home: Cambio lingua da $currentLanguage a $newLanguage');
+    
+    if (newLanguage != currentLanguage && posts.isNotEmpty) {
+      currentLanguage = newLanguage;
+      
+      debugPrint('🏠 Home: Traduco ${posts.length} post in $newLanguage');
+      
+      // Traduci tutti i post
+      final translated = <dynamic>[];
+      int count = 0;
+      for (final post in posts) {
+        count++;
+        debugPrint('📝 Home: Traduco post $count/${posts.length}...');
+        final translatedPost = await translatePost(post, newLanguage);
+        translated.add(translatedPost);
+      }
+
+      debugPrint('✅ Home: Traduzione completata! ${translated.length} post tradotti');
+      
+      if (mounted) {
+        setState(() {
+          translatedPosts = translated;
+        });
+      }
+    }
   }
 
   Future<void> _initializeWithTokenReload() async {
@@ -3879,7 +3912,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case 2:
         return posts.isNotEmpty
             ? ModernArticlesScreen(
-                posts: posts,
+                posts: translatedPosts.isNotEmpty ? translatedPosts : posts,
                 userName: userData?['name'] ?? '',
                 userEmail: userData?['email'] ?? '',
               )
