@@ -100,6 +100,12 @@ class AppLocalizations {
       'phone': 'Telefono',
       'subject': 'Oggetto',
       'message': 'Messaggio',
+      'send_message': 'Invia un messaggio',
+      'send': 'Invia',
+      'name_required': 'Nome *',
+      'email_required': 'Email *',
+      'phone_optional': 'Telefono',
+      'message_required': 'Messaggio *',
     },
     'en': {
       'app_title': 'Condo App',
@@ -188,6 +194,12 @@ class AppLocalizations {
       'phone': 'Phone',
       'subject': 'Subject',
       'message': 'Message',
+      'send_message': 'Send a message',
+      'send': 'Send',
+      'name_required': 'Name *',
+      'email_required': 'Email *',
+      'phone_optional': 'Phone',
+      'message_required': 'Message *',
     },
     'fr': {
       'app_title': 'App Condominium',
@@ -276,6 +288,12 @@ class AppLocalizations {
       'phone': 'Téléphone',
       'subject': 'Objet',
       'message': 'Message',
+      'send_message': 'Envoyer un message',
+      'send': 'Envoyer',
+      'name_required': 'Nom *',
+      'email_required': 'Email *',
+      'phone_optional': 'Téléphone',
+      'message_required': 'Message *',
     },
     'zh': {
       'app_title': '公寓应用',
@@ -364,6 +382,12 @@ class AppLocalizations {
       'phone': '电话',
       'subject': '主题',
       'message': '消息',
+      'send_message': '发送消息',
+      'send': '发送',
+      'name_required': '姓名 *',
+      'email_required': '电子邮件 *',
+      'phone_optional': '电话',
+      'message_required': '消息 *',
     },
   };
 
@@ -446,6 +470,12 @@ class AppLocalizations {
   String get phone => translate('phone');
   String get subject => translate('subject');
   String get message => translate('message');
+  String get sendMessage => translate('send_message');
+  String get send => translate('send');
+  String get nameRequired => translate('name_required');
+  String get emailRequired => translate('email_required');
+  String get phoneOptional => translate('phone_optional');
+  String get messageRequired => translate('message_required');
 }
 
 class _AppLocalizationsDelegate

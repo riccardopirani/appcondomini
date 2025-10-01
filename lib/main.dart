@@ -5688,9 +5688,9 @@ Inviato dall'app Porto Bello di Gallura
                 const Icon(Icons.contact_mail,
                     size: 48, color: Color(0xFF0288D1)),
                 const SizedBox(height: 12),
-                const Text(
-                  'Invia un messaggio',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context).sendMessage,
+                  style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF01579B),
@@ -5700,34 +5700,34 @@ Inviato dall'app Porto Bello di Gallura
                 const SizedBox(height: 20),
                 _buildTextField(
                   controller: _nameController,
-                  label: 'Nome *',
+                  label: AppLocalizations.of(context).nameRequired,
                   icon: Icons.person,
                 ),
                 const SizedBox(height: 15),
                 _buildTextField(
                   controller: _emailController,
-                  label: 'Email *',
+                  label: AppLocalizations.of(context).emailRequired,
                   icon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 15),
                 _buildTextField(
                   controller: _phoneController,
-                  label: 'Telefono',
+                  label: AppLocalizations.of(context).phoneOptional,
                   icon: Icons.phone,
                   keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 15),
                 _buildTextField(
                   controller: _messageController,
-                  label: 'Messaggio *',
+                  label: AppLocalizations.of(context).messageRequired,
                   icon: Icons.message,
                   maxLines: 4,
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.send, color: Colors.white),
-                  label: const Text('Invia'),
+                  label: Text(AppLocalizations.of(context).send),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFD54F),
                     foregroundColor: Colors.black,
