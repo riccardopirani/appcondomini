@@ -122,9 +122,25 @@ supportedLocales: const [
 ## 🔧 Tecnologie Utilizzate
 
 - **flutter_localizations**: Framework di localizzazione Flutter
-- **intl**: Supporto per l'internazionalizzazione
-- **translator**: API Google Translate per traduzione automatica
+- **intl**: Supporto per l'internazionalizzazione  
+- **MyMemory Translation API**: API gratuita per traduzione automatica dei post
 - **shared_preferences**: Persistenza della lingua selezionata
+- **http**: Chiamate API per traduzione
+
+## 🌐 API di Traduzione
+
+### MyMemory Translation API
+- **URL**: `https://api.mymemory.translated.net/get`
+- **Tipo**: GET request
+- **Gratuita**: ✅ 10.000 caratteri/giorno
+- **Nessuna API key richiesta**: ✅
+- **Supporta 170+ lingue**: ✅
+
+### Performance
+- **Traduzione parallela**: 2 post alla volta
+- **Cache intelligente**: Evita traduzioni duplicate
+- **Velocità**: ~1-2 secondi per post
+- **Fallback**: Mostra testo originale in caso di errore
 
 ## 📝 Note Importanti
 
