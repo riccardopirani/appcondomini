@@ -3407,6 +3407,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
 
       debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
+      
+      // Traduci i post se la lingua non è italiano
+      if (currentLanguage != 'it' && posts.isNotEmpty) {
+        debugPrint('🏠 Home: Traduco ${posts.length} post all\'avvio in $currentLanguage');
+        final translated = <dynamic>[];
+        for (final post in posts) {
+          final translatedPost = await translatePost(post, currentLanguage);
+          translated.add(translatedPost);
+        }
+        if (mounted) {
+          setState(() {
+            translatedPosts = translated;
+          });
+        }
+        debugPrint('✅ Home: ${translatedPosts.length} post tradotti all\'avvio');
+      } else {
+        translatedPosts = posts;
+      }
     } catch (e) {
       debugPrint('Errore caricamento post: $e');
       await _fetchPostsAlternative();
