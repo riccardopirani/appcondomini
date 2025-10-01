@@ -629,10 +629,38 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   void initState() {
     super.initState();
     translatedPosts = widget.posts;
-    _buildCategoryMap();
-    filteredPosts = widget.posts;
-    languageProvider.addListener(_onLanguageChanged);
     currentLanguage = languageProvider.locale.languageCode;
+    
+    // Traduci i post all'inizializzazione se la lingua non è italiano
+    if (currentLanguage != 'it') {
+      _translatePostsOnInit();
+    } else {
+      _buildCategoryMap();
+      filteredPosts = widget.posts;
+    }
+    
+    languageProvider.addListener(_onLanguageChanged);
+  }
+  
+  Future<void> _translatePostsOnInit() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    final translated = <dynamic>[];
+    for (final post in widget.posts) {
+      final translatedPost = await translatePost(post, currentLanguage);
+      translated.add(translatedPost);
+    }
+
+    if (mounted) {
+      setState(() {
+        translatedPosts = translated;
+        isLoading = false;
+      });
+      _buildCategoryMap();
+      _filterPosts();
+    }
   }
 
   @override
@@ -772,8 +800,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   List<String> _getAvailableCategories() {
-    final Set<String> categories = {'Tutti'};
-    for (final post in widget.posts) {
+    final Set<String> categories = {AppLocalizations.of(context).all};
+    for (final post in translatedPosts) {
       final postCategories = post['_embedded']?['wp:term']?[0];
       if (postCategories != null && postCategories.isNotEmpty) {
         for (final cat in postCategories) {
@@ -937,7 +965,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
               children: [
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Cerca negli articoli...',
+                    hintText: AppLocalizations.of(context).searchArticles,
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: searchQuery.isNotEmpty
                         ? IconButton(
@@ -972,20 +1000,20 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       child: DropdownButtonFormField<String>(
                         value: selectedStatus,
                         decoration: InputDecoration(
-                          labelText: 'Status',
+                          labelText: AppLocalizations.of(context).status,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 8),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
-                              value: 'Tutti', child: Text('Tutti')),
+                              value: 'Tutti', child: Text(AppLocalizations.of(context).all)),
                           DropdownMenuItem(
-                              value: 'Pubblico', child: Text('Pubblico')),
+                              value: 'Pubblico', child: Text(AppLocalizations.of(context).public)),
                           DropdownMenuItem(
-                              value: 'Privato', child: Text('Privato')),
+                              value: 'Privato', child: Text(AppLocalizations.of(context).private)),
                         ],
                         onChanged: (value) {
                           setState(() {
@@ -1014,7 +1042,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                '${filteredPosts.length} articoli in "$currentCategory"',
+                '${filteredPosts.length} ${AppLocalizations.of(context).articlesIn} "$currentCategory"',
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
@@ -1031,7 +1059,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                     });
                   },
                   icon: const Icon(Icons.clear_all, size: 16),
-                  label: const Text('Reset'),
+                  label: Text(AppLocalizations.of(context).reset),
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF01579B),
                   ),
@@ -1076,7 +1104,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Nessun articolo trovato',
+            AppLocalizations.of(context).noArticlesFound,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -1085,7 +1113,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Prova a modificare i filtri di ricerca',
+            AppLocalizations.of(context).tryModifyFilters,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
