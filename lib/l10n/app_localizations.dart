@@ -72,7 +72,7 @@ class AppLocalizations {
       'english': 'Inglese',
       'french': 'Francese',
       'chinese': 'Cinese',
-      
+
       // WebCam
       'webcam_live': 'Webcam Live',
       'realtime_monitoring': 'Monitoraggio in Tempo Reale',
@@ -85,8 +85,9 @@ class AppLocalizations {
       'enjoy_panoramic_view': 'Goditi la vista panoramica del paesaggio',
       'weather_station': 'Stazione Meteo',
       'weather_data': 'Dati meteorologici',
-      'check_weather_conditions': 'Consulta temperatura, vento e condizioni meteo',
-      
+      'check_weather_conditions':
+          'Consulta temperatura, vento e condizioni meteo',
+
       // Servizi
       'contact_port': 'Contatta il Porto',
       'select_service': 'Seleziona il servizio',
@@ -166,7 +167,7 @@ class AppLocalizations {
       'english': 'English',
       'french': 'French',
       'chinese': 'Chinese',
-      
+
       // WebCam
       'webcam_live': 'Live Webcam',
       'realtime_monitoring': 'Real-Time Monitoring',
@@ -179,8 +180,9 @@ class AppLocalizations {
       'enjoy_panoramic_view': 'Enjoy the panoramic view of the landscape',
       'weather_station': 'Weather Station',
       'weather_data': 'Weather data',
-      'check_weather_conditions': 'Check temperature, wind and weather conditions',
-      
+      'check_weather_conditions':
+          'Check temperature, wind and weather conditions',
+
       // Services
       'contact_port': 'Contact the Port',
       'select_service': 'Select service',
@@ -260,11 +262,12 @@ class AppLocalizations {
       'english': 'Anglais',
       'french': 'Français',
       'chinese': 'Chinois',
-      
+
       // WebCam
       'webcam_live': 'Webcam en Direct',
       'realtime_monitoring': 'Surveillance en Temps Réel',
-      'view_webcams_weather': 'Visualisez les webcams et les données météo du Port',
+      'view_webcams_weather':
+          'Visualisez les webcams et les données météo du Port',
       'port_webcam': 'Webcam du Port',
       'direct_port_view': 'Vue directe du port',
       'monitor_port_activity': 'Surveillez l\'activité du port en temps réel',
@@ -273,8 +276,9 @@ class AppLocalizations {
       'enjoy_panoramic_view': 'Profitez de la vue panoramique du paysage',
       'weather_station': 'Station Météo',
       'weather_data': 'Données météorologiques',
-      'check_weather_conditions': 'Consultez la température, le vent et les conditions météo',
-      
+      'check_weather_conditions':
+          'Consultez la température, le vent et les conditions météo',
+
       // Services
       'contact_port': 'Contacter le Port',
       'select_service': 'Sélectionner le service',
@@ -354,7 +358,7 @@ class AppLocalizations {
       'english': '英语',
       'french': '法语',
       'chinese': '中文',
-      
+
       // 网络摄像头
       'webcam_live': '实时网络摄像头',
       'realtime_monitoring': '实时监控',
@@ -368,7 +372,7 @@ class AppLocalizations {
       'weather_station': '气象站',
       'weather_data': '气象数据',
       'check_weather_conditions': '查看温度、风力和天气状况',
-      
+
       // 服务
       'contact_port': '联系港口',
       'select_service': '选择服务',
@@ -442,7 +446,7 @@ class AppLocalizations {
   String get english => translate('english');
   String get french => translate('french');
   String get chinese => translate('chinese');
-  
+
   // WebCam
   String get webcamLive => translate('webcam_live');
   String get realtimeMonitoring => translate('realtime_monitoring');
@@ -456,7 +460,7 @@ class AppLocalizations {
   String get weatherStation => translate('weather_station');
   String get weatherData => translate('weather_data');
   String get checkWeatherConditions => translate('check_weather_conditions');
-  
+
   // Services
   String get contactPort => translate('contact_port');
   String get selectService => translate('select_service');

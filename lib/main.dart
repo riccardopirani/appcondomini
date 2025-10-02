@@ -15,8 +15,6 @@ String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
 
-// MyMemory Translation API - Gratuita, 10.000 caratteri/giorno
-// Documentazione: https://mymemory.translated.net/doc/spec.php
 const String _translationApiUrl = 'https://api.mymemory.translated.net/get';
 
 // Funzione per tradurre il testo usando MyMemory Translation API
@@ -2482,17 +2480,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           // Logo e titolo
                           Container(
                             padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2196F3).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                            
                             child: Image.asset(
                               "assets/logo.png",
-                              width: 80,
-                              height: 80,
+                              width: 170,
+                              height: 170,
                             ),
                           ),
-                          const SizedBox(height: 24),
                           const Text(
                             'Benvenuto',
                             style: TextStyle(
