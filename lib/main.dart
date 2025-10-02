@@ -54,17 +54,20 @@ Future<String> translateText(String text, String targetLanguage) async {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      
+
       // MyMemory ritorna responseData.translatedText
       // responseStatus può essere int o String
       final responseStatus = data['responseStatus'];
       final statusOk = responseStatus == 200 || responseStatus == '200';
-      
-      if (statusOk && data['responseData'] != null && data['responseData']['translatedText'] != null) {
+
+      if (statusOk &&
+          data['responseData'] != null &&
+          data['responseData']['translatedText'] != null) {
         final translatedText = data['responseData']['translatedText'] as String;
-        
+
         // Debug per verificare la traduzione
-        debugPrint('Tradotto: "${text.substring(0, text.length > 50 ? 50 : text.length)}" → "${translatedText.substring(0, translatedText.length > 50 ? 50 : translatedText.length)}"');
+        debugPrint(
+            'Tradotto: "${text.substring(0, text.length > 50 ? 50 : text.length)}" → "${translatedText.substring(0, translatedText.length > 50 ? 50 : translatedText.length)}"');
 
         // Salva in cache
         if (!_translationCache.containsKey(targetLanguage)) {
@@ -74,11 +77,13 @@ Future<String> translateText(String text, String targetLanguage) async {
 
         return translatedText;
       } else {
-        debugPrint('Errore traduzione MyMemory: status=$responseStatus, details=${data['responseDetails']}');
+        debugPrint(
+            'Errore traduzione MyMemory: status=$responseStatus, details=${data['responseDetails']}');
         return text;
       }
     } else {
-      debugPrint('Errore API MyMemory: ${response.statusCode} - ${response.body}');
+      debugPrint(
+          'Errore API MyMemory: ${response.statusCode} - ${response.body}');
       return text;
     }
   } catch (e) {
@@ -672,7 +677,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   Future<void> _translatePostsOnInit() async {
-    debugPrint('🌍 Inizio traduzione ${widget.posts.length} post in $currentLanguage');
+    debugPrint(
+        '🌍 Inizio traduzione ${widget.posts.length} post in $currentLanguage');
     setState(() {
       isLoading = true;
     });
@@ -706,15 +712,16 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   Future<void> _onLanguageChanged() async {
     final newLanguage = languageProvider.locale.languageCode;
     debugPrint('🔄 Cambio lingua da $currentLanguage a $newLanguage');
-    
+
     if (newLanguage != currentLanguage) {
       setState(() {
         isLoading = true;
         currentLanguage = newLanguage;
       });
 
-      debugPrint('🌍 Inizio traduzione ${widget.posts.length} post in $newLanguage');
-      
+      debugPrint(
+          '🌍 Inizio traduzione ${widget.posts.length} post in $newLanguage');
+
       // Traduci tutti i post
       final translated = <dynamic>[];
       int count = 0;
@@ -726,7 +733,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       }
 
       debugPrint('✅ Traduzione completata! ${translated.length} post tradotti');
-      
+
       setState(() {
         translatedPosts = translated;
         isLoading = false;
@@ -1796,18 +1803,6 @@ class WebcamScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: Text(
-          AppLocalizations.of(context).webcamLive,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: const Color(0xFFFFC107),
-        elevation: 0,
-        centerTitle: true,
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -1823,36 +1818,16 @@ class WebcamScreen extends StatelessWidget {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: ListView(
               children: [
                 const SizedBox(height: 20),
-                Text(
-                  AppLocalizations.of(context).realtimeMonitoring,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  AppLocalizations.of(context).viewWebcamsWeather,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF7F8C8D),
-                  ),
-                ),
-                const SizedBox(height: 40),
-                Expanded(
-                  child: ListView(
-                    children: [
                       _buildWebcamCard(
                         context,
                         icon: Icons.videocam_rounded,
                         title: AppLocalizations.of(context).portWebcam,
                         subtitle: AppLocalizations.of(context).directPortView,
-                        description: AppLocalizations.of(context).monitorPortActivity,
+                        description:
+                            AppLocalizations.of(context).monitorPortActivity,
                         gradient: const LinearGradient(
                           colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
                         ),
@@ -1868,7 +1843,8 @@ class WebcamScreen extends StatelessWidget {
                         icon: Icons.landscape_rounded,
                         title: AppLocalizations.of(context).panoramicWebcam,
                         subtitle: AppLocalizations.of(context).panoramic360View,
-                        description: AppLocalizations.of(context).enjoyPanoramicView,
+                        description:
+                            AppLocalizations.of(context).enjoyPanoramicView,
                         gradient: const LinearGradient(
                           colors: [Color(0xFF27AE60), Color(0xFF229954)],
                         ),
@@ -1884,7 +1860,8 @@ class WebcamScreen extends StatelessWidget {
                         icon: Icons.wb_sunny_rounded,
                         title: AppLocalizations.of(context).weatherStation,
                         subtitle: AppLocalizations.of(context).weatherData,
-                        description: AppLocalizations.of(context).checkWeatherConditions,
+                        description:
+                            AppLocalizations.of(context).checkWeatherConditions,
                         gradient: const LinearGradient(
                           colors: [Color(0xFFE67E22), Color(0xFFD35400)],
                         ),
@@ -1894,9 +1871,6 @@ class WebcamScreen extends StatelessWidget {
                           );
                         },
                       ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -2480,7 +2454,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           // Logo e titolo
                           Container(
                             padding: const EdgeInsets.all(20),
-                            
                             child: Image.asset(
                               "assets/logo.png",
                               width: 170,
@@ -3060,34 +3033,37 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> _onLanguageChanged() async {
     final newLanguage = languageProvider.locale.languageCode;
     debugPrint('🏠 Home: Cambio lingua da $currentLanguage a $newLanguage');
-    
+
     if (newLanguage != currentLanguage && posts.isNotEmpty) {
       currentLanguage = newLanguage;
-      
-      debugPrint('🏠 Home: Traduco ${posts.length} post in $newLanguage (2 alla volta)');
-      
+
+      debugPrint(
+          '🏠 Home: Traduco ${posts.length} post in $newLanguage (2 alla volta)');
+
       // Traduci 2 post alla volta in parallelo
       final translated = <dynamic>[];
       for (int i = 0; i < posts.length; i += 2) {
         final batch = <Future<Map<String, dynamic>>>[];
-        
+
         // Primo post del batch
         batch.add(translatePost(posts[i], newLanguage));
-        
+
         // Secondo post del batch (se esiste)
         if (i + 1 < posts.length) {
           batch.add(translatePost(posts[i + 1], newLanguage));
         }
-        
+
         // Attendi che entrambi i post siano tradotti
         final results = await Future.wait(batch);
         translated.addAll(results);
-        
-        debugPrint('📝 Home: Tradotti ${translated.length}/${posts.length} post');
+
+        debugPrint(
+            '📝 Home: Tradotti ${translated.length}/${posts.length} post');
       }
 
-      debugPrint('✅ Home: Traduzione completata! ${translated.length} post tradotti');
-      
+      debugPrint(
+          '✅ Home: Traduzione completata! ${translated.length} post tradotti');
+
       if (mounted) {
         setState(() {
           translatedPosts = translated;
@@ -3410,36 +3386,39 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
 
       debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
-      
+
       // Traduci i post se la lingua non è italiano (2 alla volta)
       if (currentLanguage != 'it' && posts.isNotEmpty) {
-        debugPrint('🏠 Home: Traduco ${posts.length} post all\'avvio in $currentLanguage (2 alla volta)');
+        debugPrint(
+            '🏠 Home: Traduco ${posts.length} post all\'avvio in $currentLanguage (2 alla volta)');
         final translated = <dynamic>[];
-        
+
         for (int i = 0; i < posts.length; i += 2) {
           final batch = <Future<Map<String, dynamic>>>[];
-          
+
           // Primo post del batch
           batch.add(translatePost(posts[i], currentLanguage));
-          
+
           // Secondo post del batch (se esiste)
           if (i + 1 < posts.length) {
             batch.add(translatePost(posts[i + 1], currentLanguage));
           }
-          
+
           // Attendi che entrambi i post siano tradotti
           final results = await Future.wait(batch);
           translated.addAll(results);
-          
-          debugPrint('📝 Home: Tradotti ${translated.length}/${posts.length} post all\'avvio');
+
+          debugPrint(
+              '📝 Home: Tradotti ${translated.length}/${posts.length} post all\'avvio');
         }
-        
+
         if (mounted) {
           setState(() {
             translatedPosts = translated;
           });
         }
-        debugPrint('✅ Home: ${translatedPosts.length} post tradotti all\'avvio');
+        debugPrint(
+            '✅ Home: ${translatedPosts.length} post tradotti all\'avvio');
       } else {
         translatedPosts = posts;
       }
@@ -5450,21 +5429,17 @@ class ContactOptionsScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                Text(
-                  AppLocalizations.of(context).selectService,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF01579B),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                _buildButton(context, AppLocalizations.of(context).gasCylinders, Icons.local_gas_station),
-                _buildButton(context, AppLocalizations.of(context).waste, Icons.delete),
-                _buildButton(context, AppLocalizations.of(context).malfunction, Icons.build),
-                _buildButton(context, AppLocalizations.of(context).port, Icons.anchor),
+                const SizedBox(height: 20),
+                _buildButton(context, AppLocalizations.of(context).gasCylinders,
+                    'assets/bombole-gas.png'),
+                _buildButton(context, AppLocalizations.of(context).waste,
+                    'assets/ritiro-rifiuti.png'),
+                _buildButton(context, AppLocalizations.of(context).malfunction,
+                    'assets/segnalazione-guasto.png'),
+                _buildButton(context, AppLocalizations.of(context).port,
+                    'assets/ormeggio.png'),
               ],
             ),
           ),
@@ -5473,28 +5448,10 @@ class ContactOptionsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildButton(BuildContext context, String label, IconData icon) {
-    // Colori specifici per ogni servizio
-    Color primaryColor;
-    Color secondaryColor;
-    final l10n = AppLocalizations.of(context);
-
-    if (label == l10n.gasCylinders) {
-      primaryColor = const Color(0xFFE91E63); // Rosa vibrante
-      secondaryColor = const Color(0xFFF06292);
-    } else if (label == l10n.waste) {
-      primaryColor = const Color(0xFF4CAF50); // Verde natura
-      secondaryColor = const Color(0xFF81C784);
-    } else if (label == l10n.malfunction) {
-      primaryColor = const Color(0xFFFF5722); // Arancione emergenza
-      secondaryColor = const Color(0xFFFF8A65);
-    } else if (label == l10n.port) {
-      primaryColor = const Color(0xFF2196F3); // Blu oceano
-      secondaryColor = const Color(0xFF64B5F6);
-    } else {
-      primaryColor = const Color(0xFF9C27B0); // Viola default
-      secondaryColor = const Color(0xFFBA68C8);
-    }
+  Widget _buildButton(BuildContext context, String label, String imagePath) {
+    // Tutti i servizi usano il colore blu del porto
+    const Color primaryColor = Color(0xFF2196F3); // Blu oceano
+    const Color secondaryColor = Color(0xFF64B5F6);
 
     return Container(
       width: double.infinity,
@@ -5515,17 +5472,7 @@ class ContactOptionsScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: ElevatedButton.icon(
-        icon: Icon(icon, color: Colors.white, size: 28),
-        label: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 0.5,
-          ),
-        ),
+      child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -5546,6 +5493,34 @@ class ContactOptionsScreen extends StatelessWidget {
             ),
           );
         },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              imagePath,
+              width: 32,
+              height: 32,
+              color: Colors.white,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.image_not_supported,
+                    color: Colors.white, size: 28);
+              },
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -5597,7 +5572,8 @@ class _EmailFormTabState extends State<EmailFormTab> {
 
     if (email.isEmpty || messageText.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).fillRequiredFields)),
+        SnackBar(
+            content: Text(AppLocalizations.of(context).fillRequiredFields)),
       );
       return;
     }
