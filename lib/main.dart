@@ -2897,6 +2897,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
   bool isLoadingPosts = true;
+  bool _isRendering = false;
   final Set<int> _notifiedUrgentPostIds = {};
   Timer? _notificationTimer;
   Timer? _loadingTimeoutTimer;
@@ -3040,6 +3041,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _notificationTimer?.cancel();
     _loadingTimeoutTimer?.cancel();
+    _isRendering = false;
     super.dispose();
   }
 
@@ -4265,6 +4267,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
   // HOME CONTENT
   Widget _homeContent() {
+    // Evita chiamate multiple durante il rendering
+    if (_isRendering) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    _isRendering = true;
+    
     // Debug per capire perché si blocca
     debugPrint(
         '🏠 _homeContent: posts.length=${posts.length}, isLoadingPosts=$isLoadingPosts');
@@ -4328,20 +4339,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     if (visiblePosts.isNotEmpty) {
       debugPrint('🏠 Rendering ${visiblePosts.length} post visibili');
-      // Piccolo delay per evitare blocchi UI su Android
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
-          setState(() {
-            // Forza un rebuild per assicurarsi che l'UI sia responsive
-          });
-        }
+      // Reset flag dopo un breve delay per permettere il rendering
+      Future.microtask(() {
+        _isRendering = false;
       });
     } else {
       debugPrint('🏠 Nessun post visibile, mostro messaggio vuoto');
+      _isRendering = false;
     }
 
     // Mostra indicatore durante il rendering iniziale se necessario
     if (visiblePosts.isNotEmpty && isLoadingPosts) {
+      _isRendering = false; // Reset flag
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -4807,7 +4816,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       ),
     );
   }
-
   // --- i builder di item/menu/account restano invariati dal tuo codice originale ---
   Widget _buildModernMenuItem(
     BuildContext context, {
