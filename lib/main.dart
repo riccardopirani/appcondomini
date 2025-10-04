@@ -2898,8 +2898,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
+  bool isLoadingPosts = true;
   final Set<int> _notifiedUrgentPostIds = {};
   Timer? _notificationTimer;
+  Timer? _loadingTimeoutTimer;
 
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
@@ -2972,6 +2974,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     currentLanguage = languageProvider.locale.languageCode;
     languageProvider.addListener(_onLanguageChanged);
+    
+    // Inizializza translatedPosts con i post originali se la lingua è italiana
+    if (currentLanguage == 'it') {
+      translatedPosts = posts;
+    }
+    
     _initializeWithTokenReload();
   }
 
@@ -2982,37 +2990,47 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (newLanguage != currentLanguage && posts.isNotEmpty) {
       currentLanguage = newLanguage;
 
-      debugPrint(
-          '🏠 Home: Traduco ${posts.length} post in $newLanguage (2 alla volta)');
+      if (newLanguage == 'it') {
+        // Se la nuova lingua è italiana, usa i post originali senza traduzione
+        debugPrint('🏠 Home: Lingua cambiata a italiano - nessuna traduzione necessaria');
+        if (mounted) {
+          setState(() {
+            translatedPosts = posts;
+          });
+        }
+      } else {
+        debugPrint(
+            '🏠 Home: Traduco ${posts.length} post in $newLanguage (2 alla volta)');
 
-      // Traduci 2 post alla volta in parallelo
-      final translated = <dynamic>[];
-      for (int i = 0; i < posts.length; i += 2) {
-        final batch = <Future<Map<String, dynamic>>>[];
+        // Traduci 2 post alla volta in parallelo
+        final translated = <dynamic>[];
+        for (int i = 0; i < posts.length; i += 2) {
+          final batch = <Future<Map<String, dynamic>>>[];
 
-        // Primo post del batch
-        batch.add(translatePost(posts[i], newLanguage));
+          // Primo post del batch
+          batch.add(translatePost(posts[i], newLanguage));
 
-        // Secondo post del batch (se esiste)
-        if (i + 1 < posts.length) {
-          batch.add(translatePost(posts[i + 1], newLanguage));
+          // Secondo post del batch (se esiste)
+          if (i + 1 < posts.length) {
+            batch.add(translatePost(posts[i + 1], newLanguage));
+          }
+
+          // Attendi che entrambi i post siano tradotti
+          final results = await Future.wait(batch);
+          translated.addAll(results);
+
+          debugPrint(
+              '📝 Home: Tradotti ${translated.length}/${posts.length} post');
         }
 
-        // Attendi che entrambi i post siano tradotti
-        final results = await Future.wait(batch);
-        translated.addAll(results);
-
         debugPrint(
-            '📝 Home: Tradotti ${translated.length}/${posts.length} post');
-      }
+            '✅ Home: Traduzione completata! ${translated.length} post tradotti');
 
-      debugPrint(
-          '✅ Home: Traduzione completata! ${translated.length} post tradotti');
-
-      if (mounted) {
-        setState(() {
-          translatedPosts = translated;
-        });
+        if (mounted) {
+          setState(() {
+            translatedPosts = translated;
+          });
+        }
       }
     }
   }
@@ -3022,6 +3040,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     languageProvider.removeListener(_onLanguageChanged);
     WidgetsBinding.instance.removeObserver(this);
     _notificationTimer?.cancel();
+    _loadingTimeoutTimer?.cancel();
     super.dispose();
   }
 
@@ -3173,9 +3192,49 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     debugPrint('=== INIZIALIZZAZIONE DATI ===');
 
     try {
-      await fetchWpMenu();
-      await fetchPosts();
-      await fetchUserData();
+      // Esegui le operazioni in sequenza per evitare che un errore blocchi tutto
+      await _initializeWithTimeout(() => fetchUserData(), 'fetchUserData', 15);
+      
+      // Ora che i dati utente sono caricati, mostra l'UI
+      if (mounted) {
+        setState(() {
+          isLoadingUserData = false;
+        });
+      }
+
+      // Carica i post e il menu in background
+      _initializeWithTimeout(() => fetchPosts(), 'fetchPosts', 60).then((_) {
+        // Fallback: assicurati che isLoadingPosts sia false dopo il caricamento
+        if (mounted && isLoadingPosts) {
+          debugPrint('Fallback: imposto isLoadingPosts = false');
+          setState(() {
+            isLoadingPosts = false;
+          });
+        }
+        _loadingTimeoutTimer?.cancel();
+      }).catchError((e) {
+        debugPrint('Errore caricamento post: $e');
+        if (mounted) {
+          setState(() {
+            isLoadingPosts = false;
+          });
+        }
+        _loadingTimeoutTimer?.cancel();
+      });
+
+      // Timer di sicurezza: se dopo 30 secondi i post non sono ancora caricati, forza il caricamento
+      _loadingTimeoutTimer = Timer(const Duration(seconds: 30), () {
+        if (mounted && isLoadingPosts) {
+          debugPrint('Timeout sicurezza: forzo isLoadingPosts = false');
+          setState(() {
+            isLoadingPosts = false;
+          });
+        }
+      });
+      
+      _initializeWithTimeout(() => fetchWpMenu(), 'fetchWpMenu', 30).catchError((e) {
+        debugPrint('Errore caricamento menu: $e');
+      });
 
       if (mounted) {
         startUrgentNotificationWatcher(context, posts);
@@ -3186,13 +3245,42 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Errore durante inizializzazione: $e');
       if (mounted) {
+        setState(() {
+          isLoadingUserData = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Errore caricamento dati: $e'),
             backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Riprova',
+              onPressed: () {
+                setState(() {
+                  isLoadingUserData = true;
+                });
+                _initializeData();
+              },
+            ),
           ),
         );
       }
+    }
+  }
+
+  Future<void> _initializeWithTimeout(Future<void> Function() operation, String operationName, int timeoutSeconds) async {
+    try {
+      debugPrint('=== INIZIO $operationName (timeout: ${timeoutSeconds}s) ===');
+      await operation().timeout(
+        Duration(seconds: timeoutSeconds),
+        onTimeout: () {
+          debugPrint('=== TIMEOUT $operationName dopo ${timeoutSeconds}s ===');
+          throw TimeoutException('$operationName timeout dopo ${timeoutSeconds}s', Duration(seconds: timeoutSeconds));
+        },
+      );
+      debugPrint('=== COMPLETATO $operationName ===');
+    } catch (e) {
+      debugPrint('=== ERRORE $operationName: $e ===');
+      rethrow;
     }
   }
 
@@ -3365,7 +3453,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint(
             '✅ Home: ${translatedPosts.length} post tradotti all\'avvio');
       } else {
-        translatedPosts = posts;
+        // Se la lingua è italiana o non ci sono post, usa i post originali
+        debugPrint('🏠 Home: Lingua italiana ($currentLanguage) - nessuna traduzione necessaria');
+        debugPrint('🏠 Home: Prima setState - isLoadingPosts: $isLoadingPosts, posts: ${posts.length}');
+        if (mounted) {
+          setState(() {
+            translatedPosts = posts;
+            isLoadingPosts = false;
+          });
+          debugPrint('🏠 Home: Dopo setState - isLoadingPosts: $isLoadingPosts');
+        } else {
+          debugPrint('🏠 Home: Widget non mounted, non aggiorno lo state');
+        }
       }
     } catch (e) {
       debugPrint('Errore caricamento post: $e');
@@ -3820,6 +3919,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (mounted) {
       setState(() {
         posts = filtered;
+        isLoadingPosts = false;
       });
       debugPrint('=== POST AGGIORNATI NELLO STATE: ${posts.length} ===');
     } else {
@@ -3844,6 +3944,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         if (mounted) {
           setState(() {
             posts = [];
+            isLoadingPosts = false;
           });
         }
         debugPrint('Nessun post disponibile, lista vuota');
@@ -3853,6 +3954,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           posts = [];
+          isLoadingPosts = false;
         });
       }
     }
@@ -3887,8 +3989,29 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     if (isLoadingUserData) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              const Text(
+                'Caricamento dati...',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    isLoadingUserData = false;
+                  });
+                },
+                child: const Text('Salta caricamento'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -4136,23 +4259,35 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
   // HOME CONTENT
   Widget _homeContent() {
+    // Debug per capire perché si blocca
+    debugPrint('🏠 _homeContent: posts.length=${posts.length}, isLoadingPosts=$isLoadingPosts');
+    
     // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
-    if (posts.isEmpty && isLoadingUserData) {
-      return const Center(
+    if (posts.isEmpty && isLoadingPosts) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
+            const CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'Caricamento post...',
               style: TextStyle(
                 fontSize: 16,
                 color: Color(0xFF666666),
                 fontWeight: FontWeight.w500,
               ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  isLoadingPosts = false;
+                });
+              },
+              child: const Text('Continua senza post'),
             ),
           ],
         ),
@@ -4171,8 +4306,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           excerpt.contains('devi essere loggato') ||
           content.trim().isEmpty;
 
-      return !hasRestrictedTitle && !hasRestrictedContent;
+      final isVisible = !hasRestrictedTitle && !hasRestrictedContent;
+      
+      if (!isVisible) {
+        debugPrint('🏠 Post filtrato: "${post['title']?['rendered']}" - restrictedTitle: $hasRestrictedTitle, restrictedContent: $hasRestrictedContent');
+      }
+
+      return isVisible;
     }).toList();
+
+    debugPrint('🏠 _homeContent: posts totali=${posts.length}, visiblePosts=${visiblePosts.length}');
+
+    if (visiblePosts.isNotEmpty) {
+      debugPrint('🏠 Rendering ${visiblePosts.length} post visibili');
+    } else {
+      debugPrint('🏠 Nessun post visibile, mostro messaggio vuoto');
+    }
 
     // Urgenti in alto
     visiblePosts.sort((a, b) {
@@ -4196,7 +4345,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (visiblePosts.isNotEmpty)
+              if (visiblePosts.isNotEmpty) ...[
                 ...visiblePosts.map((post) {
                   final categories = post['_embedded']?['wp:term']?[0];
                   final categoryNames =
@@ -4565,6 +4714,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         ),
                       ));
                 }).toList(),
+              ],
               if (visiblePosts.isEmpty)
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
