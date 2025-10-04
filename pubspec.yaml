@@ -36,3 +36,10 @@ flutter:
     - assets/ritiro-rifiuti.png
     - assets/segnalazione-guasto.png
     - assets/ormeggio.png
+  
+  fonts:
+    - family: Karla
+      fonts:
+        - asset: fonts/Karla-Regular.ttf
+        - asset: fonts/Karla-Bold.ttf
+          weight: 700

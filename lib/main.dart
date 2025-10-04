@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'l10n/app_localizations.dart';
 import 'language_provider.dart';
+import 'app_theme.dart';
 
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
@@ -868,46 +869,6 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: Text(
-          showCategories
-              ? AppLocalizations.of(context).articleCategories
-              : currentCategory,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: const Color(0xFF01579B),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: showCategories
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _goBackToCategories,
-              ),
-        actions: [
-          if (!showCategories) ...[
-            IconButton(
-              icon: Icon(isSearchExpanded ? Icons.close : Icons.search),
-              onPressed: () {
-                setState(() {
-                  isSearchExpanded = !isSearchExpanded;
-                  if (!isSearchExpanded) {
-                    searchQuery = '';
-                    _filterPosts();
-                  }
-                });
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _refreshPosts,
-            ),
-          ],
-        ],
-      ),
       body: showCategories ? _buildCategoriesView() : _buildArticlesView(),
     );
   }
@@ -955,12 +916,12 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3).withOpacity(0.1),
+                          color: AppColors.secondaryBlue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.folder_outlined,
-                          color: Color(0xFF2196F3),
+                          color: AppColors.secondaryBlue,
                           size: 24,
                         ),
                       ),
@@ -1117,7 +1078,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                   icon: const Icon(Icons.clear_all, size: 16),
                   label: Text(AppLocalizations.of(context).reset),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF01579B),
+                    foregroundColor: AppColors.primary,
                   ),
                 ),
             ],
@@ -1262,7 +1223,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           decoration: BoxDecoration(
                             color: status == 'private'
                                 ? const Color(0xFFFF9800).withOpacity(0.1)
-                                : const Color(0xFF2196F3).withOpacity(0.1),
+                                : AppColors.secondaryBlue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -1271,7 +1232,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                                 : Icons.article_rounded,
                             color: status == 'private'
                                 ? const Color(0xFFFF9800)
-                                : const Color(0xFF2196F3),
+                                : AppColors.secondaryBlue,
                             size: 20,
                           ),
                         ),
@@ -1567,7 +1528,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.category),
-        backgroundColor: const Color(0xFFFFC107),
+        backgroundColor: AppColors.secondary,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -1657,7 +1618,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                                         color: status == 'private'
                                             ? const Color(0xFFFF9800)
                                                 .withOpacity(0.1)
-                                            : const Color(0xFF2196F3)
+                                            : AppColors.secondaryBlue
                                                 .withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
@@ -1667,7 +1628,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                                             : Icons.article_rounded,
                                         color: status == 'private'
                                             ? const Color(0xFFFF9800)
-                                            : const Color(0xFF2196F3),
+                                            : AppColors.secondaryBlue,
                                         size: 20,
                                       ),
                                     ),
@@ -1821,56 +1782,54 @@ class WebcamScreen extends StatelessWidget {
             child: ListView(
               children: [
                 const SizedBox(height: 20),
-                      _buildWebcamCard(
-                        context,
-                        icon: Icons.videocam_rounded,
-                        title: AppLocalizations.of(context).portWebcam,
-                        subtitle: AppLocalizations.of(context).directPortView,
-                        description:
-                            AppLocalizations.of(context).monitorPortActivity,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
-                        ),
-                        onTap: () {
-                          _openInAppBrowser(
-                            'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWebcamCard(
-                        context,
-                        icon: Icons.landscape_rounded,
-                        title: AppLocalizations.of(context).panoramicWebcam,
-                        subtitle: AppLocalizations.of(context).panoramic360View,
-                        description:
-                            AppLocalizations.of(context).enjoyPanoramicView,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF27AE60), Color(0xFF229954)],
-                        ),
-                        onTap: () {
-                          _openInAppBrowser(
-                            'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWebcamCard(
-                        context,
-                        icon: Icons.wb_sunny_rounded,
-                        title: AppLocalizations.of(context).weatherStation,
-                        subtitle: AppLocalizations.of(context).weatherData,
-                        description:
-                            AppLocalizations.of(context).checkWeatherConditions,
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFE67E22), Color(0xFFD35400)],
-                        ),
-                        onTap: () {
-                          _openInAppBrowser(
-                            'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
-                          );
-                        },
-                      ),
+                _buildWebcamCard(
+                  context,
+                  icon: Icons.videocam_rounded,
+                  title: AppLocalizations.of(context).portWebcam,
+                  subtitle: AppLocalizations.of(context).directPortView,
+                  description: AppLocalizations.of(context).monitorPortActivity,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
+                  ),
+                  onTap: () {
+                    _openInAppBrowser(
+                      'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildWebcamCard(
+                  context,
+                  icon: Icons.landscape_rounded,
+                  title: AppLocalizations.of(context).panoramicWebcam,
+                  subtitle: AppLocalizations.of(context).panoramic360View,
+                  description: AppLocalizations.of(context).enjoyPanoramicView,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF27AE60), Color(0xFF229954)],
+                  ),
+                  onTap: () {
+                    _openInAppBrowser(
+                      'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                _buildWebcamCard(
+                  context,
+                  icon: Icons.wb_sunny_rounded,
+                  title: AppLocalizations.of(context).weatherStation,
+                  subtitle: AppLocalizations.of(context).weatherData,
+                  description:
+                      AppLocalizations.of(context).checkWeatherConditions,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE67E22), Color(0xFFD35400)],
+                  ),
+                  onTap: () {
+                    _openInAppBrowser(
+                      'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -2009,21 +1968,7 @@ class _MyAppState extends State<MyApp> {
           .locale.languageCode), // Forza rebuild quando cambia lingua
       navigatorKey: navigatorKey,
       title: 'Condominio App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-          headlineLarge: TextStyle(
-            fontSize: 16,
-            color: Colors.black87,
-          ),
-        ),
-      ),
+      theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       locale: languageProvider.locale,
       localizationsDelegates: const [
@@ -2159,8 +2104,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFC107),
-                          foregroundColor: Colors.white,
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.black,
                           elevation: 8,
                           shadowColor: const Color(0xFFFFC107).withOpacity(0.3),
                           shape: RoundedRectangleBorder(
@@ -2499,13 +2444,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   margin: const EdgeInsets.all(8),
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF2196F3)
+                                    color: AppColors.secondaryBlue
                                         .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
                                     Icons.person_rounded,
-                                    color: Color(0xFF2196F3),
+                                    color: AppColors.secondaryBlue,
                                     size: 20,
                                   ),
                                 ),
@@ -2546,13 +2491,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   margin: const EdgeInsets.all(8),
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF2196F3)
+                                    color: AppColors.secondaryBlue
                                         .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
                                     Icons.lock_rounded,
-                                    color: Color(0xFF2196F3),
+                                    color: AppColors.secondaryBlue,
                                     size: 20,
                                   ),
                                 ),
@@ -2593,8 +2538,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       }
                                     },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFFC107),
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.secondary,
+                                foregroundColor: Colors.black,
                                 elevation: 8,
                                 shadowColor:
                                     const Color(0xFFFFC107).withOpacity(0.3),
@@ -2607,7 +2552,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       width: 24,
                                       height: 24,
                                       child: CircularProgressIndicator(
-                                        color: Colors.white,
+                                        color: Colors.black,
                                         strokeWidth: 2,
                                       ),
                                     )
@@ -2634,7 +2579,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: const Text(
                                   'Registrati',
                                   style: TextStyle(
-                                    color: Color(0xFF2196F3),
+                                    color: AppColors.secondaryBlue,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -2647,7 +2592,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: const Text(
                                   'Password\ndimenticata?',
                                   style: TextStyle(
-                                    color: Color(0xFF2196F3),
+                                    color: AppColors.secondaryBlue,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -2689,7 +2634,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: const Text(
                 'OK',
                 style: TextStyle(
-                  color: Color(0xFF2196F3),
+                  color: AppColors.secondaryBlue,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -3957,7 +3902,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1E3C72), Color(0xFF2A5298)],
+              colors: [AppColors.primary, AppColors.secondaryBlue],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -3970,17 +3915,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withOpacity(0.2), width: 1),
-                        ),
-                        child: Image.asset('assets/logo.png', height: 60),
-                      ),
-                      const SizedBox(height: 16),
                       Text(
                         AppLocalizations.of(context).portoBello,
                         style: const TextStyle(
@@ -4035,7 +3969,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             title: AppLocalizations.of(context).contacts,
                             subtitle:
                                 AppLocalizations.of(context).contactThePort,
-                            color: const Color(0xFF2196F3),
+                            color: AppColors.secondaryBlue,
                             onTap: () {
                               Navigator.pop(context);
                               _openInAppBrowser(
@@ -4143,24 +4077,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         preferredSize: const Size.fromHeight(60),
         child: Builder(
           builder: (ctx) => AppBar(
-            backgroundColor: const Color(0xFFFFC107),
+            backgroundColor: AppColors.secondary,
             elevation: 8,
             automaticallyImplyLeading: false,
-            titleSpacing: 0,
-            title: Row(
-              children: [
-                const SizedBox(width: 12),
-                Image.asset('assets/logo.png', height: 40),
-                const SizedBox(width: 12),
-                Text(
-                  AppLocalizations.of(context).portoDiGallura,
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
-                ),
-              ],
-            ),
+            centerTitle: true,
+            title: Image.asset('assets/logo.png', height: 40),
             actions: [
               IconButton(
                 icon: const Icon(Icons.menu, color: Colors.white),
@@ -4173,8 +4094,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       ),
       body: _getBody(),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFFFFC107),
-        selectedItemColor: const Color(0xFF1565C0),
+        backgroundColor: AppColors.secondary,
+        selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.black54,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -4296,7 +4217,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       ? const Color(0xFFE53935)
                       : (status == 'private'
                           ? const Color(0xFFFF9800)
-                          : const Color(0xFF2196F3));
+                          : AppColors.secondaryBlue);
 
                   return Padding(
                       padding: const EdgeInsets.only(bottom: 28),
@@ -4513,7 +4434,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 12, vertical: 6),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF2196F3)
+                                            color: AppColors.secondaryBlue
                                                 .withOpacity(0.1),
                                             borderRadius:
                                                 BorderRadius.circular(16),
@@ -4666,7 +4587,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Ricarica'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFC107),
+                        backgroundColor: AppColors.secondary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 24, vertical: 12),
@@ -4979,7 +4900,7 @@ class TabScreen extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFFFFC107), // Giallo sole
+          backgroundColor: AppColors.secondary, // Giallo sole
           centerTitle: true,
           elevation: 6,
         ),
@@ -5030,7 +4951,7 @@ class AppInfoScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFE0F7FA),
       appBar: AppBar(
         title: const Text('Informazioni App'),
-        backgroundColor: const Color(0xFFFFC107),
+        backgroundColor: AppColors.secondary,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -5410,10 +5331,7 @@ class ContactOptionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFE0F7FA), // Azzurro mare
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context).contactPort),
-        backgroundColor: const Color(0xFFFFC107),
-      ),
+
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -5449,9 +5367,9 @@ class ContactOptionsScreen extends StatelessWidget {
   }
 
   Widget _buildButton(BuildContext context, String label, String imagePath) {
-    // Tutti i servizi usano il colore blu del porto
-    const Color primaryColor = Color(0xFF2196F3); // Blu oceano
-    const Color secondaryColor = Color(0xFF64B5F6);
+    // Tutti i servizi usano il colore blu principale
+    const Color primaryColor = AppColors.primary;
+    const Color secondaryColor = AppColors.secondaryBlue;
 
     return Container(
       width: double.infinity,
@@ -5634,7 +5552,7 @@ Inviato dall'app Porto Bello di Gallura
       backgroundColor: const Color(0xFFE0F7FA),
       appBar: AppBar(
         title: Text(widget.subject),
-        backgroundColor: const Color(0xFFFFC107),
+        backgroundColor: AppColors.secondary,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -5786,7 +5704,7 @@ class PostDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dettaglio Post'),
-        backgroundColor: const Color(0xFF01579B),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -5878,7 +5796,7 @@ class PostDetailScreen extends StatelessWidget {
                   color: const Color(0xFFE3F2FD),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: const Color(0xFF2196F3).withOpacity(0.3)),
+                      color: AppColors.secondaryBlue.withOpacity(0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
