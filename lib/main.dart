@@ -3284,8 +3284,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       );
       debugPrint('=== COMPLETATO $operationName ===');
     } catch (e) {
-      debugPrint('=== ERRORE $operationName: $e ===');
-      rethrow;
+      print("Error: ${e.toString()}");
     }
   }
 
@@ -4267,15 +4266,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
   // HOME CONTENT
   Widget _homeContent() {
-    // Evita chiamate multiple durante il rendering
-    if (_isRendering) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-    
-    _isRendering = true;
-    
     // Debug per capire perché si blocca
     debugPrint(
         '🏠 _homeContent: posts.length=${posts.length}, isLoadingPosts=$isLoadingPosts');
@@ -4321,8 +4311,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final hasRestrictedTitle = title.contains('restricted');
       final hasRestrictedContent = content.contains('effettuare il login') ||
           excerpt.contains('effettuare il login') ||
-          excerpt.contains('devi essere loggato') ||
-          content.trim().isEmpty;
+          excerpt.contains('devi essere loggato');
 
       final isVisible = !hasRestrictedTitle && !hasRestrictedContent;
 
@@ -4339,18 +4328,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     if (visiblePosts.isNotEmpty) {
       debugPrint('🏠 Rendering ${visiblePosts.length} post visibili');
-      // Reset flag dopo un breve delay per permettere il rendering
-      Future.microtask(() {
-        _isRendering = false;
-      });
     } else {
       debugPrint('🏠 Nessun post visibile, mostro messaggio vuoto');
-      _isRendering = false;
     }
 
     // Mostra indicatore durante il rendering iniziale se necessario
     if (visiblePosts.isNotEmpty && isLoadingPosts) {
-      _isRendering = false; // Reset flag
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
