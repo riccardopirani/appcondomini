@@ -665,8 +665,6 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     super.initState();
     translatedPosts = widget.posts;
     currentLanguage = languageProvider.locale.languageCode;
-
-    // Traduci i post all'inizializzazione se la lingua non è italiano
     if (currentLanguage != 'it') {
       _translatePostsOnInit();
     } else {
@@ -2974,12 +2972,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     currentLanguage = languageProvider.locale.languageCode;
     languageProvider.addListener(_onLanguageChanged);
-    
+
     // Inizializza translatedPosts con i post originali se la lingua è italiana
     if (currentLanguage == 'it') {
       translatedPosts = posts;
     }
-    
+
     _initializeWithTokenReload();
   }
 
@@ -2992,7 +2990,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       if (newLanguage == 'it') {
         // Se la nuova lingua è italiana, usa i post originali senza traduzione
-        debugPrint('🏠 Home: Lingua cambiata a italiano - nessuna traduzione necessaria');
+        debugPrint(
+            '🏠 Home: Lingua cambiata a italiano - nessuna traduzione necessaria');
         if (mounted) {
           setState(() {
             translatedPosts = posts;
@@ -3194,7 +3193,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     try {
       // Esegui le operazioni in sequenza per evitare che un errore blocchi tutto
       await _initializeWithTimeout(() => fetchUserData(), 'fetchUserData', 15);
-      
+
       // Ora che i dati utente sono caricati, mostra l'UI
       if (mounted) {
         setState(() {
@@ -3231,8 +3230,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           });
         }
       });
-      
-      _initializeWithTimeout(() => fetchWpMenu(), 'fetchWpMenu', 30).catchError((e) {
+
+      _initializeWithTimeout(() => fetchWpMenu(), 'fetchWpMenu', 30)
+          .catchError((e) {
         debugPrint('Errore caricamento menu: $e');
       });
 
@@ -3267,14 +3267,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _initializeWithTimeout(Future<void> Function() operation, String operationName, int timeoutSeconds) async {
+  Future<void> _initializeWithTimeout(Future<void> Function() operation,
+      String operationName, int timeoutSeconds) async {
     try {
       debugPrint('=== INIZIO $operationName (timeout: ${timeoutSeconds}s) ===');
       await operation().timeout(
         Duration(seconds: timeoutSeconds),
         onTimeout: () {
           debugPrint('=== TIMEOUT $operationName dopo ${timeoutSeconds}s ===');
-          throw TimeoutException('$operationName timeout dopo ${timeoutSeconds}s', Duration(seconds: timeoutSeconds));
+          throw TimeoutException(
+              '$operationName timeout dopo ${timeoutSeconds}s',
+              Duration(seconds: timeoutSeconds));
         },
       );
       debugPrint('=== COMPLETATO $operationName ===');
@@ -3454,14 +3457,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             '✅ Home: ${translatedPosts.length} post tradotti all\'avvio');
       } else {
         // Se la lingua è italiana o non ci sono post, usa i post originali
-        debugPrint('🏠 Home: Lingua italiana ($currentLanguage) - nessuna traduzione necessaria');
-        debugPrint('🏠 Home: Prima setState - isLoadingPosts: $isLoadingPosts, posts: ${posts.length}');
+        debugPrint(
+            '🏠 Home: Lingua italiana ($currentLanguage) - nessuna traduzione necessaria');
+        debugPrint(
+            '🏠 Home: Prima setState - isLoadingPosts: $isLoadingPosts, posts: ${posts.length}');
         if (mounted) {
           setState(() {
             translatedPosts = posts;
             isLoadingPosts = false;
           });
-          debugPrint('🏠 Home: Dopo setState - isLoadingPosts: $isLoadingPosts');
+          debugPrint(
+              '🏠 Home: Dopo setState - isLoadingPosts: $isLoadingPosts');
         } else {
           debugPrint('🏠 Home: Widget non mounted, non aggiorno lo state');
         }
@@ -4260,8 +4266,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // HOME CONTENT
   Widget _homeContent() {
     // Debug per capire perché si blocca
-    debugPrint('🏠 _homeContent: posts.length=${posts.length}, isLoadingPosts=$isLoadingPosts');
-    
+    debugPrint(
+        '🏠 _homeContent: posts.length=${posts.length}, isLoadingPosts=$isLoadingPosts');
+
     // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
     if (posts.isEmpty && isLoadingPosts) {
       return Center(
@@ -4307,15 +4314,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           content.trim().isEmpty;
 
       final isVisible = !hasRestrictedTitle && !hasRestrictedContent;
-      
+
       if (!isVisible) {
-        debugPrint('🏠 Post filtrato: "${post['title']?['rendered']}" - restrictedTitle: $hasRestrictedTitle, restrictedContent: $hasRestrictedContent');
+        debugPrint(
+            '🏠 Post filtrato: "${post['title']?['rendered']}" - restrictedTitle: $hasRestrictedTitle, restrictedContent: $hasRestrictedContent');
       }
 
       return isVisible;
     }).toList();
 
-    debugPrint('🏠 _homeContent: posts totali=${posts.length}, visiblePosts=${visiblePosts.length}');
+    debugPrint(
+        '🏠 _homeContent: posts totali=${posts.length}, visiblePosts=${visiblePosts.length}');
 
     if (visiblePosts.isNotEmpty) {
       debugPrint('🏠 Rendering ${visiblePosts.length} post visibili');
