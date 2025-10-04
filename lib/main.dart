@@ -5330,14 +5330,13 @@ class ContactOptionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE0F7FA), // Azzurro mare
-
+      backgroundColor: const Color(0xFFE0F7FA),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFFE0F7FA), // Azzurro mare
-              Color(0xFFF0F8FF), // Bianco azzurro
+              Color(0xFFE0F7FA),
+              Color(0xFFF0F8FF),
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
