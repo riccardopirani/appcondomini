@@ -4328,8 +4328,33 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     if (visiblePosts.isNotEmpty) {
       debugPrint('🏠 Rendering ${visiblePosts.length} post visibili');
+      // Piccolo delay per evitare blocchi UI su Android
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          setState(() {
+            // Forza un rebuild per assicurarsi che l'UI sia responsive
+          });
+        }
+      });
     } else {
       debugPrint('🏠 Nessun post visibile, mostro messaggio vuoto');
+    }
+
+    // Mostra indicatore durante il rendering iniziale se necessario
+    if (visiblePosts.isNotEmpty && isLoadingPosts) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Rendering articoli...',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
     }
 
     // Urgenti in alto
@@ -4349,13 +4374,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
       ),
       child: Center(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (visiblePosts.isNotEmpty) ...[
-                ...visiblePosts.map((post) {
+          child: visiblePosts.isNotEmpty
+              ? ListView.builder(
+                  itemCount: visiblePosts.length,
+                  itemBuilder: (context, index) {
+                    final post = visiblePosts[index];
                   final categories = post['_embedded']?['wp:term']?[0];
                   final categoryNames =
                       (categories is List && categories.isNotEmpty)
@@ -4440,15 +4465,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                               boxShadow: [
                                 BoxShadow(
                                   color: isUrgente
-                                      ? Colors.red.withOpacity(0.2)
-                                      : Colors.black.withOpacity(0.08),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                                      ? Colors.red.withOpacity(0.15)
+                                      : Colors.black.withOpacity(0.06),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
@@ -4465,6 +4485,34 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                           height: 180,
                                           width: double.infinity,
                                           fit: BoxFit.cover,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return Container(
+                                              height: 180,
+                                              width: double.infinity,
+                                              color: Colors.grey[300],
+                                              child: Center(
+                                                child: CircularProgressIndicator(
+                                                  value: loadingProgress.expectedTotalBytes != null
+                                                      ? loadingProgress.cumulativeBytesLoaded / 
+                                                        loadingProgress.expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              height: 180,
+                                              width: double.infinity,
+                                              color: Colors.grey[300],
+                                              child: const Icon(
+                                                Icons.image_not_supported,
+                                                size: 48,
+                                                color: Colors.grey,
+                                              ),
+                                            );
+                                          },
                                         ),
                                         Positioned.fill(
                                           child: DecoratedBox(
@@ -4722,10 +4770,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           ),
                         ),
                       ));
-                }).toList(),
-              ],
-              if (visiblePosts.isEmpty)
-                Column(
+                  },
+                )
+              : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(Icons.inbox_outlined,
@@ -4756,8 +4803,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
-            ],
-          ),
         ),
       ),
     );
