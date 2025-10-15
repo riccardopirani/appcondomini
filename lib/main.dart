@@ -1763,17 +1763,7 @@ class WebcamScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFC107),
-              Color(0xFFF8F9FA),
-            ],
-            stops: [0.0, 0.3],
-          ),
-        ),
+        
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -4158,46 +4148,39 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 ),
 
                 // Logout
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                          colors: [Color(0xFFE91E63), Color(0xFFF06292)]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFE91E63).withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      leading: const Icon(Icons.logout,
-                          color: Colors.white, size: 24),
-                      title: Text(
-                        AppLocalizations.of(context).logout,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
-                      ),
-                      onTap: () async {
-                        await clearLoginData();
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const MyApp()),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ),
+                 Padding(
+                 padding: const EdgeInsets.all(16),
+                 child: Container(
+                   
+                   width: double.infinity,
+                   decoration: BoxDecoration(
+                     color: Color(0xFFE53935),
+                     borderRadius: BorderRadius.circular(12),
+                   ),
+                   child: ListTile(
+                     leading: const Icon(Icons.logout,
+                         color: Colors.white, size: 24),
+                     title: Text(
+                       AppLocalizations.of(context).logout,
+                       style: const TextStyle(
+                           color: Colors.white,
+                           fontSize: 16,
+                           fontWeight: FontWeight.bold),
+                     ),
+                     onTap: () async {
+                       await clearLoginData();
+                       if (context.mounted) {
+                         Navigator.pop(context);
+                         Navigator.pushReplacement(
+                           context,
+                           MaterialPageRoute(
+                               builder: (context) => const MyApp()),
+                         );
+                       }
+                     },
+                   ),
+                 ),
+               ),
               ],
             ),
           ),
@@ -4214,7 +4197,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             title: Image.asset('assets/logo.png', height: 40),
             actions: [
               IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
+                icon: const Icon(Icons.menu, color: Colors.blue),
                 onPressed: () => Scaffold.of(ctx).openEndDrawer(),
                 tooltip: 'Menu',
               ),
@@ -4882,15 +4865,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               () => _openInAppBrowser(
                   'https://www.new.portobellodigallura.it/numeri-util/'),
             ),
-            _buildUsefulSectionItem(
-              context,
-              'Servizi',
-              'Tutti i nostri servizi',
-              Icons.room_service,
-              () => _openInAppBrowser(
-                  'https://www.new.portobellodigallura.it/servizi/'),
-            ),
-            const SizedBox(height: 20),
+           
           ],
         ),
       ),
@@ -5151,7 +5126,7 @@ class AppInfoScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Card(
               elevation: 8,
@@ -5161,22 +5136,13 @@ class AppInfoScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Row(
                       children: [
                         Image.asset('assets/logo.png', height: 60),
                         const SizedBox(width: 16),
-                        const Expanded(
-                          child: Text(
-                            'Porto Bello di Gallura',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF01579B),
-                            ),
-                          ),
-                        ),
+                        
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -5190,7 +5156,7 @@ class AppInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Benvenuto nell\'applicazione ufficiale del Porto Bello di Gallura. '
+                      'Benvenuto nell\'applicazione ufficiale del Portobello di Gallura. '
                       'Questa app ti permette di rimanere sempre aggiornato sulle novità '
                       'del condominio e di accedere rapidamente ai servizi disponibili.',
                       style: TextStyle(
@@ -5702,7 +5668,7 @@ Messaggio:
 $messageText
 
 ---
-Inviato dall'app Porto Bello di Gallura
+Inviato dall'app Portobello di Gallura
       ''';
 
       // Apri l'app email del dispositivo
@@ -5981,42 +5947,6 @@ class PostDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Excerpt se disponibile
-            if (excerpt.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: AppColors.secondaryBlue.withOpacity(0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Anteprima:',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1976D2),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      excerpt,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF424242),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
 
             // Contenuto principale
             const Text(
