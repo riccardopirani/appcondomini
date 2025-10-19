@@ -601,12 +601,16 @@ Future<void> _verifyLoginSuccess() async {
 }
 
 Future<void> clearLoginData() async {
+  debugPrint('🔓 Logout - cancellazione dati utente');
   final prefs = await SharedPreferences.getInstance();
   await prefs.remove('jwtToken');
   await prefs.remove('username');
   await prefs.remove('password');
+  await prefs.remove('originalUsername');
+  await prefs.remove('originalEmail');
   await prefs.setBool('isLoggedIn', false);
   jwtToken = null;
+  debugPrint('✅ Tutti i dati utente cancellati');
 }
 
 Future<void> _openInAppBrowser(String url) async {
@@ -2671,59 +2675,48 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkLogin() async {
-    debugPrint('check login user');
+    debugPrint('🔑 Check login user');
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString('jwtToken');
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
 
-    debugPrint('Dati salvati:');
+    debugPrint('📊 Dati salvati:');
     debugPrint(
         '- Token: ${savedToken != null ? "Presente (${savedToken.length} chars)" : "Assente"}');
     debugPrint('- isLoggedIn: $isLoggedIn');
     debugPrint('- Username: ${username != null ? "Presente" : "Assente"}');
     debugPrint('- Password: ${password != null ? "Presente" : "Assente"}');
 
-    if (savedToken != null &&
-        savedToken.isNotEmpty &&
-        isLoggedIn &&
-        username != null &&
-        password != null) {
-      jwtToken = savedToken;
-
-      // Verifica se i cookie contengono una sessione valida
-      if (jwtToken!.contains('wordpress_logged_in')) {
-        debugPrint('Cookie di sessione valido, utente già loggato');
-
-        // Verifica aggiuntiva: testa se la sessione è ancora attiva
-        final isValid = await _verifySessionValidity();
-        if (isValid) {
-          debugPrint('Sessione verificata e valida, vai alla home');
-          // Vai direttamente alla home
-          if (context.mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MyHomePage(
-                  title: '',
-                  userEmail: '',
-                  userName: '',
-                ),
-              ),
-            );
-          }
-        } else {
-          debugPrint('Sessione non valida, riautenticazione automatica');
-          await _autoReLogin(username, password);
-        }
+    // Se l'utente ha fatto login almeno una volta, mantienilo loggato
+    if (isLoggedIn && username != null && password != null) {
+      debugPrint('✅ Utente precedentemente loggato, mantengo la sessione');
+      
+      // Carica il token se presente
+      if (savedToken != null && savedToken.isNotEmpty) {
+        jwtToken = savedToken;
+        debugPrint('🔐 Token caricato dalla memoria');
       } else {
-        debugPrint('Cookie di sessione scaduto, riautenticazione automatica');
-        // Prova a riautenticare automaticamente
-        await _autoReLogin(username, password);
+        debugPrint('⚠️ Token mancante, genero nuovo token...');
+      }
+
+      // Vai alla home - la home gestirà eventuali problemi di sessione
+      if (context.mounted) {
+        debugPrint('🏠 Navigo alla home page');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MyHomePage(
+              title: '',
+              userEmail: '',
+              userName: '',
+            ),
+          ),
+        );
       }
     } else {
-      debugPrint('Nessun token salvato, mostra onboarding');
+      debugPrint('❌ Nessun login precedente, mostra onboarding');
       // Mostra l'onboarding che porta al login
       if (context.mounted) {
         Navigator.pushReplacement(
@@ -3050,22 +3043,36 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> _initializeWithTokenReload() async {
     debugPrint('=== INIZIALIZZAZIONE CON RICARICA TOKEN ===');
-    await reloadTokenFromStorage();
-
-    debugPrint(
-        'Token dopo ricarica: ${jwtToken != null ? "Presente" : "Mancante"}');
-    if (jwtToken != null) {
-      debugPrint(
-          'Token contiene wordpress_logged_in: ${jwtToken!.contains('wordpress_logged_in')}');
-      debugPrint('Token length: ${jwtToken!.length}');
-    }
-
-    if (jwtToken != null && !jwtToken!.contains('wordpress_logged_in')) {
-      debugPrint('Token presente ma non valido, tentativo di rigenerazione...');
-      await regenerateToken();
+    
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final username = prefs.getString('username');
+    final password = prefs.getString('password');
+    
+    debugPrint('🔐 isLoggedIn: $isLoggedIn, username: $username');
+    
+    // Se l'utente è loggato, assicurati che abbia un token valido
+    if (isLoggedIn && username != null && password != null) {
       await reloadTokenFromStorage();
+
       debugPrint(
-          'Token dopo rigenerazione: ${jwtToken != null ? "Presente" : "Mancante"}');
+          'Token dopo ricarica: ${jwtToken != null ? "Presente" : "Mancante"}');
+      if (jwtToken != null) {
+        debugPrint(
+            'Token contiene wordpress_logged_in: ${jwtToken!.contains('wordpress_logged_in')}');
+        debugPrint('Token length: ${jwtToken!.length}');
+      }
+
+      // Se il token è mancante o non valido, rigeneralo
+      if (jwtToken == null || !jwtToken!.contains('wordpress_logged_in')) {
+        debugPrint('⚠️ Token mancante o non valido, rigenerazione automatica...');
+        await regenerateToken();
+        await reloadTokenFromStorage();
+        debugPrint(
+            '✅ Token dopo rigenerazione: ${jwtToken != null ? "Presente" : "Mancante"}');
+      }
+    } else {
+      debugPrint('❌ Utente non loggato o credenziali mancanti');
     }
 
     await _initializeData();
