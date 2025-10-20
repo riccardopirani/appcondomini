@@ -1409,6 +1409,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
         .replaceAll(RegExp(r'<[^>]*>'), '')
         .replaceAll('&nbsp;', ' ')
         .replaceAll('&amp;', '&')
+        .replaceAll('::', '')
+        .replaceAll(RegExp(r'/\d+'), '') // Rimuove /2, /3, /4, etc.
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>')
         .replaceAll('&quot;', '"')
@@ -1742,7 +1744,10 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
 
     // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return decodedText.replaceAll(regex, '');
+    return decodedText
+        .replaceAll(regex, '')
+        .replaceAll('::', '')
+        .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
   }
 
   Future<void> _openInAppBrowser(String url) async {
@@ -2694,7 +2699,7 @@ class _SplashScreenState extends State<SplashScreen>
     // Se l'utente ha fatto login almeno una volta, mantienilo loggato
     if (isLoggedIn && username != null && password != null) {
       debugPrint('✅ Utente precedentemente loggato, mantengo la sessione');
-      
+
       // Carica il token se presente
       if (savedToken != null && savedToken.isNotEmpty) {
         jwtToken = savedToken;
@@ -3050,9 +3055,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
-    
+
     debugPrint('🔐 isLoggedIn: $isLoggedIn, username: $username');
-    
+
     // Se l'utente è loggato, assicurati che abbia un token valido
     if (isLoggedIn && username != null && password != null) {
       await reloadTokenFromStorage();
@@ -3067,7 +3072,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Se il token è mancante o non valido, rigeneralo
       if (jwtToken == null || !jwtToken!.contains('wordpress_logged_in')) {
-        debugPrint('⚠️ Token mancante o non valido, rigenerazione automatica...');
+        debugPrint(
+            '⚠️ Token mancante o non valido, rigenerazione automatica...');
         await regenerateToken();
         await reloadTokenFromStorage();
         debugPrint(
@@ -4315,14 +4321,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       onTap: () async {
                         // Chiudi il drawer prima di fare logout
                         Navigator.of(context).pop();
-                        
+
                         // Mostra dialogo di conferma
                         final conferma = await showDialog<bool>(
                           context: context,
                           builder: (BuildContext context) {
                             return AlertDialog(
                               title: const Text('Conferma Logout'),
-                              content: const Text('Sei sicuro di voler uscire?'),
+                              content:
+                                  const Text('Sei sicuro di voler uscire?'),
                               actions: <Widget>[
                                 TextButton(
                                   child: const Text('Annulla'),
@@ -4340,14 +4347,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             );
                           },
                         );
-                        
+
                         if (conferma == true && context.mounted) {
                           await clearLoginData();
-                          
+
                           // Usa pushAndRemoveUntil per pulire tutto lo stack e tornare alla login
                           if (context.mounted) {
                             Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              MaterialPageRoute(
+                                  builder: (context) => const LoginScreen()),
                               (Route<dynamic> route) => false,
                             );
                           }
@@ -4393,8 +4401,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               icon: const Icon(Icons.home),
               label: AppLocalizations.of(context).home),
           const BottomNavigationBarItem(
-              icon: Icon(Icons.article),
-              label: 'Comunicazioni'),
+              icon: Icon(Icons.article), label: 'Comunicazioni'),
           BottomNavigationBarItem(
               icon: const Icon(Icons.contact_mail),
               label: AppLocalizations.of(context).services),
@@ -4414,7 +4421,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (htmlText.isEmpty) return htmlText;
     final decodedText = decodeHtmlEntities(htmlText);
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return decodedText.replaceAll(regex, '');
+    return decodedText
+        .replaceAll(regex, '')
+        .replaceAll('::', '')
+        .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
   }
 
   bool _isUrgent(dynamic post) {
@@ -4491,14 +4501,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     SliverToBoxAdapter(
                       child: Column(
                         children: [
-                          _buildButton(context, "Emergenze",
-                              'assets/bombole-gas.png'),
+                          _buildButton(
+                              context, "Emergenze", 'assets/bombole-gas.png'),
                           _buildButton(context, "Assistenza medica",
                               'assets/ritiro-rifiuti.png'),
                           _buildButton(context, "Segnala Guasto",
                               'assets/segnalazione-guasto.png'),
-                          _buildButton(context, "Ritiro rifiuti",
-                              'assets/ormeggio.png'),
+                          _buildButton(
+                              context, "Ritiro rifiuti", 'assets/ormeggio.png'),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -4512,12 +4522,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           final categoryNames =
                               (categories is List && categories.isNotEmpty)
                                   ? categories
-                                      .map<String>((c) => (c['name'] ?? '') as String)
+                                      .map<String>(
+                                          (c) => (c['name'] ?? '') as String)
                                       .join(', ')
                                   : 'Senza categoria';
 
-                          final imageUrl = post['_embedded']?['wp:featuredmedia']?[0]
-                              ?['source_url'];
+                          final imageUrl = post['_embedded']
+                              ?['wp:featuredmedia']?[0]?['source_url'];
                           final isUrgente = _isUrgent(post);
                           final url = post['link'];
                           final authorId = post['author'] ?? 0;
@@ -4543,7 +4554,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                       MaterialPageRoute(
                                         builder: (context) => PostDetailScreen(
                                           post: post,
-                                          userName: userData?['name'] ?? 'Utente',
+                                          userName:
+                                              userData?['name'] ?? 'Utente',
                                           userEmail: userData?['email'] ?? '',
                                         ),
                                       ),
@@ -4551,11 +4563,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                   },
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: isUrgente
+                                          ? const Color(
+                                              0xFFFFEBEE) // Sfondo rosso chiaro per urgenti
+                                          : Colors.white,
                                       borderRadius: BorderRadius.circular(24),
+                                      border: isUrgente
+                                          ? Border.all(
+                                              color: const Color(
+                                                  0xFFE53935), // Bordo rosso per urgenti
+                                              width: 3,
+                                            )
+                                          : null,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.08),
+                                          color: isUrgente
+                                              ? const Color(0xFFE53935)
+                                                  .withOpacity(0.3)
+                                              : Colors.black.withOpacity(0.08),
                                           blurRadius: 16,
                                           offset: const Offset(0, 4),
                                         ),
@@ -4567,7 +4592,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                       children: [
                                         if (imageUrl != null)
                                           ClipRRect(
-                                            borderRadius: const BorderRadius.only(
+                                            borderRadius:
+                                                const BorderRadius.only(
                                               topLeft: Radius.circular(24),
                                               topRight: Radius.circular(24),
                                             ),
@@ -4596,8 +4622,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                   child: Container(
                                                     decoration: BoxDecoration(
                                                       gradient: LinearGradient(
-                                                        begin: Alignment
-                                                            .topCenter,
+                                                        begin:
+                                                            Alignment.topCenter,
                                                         end: Alignment
                                                             .bottomCenter,
                                                         colors: [
@@ -4701,10 +4727,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                decodeHtmlEntities(
-                                                    post['title']
-                                                            ?['rendered'] ??
-                                                        ''),
+                                                decodeHtmlEntities(post['title']
+                                                        ?['rendered'] ??
+                                                    ''),
                                                 style: const TextStyle(
                                                   fontSize: 20,
                                                   fontWeight: FontWeight.bold,
@@ -4852,14 +4877,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               : ListView(
                   children: [
                     const SizedBox(height: 8),
-                    _buildButton(context, "Emergenze",
-                        'assets/bombole-gas.png'),
+                    _buildButton(
+                        context, "Emergenze", 'assets/bombole-gas.png'),
                     _buildButton(context, "Assistenza medica",
                         'assets/ritiro-rifiuti.png'),
                     _buildButton(context, "Segnala Guasto",
                         'assets/segnalazione-guasto.png'),
-                    _buildButton(context, "Ritiro rifiuti",
-                        'assets/ormeggio.png'),
+                    _buildButton(
+                        context, "Ritiro rifiuti", 'assets/ormeggio.png'),
                     const SizedBox(height: 40),
                     const Icon(Icons.inbox_outlined,
                         size: 64, color: Colors.grey),
@@ -4900,7 +4925,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
   // COMUNICAZIONI CONTENT - Post
   Widget _comunicazioniContent() {
-    
     // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
     if (posts.isEmpty && isLoadingPosts) {
       return Center(
@@ -6122,7 +6146,10 @@ class PostTab extends StatelessWidget {
 
     // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return decodedText.replaceAll(regex, '');
+    return decodedText
+        .replaceAll(regex, '')
+        .replaceAll('::', '')
+        .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
   }
 
   @override
@@ -6595,7 +6622,10 @@ class PostDetailScreen extends StatelessWidget {
 
     // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
-    return decodedText.replaceAll(regex, '');
+    return decodedText
+        .replaceAll(regex, '')
+        .replaceAll('::', '')
+        .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
   }
 
   @override
