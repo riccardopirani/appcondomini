@@ -158,6 +158,7 @@ Future<void> sendEmail({
 
 // Funzione per creare l'autenticazione Basic Auth
 String createBasicAuth(String username, String password) {
+  print(password);
   final credentials = '$username:$password';
   final encoded = base64Encode(utf8.encode(credentials));
   return 'Basic $encoded';
@@ -2530,6 +2531,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         _showErrorDialog('Campi mancanti',
                                             'Inserisci username e password per effettuare il login.');
                                       } else {
+                                        print(password);
                                         handleLogin(username, password);
                                       }
                                     },
@@ -3043,7 +3045,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> _initializeWithTokenReload() async {
     debugPrint('=== INIZIALIZZAZIONE CON RICARICA TOKEN ===');
-    
+
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final username = prefs.getString('username');
@@ -4104,13 +4106,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget _getBody() {
     switch (_selectedIndex) {
       case 0:
-        return _homeContent();
+        return _homeContent(); // Solo pulsanti servizi
       case 1:
+        return _comunicazioniContent(); // Post
+      case 2:
         return ContactOptionsScreen(
           userName: userData?['name'] ?? '',
           userEmail: userData?['email'] ?? '',
         );
-      case 2:
+      case 3:
         return posts.isNotEmpty
             ? ModernArticlesScreen(
                 posts: translatedPosts.isNotEmpty ? translatedPosts : posts,
@@ -4118,7 +4122,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 userEmail: userData?['email'] ?? '',
               )
             : const NoAccessMessage();
-      case 3:
+      case 4:
         return const WebcamScreen();
       default:
         return const SizedBox.shrink();
@@ -4309,14 +4313,44 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             fontWeight: FontWeight.bold),
                       ),
                       onTap: () async {
-                        await clearLoginData();
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const MyApp()),
-                          );
+                        // Chiudi il drawer prima di fare logout
+                        Navigator.of(context).pop();
+                        
+                        // Mostra dialogo di conferma
+                        final conferma = await showDialog<bool>(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('Conferma Logout'),
+                              content: const Text('Sei sicuro di voler uscire?'),
+                              actions: <Widget>[
+                                TextButton(
+                                  child: const Text('Annulla'),
+                                  onPressed: () {
+                                    Navigator.of(context).pop(false);
+                                  },
+                                ),
+                                TextButton(
+                                  child: const Text('Esci'),
+                                  onPressed: () {
+                                    Navigator.of(context).pop(true);
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                        
+                        if (conferma == true && context.mounted) {
+                          await clearLoginData();
+                          
+                          // Usa pushAndRemoveUntil per pulire tutto lo stack e tornare alla login
+                          if (context.mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              (Route<dynamic> route) => false,
+                            );
+                          }
                         }
                       },
                     ),
@@ -4353,10 +4387,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         unselectedItemColor: Colors.black54,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed, // Per mostrare più di 3 item
         items: [
           BottomNavigationBarItem(
               icon: const Icon(Icons.home),
               label: AppLocalizations.of(context).home),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.article),
+              label: 'Comunicazioni'),
           BottomNavigationBarItem(
               icon: const Icon(Icons.contact_mail),
               label: AppLocalizations.of(context).services),
@@ -4388,12 +4426,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   // ---------------------------------------------------------------------------
-  // HOME CONTENT
+  // HOME CONTENT - Pulsanti servizi + Post
   Widget _homeContent() {
-    // Debug per capire perché si blocca
-    debugPrint(
-        '🏠 _homeContent: posts.length=${posts.length}, isLoadingPosts=$isLoadingPosts');
-
     // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
     if (posts.isEmpty && isLoadingPosts) {
       return Center(
@@ -4405,7 +4439,480 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Caricamento post...',
+              'Caricamento...',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF666666),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final visiblePosts = posts.where((post) {
+      final title =
+          decodeHtmlEntities(post['title']?['rendered'] ?? '').toLowerCase();
+      final content = decodeHtmlEntities(post['content']?['rendered'] ?? '');
+      final excerpt = decodeHtmlEntities(post['excerpt']?['rendered'] ?? '');
+
+      final hasRestrictedTitle = title.contains('restricted');
+      final hasRestrictedContent = content.contains('effettuare il login') ||
+          excerpt.contains('effettuare il login') ||
+          excerpt.contains('devi essere loggato');
+
+      return !hasRestrictedTitle && !hasRestrictedContent;
+    }).toList();
+
+    // Urgenti in alto
+    visiblePosts.sort((a, b) {
+      final aUrg = _isUrgent(a) ? 1 : 0;
+      final bUrg = _isUrgent(b) ? 1 : 0;
+      return bUrg.compareTo(aUrg);
+    });
+
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF81D4FA), Color(0xFFE1F5FE)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: visiblePosts.isNotEmpty
+              ? CustomScrollView(
+                  slivers: [
+                    // Pulsanti dei servizi
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          _buildButton(context, "Emergenze",
+                              'assets/bombole-gas.png'),
+                          _buildButton(context, "Assistenza medica",
+                              'assets/ritiro-rifiuti.png'),
+                          _buildButton(context, "Segnala Guasto",
+                              'assets/segnalazione-guasto.png'),
+                          _buildButton(context, "Ritiro rifiuti",
+                              'assets/ormeggio.png'),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                    // Lista dei post
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final post = visiblePosts[index];
+                          final categories = post['_embedded']?['wp:term']?[0];
+                          final categoryNames =
+                              (categories is List && categories.isNotEmpty)
+                                  ? categories
+                                      .map<String>((c) => (c['name'] ?? '') as String)
+                                      .join(', ')
+                                  : 'Senza categoria';
+
+                          final imageUrl = post['_embedded']?['wp:featuredmedia']?[0]
+                              ?['source_url'];
+                          final isUrgente = _isUrgent(post);
+                          final url = post['link'];
+                          final authorId = post['author'] ?? 0;
+                          final status = post['status'] ?? '';
+
+                          final Color badgeColor = isUrgente
+                              ? const Color(0xFFE53935)
+                              : (status == 'private'
+                                  ? const Color(0xFFFF9800)
+                                  : AppColors.secondaryBlue);
+
+                          return Padding(
+                              padding: const EdgeInsets.only(bottom: 28),
+                              child: Material(
+                                borderRadius: BorderRadius.circular(24),
+                                elevation: 0,
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(24),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => PostDetailScreen(
+                                          post: post,
+                                          userName: userData?['name'] ?? 'Utente',
+                                          userEmail: userData?['email'] ?? '',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(24),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (imageUrl != null)
+                                          ClipRRect(
+                                            borderRadius: const BorderRadius.only(
+                                              topLeft: Radius.circular(24),
+                                              topRight: Radius.circular(24),
+                                            ),
+                                            child: Stack(
+                                              children: [
+                                                Image.network(
+                                                  imageUrl,
+                                                  width: double.infinity,
+                                                  height: 220,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error,
+                                                      stackTrace) {
+                                                    return Container(
+                                                      height: 220,
+                                                      color: const Color(
+                                                          0xFFE0E0E0),
+                                                      child: const Center(
+                                                        child: Icon(Icons.image,
+                                                            size: 48,
+                                                            color: Colors.grey),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                                Positioned.fill(
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        begin: Alignment
+                                                            .topCenter,
+                                                        end: Alignment
+                                                            .bottomCenter,
+                                                        colors: [
+                                                          Colors.transparent,
+                                                          Colors.black
+                                                              .withOpacity(0.3)
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (isUrgente)
+                                                  Positioned(
+                                                    top: 12,
+                                                    left: 12,
+                                                    child: Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                            0xFFE53935),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(20),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .priority_high_rounded,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 16),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                            'URGENTE',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                if (status == 'private')
+                                                  Positioned(
+                                                    top: 12,
+                                                    right: 12,
+                                                    child: Container(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                            0xFFFF9800),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(20),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(Icons.lock,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 14),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                            'PRIVATO',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        Padding(
+                                          padding: const EdgeInsets.all(20),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                decodeHtmlEntities(
+                                                    post['title']
+                                                            ?['rendered'] ??
+                                                        ''),
+                                                style: const TextStyle(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF212121),
+                                                  height: 1.3,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 5),
+                                                    decoration: BoxDecoration(
+                                                      color: isUrgente
+                                                          ? const Color(
+                                                                  0xFFE53935)
+                                                              .withOpacity(0.1)
+                                                          : (status == 'private'
+                                                              ? const Color(
+                                                                      0xFFFF9800)
+                                                                  .withOpacity(
+                                                                      0.1)
+                                                              : const Color(
+                                                                      0xFF4CAF50)
+                                                                  .withOpacity(
+                                                                      0.1)),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
+                                                    ),
+                                                    child: Text(
+                                                      isUrgente
+                                                          ? 'Urgente'
+                                                          : (status == 'private'
+                                                              ? 'Privato'
+                                                              : 'Pubblico'),
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: isUrgente
+                                                            ? const Color(
+                                                                0xFFE53935)
+                                                            : (status ==
+                                                                    'private'
+                                                                ? const Color(
+                                                                    0xFFFF9800)
+                                                                : const Color(
+                                                                    0xFF4CAF50)),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const Spacer(),
+                                                  if (authorId is int &&
+                                                      authorId > 0)
+                                                    const Text(
+                                                      'Autore',
+                                                      style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors.grey),
+                                                    ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                _removeHtmlTags(post['excerpt']
+                                                        ?['rendered'] ??
+                                                    ''),
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  color: Color(0xFF555555),
+                                                  height: 1.5,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          PostDetailScreen(
+                                                        post: post,
+                                                        userName:
+                                                            userData?['name'] ??
+                                                                'Utente',
+                                                        userEmail: userData?[
+                                                                'email'] ??
+                                                            '',
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: badgeColor,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 24,
+                                                      vertical: 12),
+                                                  shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              16)),
+                                                  elevation: 4,
+                                                  shadowColor: badgeColor
+                                                      .withOpacity(0.3),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text('Leggi tutto',
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            fontSize: 14)),
+                                                    SizedBox(width: 8),
+                                                    Icon(
+                                                        Icons
+                                                            .arrow_forward_rounded,
+                                                        size: 16),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ));
+                        },
+                        childCount: visiblePosts.length,
+                      ),
+                    ),
+                  ],
+                )
+              : ListView(
+                  children: [
+                    const SizedBox(height: 8),
+                    _buildButton(context, "Emergenze",
+                        'assets/bombole-gas.png'),
+                    _buildButton(context, "Assistenza medica",
+                        'assets/ritiro-rifiuti.png'),
+                    _buildButton(context, "Segnala Guasto",
+                        'assets/segnalazione-guasto.png'),
+                    _buildButton(context, "Ritiro rifiuti",
+                        'assets/ormeggio.png'),
+                    const SizedBox(height: 40),
+                    const Icon(Icons.inbox_outlined,
+                        size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Nessuna comunicazione disponibile',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await fetchPosts();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Ricarica'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // COMUNICAZIONI CONTENT - Post
+  Widget _comunicazioniContent() {
+    
+    // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
+    if (posts.isEmpty && isLoadingPosts) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Caricamento comunicazioni...',
               style: TextStyle(
                 fontSize: 16,
                 color: Color(0xFF666666),
@@ -4441,19 +4948,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       if (!isVisible) {
         debugPrint(
-            '🏠 Post filtrato: "${post['title']?['rendered']}" - restrictedTitle: $hasRestrictedTitle, restrictedContent: $hasRestrictedContent');
+            '📰 Post filtrato: "${post['title']?['rendered']}" - restrictedTitle: $hasRestrictedTitle, restrictedContent: $hasRestrictedContent');
       }
 
       return isVisible;
     }).toList();
 
     debugPrint(
-        '🏠 _homeContent: posts totali=${posts.length}, visiblePosts=${visiblePosts.length}');
+        '📰 _comunicazioniContent: posts totali=${posts.length}, visiblePosts=${visiblePosts.length}');
 
     if (visiblePosts.isNotEmpty) {
-      debugPrint('🏠 Rendering ${visiblePosts.length} post visibili');
+      debugPrint('📰 Rendering ${visiblePosts.length} post visibili');
     } else {
-      debugPrint('🏠 Nessun post visibile, mostro messaggio vuoto');
+      debugPrint('📰 Nessun post visibile, mostro messaggio vuoto');
     }
 
     // Mostra indicatore durante il rendering iniziale se necessario
@@ -4465,7 +4972,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             CircularProgressIndicator(),
             SizedBox(height: 16),
             Text(
-              'Rendering articoli...',
+              'Rendering comunicazioni...',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],
@@ -4921,7 +5428,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         size: 64, color: Colors.grey),
                     const SizedBox(height: 16),
                     const Text(
-                      'Nessun articolo disponibile',
+                      'Nessuna comunicazione disponibile',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -4945,6 +5453,84 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+
+  // Metodo per costruire i pulsanti dei servizi
+  Widget _buildButton(BuildContext context, String label, String imagePath) {
+    // Tutti i servizi usano il colore blu principale
+    const Color primaryColor = AppColors.primary;
+    const Color secondaryColor = AppColors.secondaryBlue;
+
+    return Container(
+      width: double.infinity,
+      height: 70,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primaryColor, secondaryColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmailFormTab(
+                userName: userData?['name'] ?? 'Utente',
+                userEmail: userData?['email'] ?? '',
+                subject: label,
+              ),
+            ),
+          );
+        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              imagePath,
+              width: 32,
+              height: 32,
+              color: Colors.white,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.image_not_supported,
+                    color: Colors.white, size: 28);
+              },
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
         ),
       ),
     );
