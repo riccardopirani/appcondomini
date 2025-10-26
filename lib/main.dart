@@ -2062,7 +2062,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     _buildOnboardingPage(
                       Icons.home_rounded,
-                      'Benvenuto nell\'app del condominio!',
+                      'Ricevi le comunicazioni\n relative al condominio e richiedi\n i nostri servizi',
                       'Gestisci facilmente tutte le informazioni relative al tuo condominio in modo semplice e intuitivo.',
                       const Color(0xFF3498DB),
                     ),
@@ -2072,12 +2072,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       'Visualizza le ultime novità, comunicazioni e aggiornamenti riguardanti il tuo condominio.',
                       const Color(0xFFE74C3C),
                     ),
-                    _buildOnboardingPage(
-                      Icons.people_rounded,
-                      'Connettiti con i vicini',
-                      'Usa il nostro sistema di messaggistica per restare in contatto con i tuoi vicini e l\'amministrazione.',
-                      const Color(0xFF2ECC71),
-                    ),
+                  
                   ],
                 ),
               ),
