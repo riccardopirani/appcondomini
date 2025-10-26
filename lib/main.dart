@@ -1458,6 +1458,8 @@ class CategoryPostViewer extends StatelessWidget {
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text('$postCount post'),
             trailing: const Icon(Icons.arrow_forward_ios),
@@ -1532,7 +1534,11 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.category),
+        title: Text(
+          widget.category,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         backgroundColor: AppColors.secondary,
         actions: [
           IconButton(
@@ -1892,6 +1898,8 @@ class WebcamScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1901,6 +1909,8 @@ class WebcamScreen extends StatelessWidget {
                           color: Colors.white.withOpacity(0.9),
                           fontWeight: FontWeight.w500,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -1909,6 +1919,8 @@ class WebcamScreen extends StatelessWidget {
                           fontSize: 13,
                           color: Colors.white.withOpacity(0.8),
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -2184,6 +2196,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 1.2,
             ),
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
 
           const SizedBox(height: 24),
@@ -2197,6 +2211,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 1.5,
             ),
             textAlign: TextAlign.center,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -2692,7 +2708,7 @@ class _SplashScreenState extends State<SplashScreen>
     // Se l'utente ha fatto login almeno una volta, mantienilo loggato
     if (isLoggedIn && username != null && password != null) {
       debugPrint('✅ Utente precedentemente loggato, mantengo la sessione');
-
+      
       // Carica il token se presente
       if (savedToken != null && savedToken.isNotEmpty) {
         jwtToken = savedToken;
@@ -3048,9 +3064,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
-
+    
     debugPrint('🔐 isLoggedIn: $isLoggedIn, username: $username');
-
+    
     // Se l'utente è loggato, assicurati che abbia un token valido
     if (isLoggedIn && username != null && password != null) {
       await reloadTokenFromStorage();
@@ -4214,6 +4230,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             fontWeight: FontWeight.bold,
                             color: Colors.white),
                         textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Container(
@@ -4229,6 +4247,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                               fontSize: 14,
                               color: Colors.white70,
                               fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -4369,15 +4389,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         );
 
                         if (conferma == true && context.mounted) {
-                          await clearLoginData();
+                        await clearLoginData();
 
                           // Usa pushAndRemoveUntil per pulire tutto lo stack e tornare alla login
-                          if (context.mounted) {
+                        if (context.mounted) {
                             Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
+                            MaterialPageRoute(
                                   builder: (context) => const LoginScreen()),
                               (Route<dynamic> route) => false,
-                            );
+                          );
                           }
                         }
                       },
@@ -4759,6 +4779,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                   color: Color(0xFF212121),
                                                   height: 1.3,
                                                 ),
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                               const SizedBox(height: 12),
                                               Row(
@@ -5339,6 +5361,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                                 fontWeight: FontWeight.w600,
                                                 color: Color(0xFF1976D2),
                                               ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                           const SizedBox(height: 12),
@@ -5575,6 +5599,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   letterSpacing: 0.5,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -5606,13 +5632,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               borderRadius: BorderRadius.circular(12)),
           child: const Icon(Icons.link, color: Colors.white, size: 24),
         ),
-        title: Text(title,
+        title: Text(
+          title,
             style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
-                fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle,
-            style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: const Icon(Icons.arrow_forward_ios,
             color: Colors.white70, size: 16),
         onTap: onTap,
@@ -5688,9 +5722,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
         child: Icon(icon, color: const Color(0xFF0277BD), size: 20),
       ),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      subtitle: Text(subtitle),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        subtitle,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: () {
         Navigator.pop(context);
@@ -5835,9 +5877,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               '$label:',
               style: const TextStyle(
                   fontWeight: FontWeight.bold, color: Colors.grey),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -6397,6 +6448,8 @@ class ContactOptionsScreen extends StatelessWidget {
                   letterSpacing: 0.5,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -6513,7 +6566,11 @@ Inviato dall'app Portobello di Gallura
     return Scaffold(
       backgroundColor: const Color(0xFFE0F7FA),
       appBar: AppBar(
-        title: Text(widget.subject),
+        title: Text(
+          widget.subject,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         backgroundColor: AppColors.secondary,
       ),
       body: Center(
@@ -6686,6 +6743,8 @@ class PostDetailScreen extends StatelessWidget {
                 color: Color(0xFF01579B),
                 height: 1.3,
               ),
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 16),
 
@@ -6737,6 +6796,8 @@ class PostDetailScreen extends StatelessWidget {
                       fontSize: 12,
                       color: Colors.grey,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (date.isNotEmpty) ...[
                     const SizedBox(height: 4),
