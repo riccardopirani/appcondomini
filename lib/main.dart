@@ -2049,8 +2049,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   }),
                 ),
               ),
-
-              // PageView
               Expanded(
                 child: PageView(
                   controller: _pageController,
