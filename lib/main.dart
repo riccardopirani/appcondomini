@@ -2034,7 +2034,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.all(20.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(3, (index) {
+                  children: List.generate(2, (index) {
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: _currentPage == index ? 24 : 8,
@@ -3389,11 +3389,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Salva i dati dell'utente originale prima del login automatico
       final prefs = await SharedPreferences.getInstance();
-      final originalUsername = prefs.getString('originalUsername');
-      final originalEmail = prefs.getString('originalEmail');
+      
+      // Se non esistono ancora dati originali, salva quelli attuali
+      String? originalUsername = prefs.getString('originalUsername');
+      String? originalEmail = prefs.getString('originalEmail');
+      
+      if (originalUsername == null || originalEmail == null) {
+        // Salva l'utente corrente come originale
+        final currentUsername = prefs.getString('username');
+        if (currentUsername != null) {
+          await prefs.setString('originalUsername', currentUsername);
+          await prefs.setString('originalEmail', currentUsername);
+          originalUsername = currentUsername;
+          originalEmail = currentUsername;
+          debugPrint('✅ Salvati dati utente corrente come originali: $currentUsername');
+        }
+      }
 
       debugPrint(
-          'Utente originale salvato: $originalUsername ($originalEmail)');
+          'Utente originale che verrà mostrato nella UI: $originalUsername ($originalEmail)');
 
       // Step 1: Ottieni il nonce necessario per il login
       final nonceResponse = await http.get(
@@ -3455,11 +3469,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           await prefs.setString('password', fallbackPassword);
           await prefs.setBool('isLoggedIn', true);
 
-          // Ripristina i dati dell'utente originale se esistono
+          // IMPORTANTE: Mantieni sempre i dati dell'utente originale per la visualizzazione
           if (originalUsername != null && originalEmail != null) {
             await prefs.setString('originalUsername', originalUsername);
             await prefs.setString('originalEmail', originalEmail);
-            debugPrint('✅ Dati utente originale preservati: $originalUsername');
+            debugPrint('✅ Dati utente originale preservati per la UI: $originalUsername');
+            debugPrint('   (Credenziali fallback usate solo per scaricare i post)');
+            
+            // Aggiorna userData per mostrare l'utente originale nella UI
+            if (mounted) {
+              setState(() {
+                userData = {
+                  'name': originalUsername,
+                  'email': originalEmail,
+                  'id': 1,
+                };
+              });
+              debugPrint('✅ UI aggiornata con dati utente originale');
+            }
           }
 
           debugPrint('✅ Auto-login completato con successo, cookies salvati');
@@ -4388,13 +4415,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         unselectedItemColor: Colors.black54,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed, // Per mostrare più di 3 item
+        type: BottomNavigationBarType.fixed,
+        selectedFontSize: 10, // Ridotto per evitare overflow
+        unselectedFontSize: 9, // Ridotto per evitare overflow
+        iconSize: 22, // Ridotto leggermente
         items: [
           BottomNavigationBarItem(
               icon: const Icon(Icons.home),
               label: AppLocalizations.of(context).home),
           const BottomNavigationBarItem(
-              icon: Icon(Icons.article), label: 'Comunicazioni'),
+              icon: Icon(Icons.article), label: 'News'),
           BottomNavigationBarItem(
               icon: const Icon(Icons.contact_mail),
               label: AppLocalizations.of(context).services),
