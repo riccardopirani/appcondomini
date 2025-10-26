@@ -2178,7 +2178,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 28,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
               height: 1.2,
@@ -3384,7 +3384,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<bool> _autoLoginWithFallbackCredentials() async {
     try {
       debugPrint('=== TENTATIVO LOGIN AUTOMATICO IN BACKGROUND ===');
-      const fallbackUsername = 'riccardo@marconisoftwa.com';
+      const fallbackUsername = 'riccardo@marconisoftware.com';
       const fallbackPassword = '4817Riccardo*';
 
       // Salva i dati dell'utente originale prima del login automatico
