@@ -4545,13 +4545,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       child: Column(
                         children: [
                           _buildButton(
-                              context, "Emergenze", 'assets/bombole-gas.png'),
+                              context, "Emergenze", 'assets/emergenza.png'),
                           _buildButton(context, "Assistenza medica",
-                              'assets/ritiro-rifiuti.png'),
+                              'assets/ritiro_rifiuti.png'),
                           _buildButton(context, "Segnala Guasto",
-                              'assets/segnalazione-guasto.png'),
+                              'assets/guasto.png'),
                           _buildButton(
-                              context, "Ritiro rifiuti", 'assets/ormeggio.png'),
+                              context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -4923,13 +4923,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   children: [
                     const SizedBox(height: 8),
                     _buildButton(
-                        context, "Emergenze", 'assets/bombole-gas.png'),
+                        context, "Emergenze", 'assets/emergenza.png'),
                     _buildButton(context, "Assistenza medica",
-                        'assets/ritiro-rifiuti.png'),
+                        'assets/ritiro_rifiuti.png'),
                     _buildButton(context, "Segnala Guasto",
-                        'assets/segnalazione-guasto.png'),
+                        'assets/guasto.png'),
                     _buildButton(
-                        context, "Ritiro rifiuti", 'assets/ormeggio.png'),
+                        context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
                     const SizedBox(height: 40),
                     const Icon(Icons.inbox_outlined,
                         size: 64, color: Colors.grey),
@@ -5529,6 +5529,177 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     );
   }
 
+  // Metodo per mostrare popup emergenze
+  void _showEmergencyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.emergency, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
+              const Text('Numeri di Emergenza',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildEmergencyItem('Numero unico emergenza (NUE)', 'Tel. 112', null),
+                const Divider(),
+                _buildEmergencyItem('Pronto intervento – soccorso sanitario', 'Tel. 118', null),
+                const Divider(),
+                _buildEmergencyItem('Carabinieri', 'Tel. 112', 'www.carabinieri.it'),
+                const Divider(),
+                _buildEmergencyItem('Polizia di Stato', 'Tel. 113', 'www.poliziadistato.it'),
+                const Divider(),
+                _buildEmergencyItem('Vigili del Fuoco', 'Tel. 115', 'www.vigilfuoco.it'),
+                const Divider(),
+                _buildEmergencyItem('Guardia di Finanza', 'Tel. 117', 'www.gdf.gov.it'),
+                const Divider(),
+                _buildEmergencyItem('Guardia Costiera – soccorso in mare', 'Tel. 1530', 'www.guardiacostiera.gov.it'),
+                const Divider(),
+                _buildEmergencyItem('SOS elettricità (ENEL)', 'Tel. 803 500', 'www.enel.it'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Chiudi', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmergencyItem(String title, String phone, String? website) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Text(phone,
+              style: const TextStyle(fontSize: 16, color: AppColors.primary)),
+          if (website != null) ...[
+            const SizedBox(height: 2),
+            Text(website,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Metodo per mostrare popup servizi sanitari
+  void _showMedicalServicesDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.local_hospital, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Servizi Sanitari',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Guardia medica Portobello',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                const Text('Dott. Luigi Pansini',
+                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+                const SizedBox(height: 8),
+                const Text(
+                    'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
+                    style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 8),
+                const Text('Cell. +39 327 796 4108',
+                    style: TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                const Divider(height: 24),
+                _buildMedicalSection('ASL Gallura – Ambulatorio continuità assistenziale', [
+                  'Vignola Mare, Camping Saragosa\nTel. +39 079 678463',
+                  'Santa Teresa di Gallura - Via Carlo Felice\nTel. +39 0789 552 021',
+                  'Isola Rossa - Corso Trinità\nTel. +39 079 678 464',
+                ]),
+                const Divider(height: 24),
+                _buildMedicalSection('Guardia medica', [
+                  'Arzachena - Via J. di Scanu\nTel. +39 0789 552 600',
+                  'Calangianus - via Madrid\nTel. +39 079 660 234',
+                  'Luogosanto - Via Trieste\nTel. +39 079 678 404; +39 079 678 403',
+                  'Palau - Via degli Achei\nTel. +39 0789 552 809',
+                  'Santa Teresa - Via Carlo Felice, 112\nTel. +39 0789 552 867',
+                  'Sant\'Antonio di Gallura - Via G. Galilei\nTel. +39 366 812 3023',
+                  'Tempio Pausania – Ospedale Paolo Dettori\nTel. +39 079 678 306',
+                  'Trinità d\'Agultu - Vicolo Bortigiadas\nTel. +39 079 678 479',
+                ]),
+                const Divider(height: 24),
+                const Text('Ospedale Giovanni Paolo II, Olbia',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 4),
+                const Text('Via Bazzoni – Sircana, 2/2A\nTel. +39 0789 552 200',
+                    style: TextStyle(fontSize: 13)),
+                const Divider(height: 24),
+                _buildMedicalSection('Farmacie', [
+                  'Farmacia Collu - Via Tempio 12, Aglientu\nTel. +39 079 654 445',
+                  'Farmacia Grixoni - Via Al Mare 25, Trinità D\'Agultu\nTel. +39 079 681 214',
+                  'Farmacia Orecchioni - Via Vittorio Emanuele 45, Luogosanto\nTel. +39 079 652 029',
+                  'Farmacia Bulciolu - Piazza S. Vittorio 2, Santa Teresa\nTel. +39 0789 754 365',
+                  'Farmacia Pinna - Via San Paolo 2, Tempio Pausania\nTel. +39 079 631 156',
+                  'Farmacia Spano - Piazza Gallura 20, Tempio Pausania\nTel. +39 079 631 254',
+                ]),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Chiudi', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMedicalSection(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        ...items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(item, style: const TextStyle(fontSize: 13)),
+            )),
+      ],
+    );
+  }
+
   // Metodo per costruire i pulsanti dei servizi
   Widget _buildButton(BuildContext context, String label, String imagePath) {
     // Tutti i servizi usano il colore blu principale
@@ -5564,16 +5735,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => EmailFormTab(
-                userName: userData?['name'] ?? 'Utente',
-                userEmail: userData?['email'] ?? '',
-                subject: label,
+          // Gestisci casi speciali per Emergenze e Assistenza medica
+          if (label == "Emergenze") {
+            _showEmergencyDialog(context);
+          } else if (label == "Assistenza medica" || label == "Servizi sanitari") {
+            _showMedicalServicesDialog(context);
+          } else {
+            // Per gli altri servizi, apri il form email
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EmailFormTab(
+                  userName: userData?['name'] ?? 'Utente',
+                  userEmail: userData?['email'] ?? '',
+                  subject: label,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -6109,6 +6288,8 @@ class AppInfoScreen extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF01579B),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   description,
@@ -6116,6 +6297,8 @@ class AppInfoScreen extends StatelessWidget {
                     fontSize: 14,
                     color: Color(0xFF37474F),
                   ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -6363,19 +6546,189 @@ class ContactOptionsScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                _buildButton(context, AppLocalizations.of(context).gasCylinders,
-                    'assets/bombole-gas.png'),
-                _buildButton(context, AppLocalizations.of(context).waste,
-                    'assets/ritiro-rifiuti.png'),
+                _buildButton(context, "Emergenze",
+                    'assets/emergenza.png'),
+                _buildButton(context, "Assistenza medica",
+                    'assets/ritiro_rifiuti.png'),
                 _buildButton(context, AppLocalizations.of(context).malfunction,
-                    'assets/segnalazione-guasto.png'),
-                _buildButton(context, AppLocalizations.of(context).port,
-                    'assets/ormeggio.png'),
+                    'assets/guasto.png'),
+                _buildButton(context, AppLocalizations.of(context).waste,
+                    'assets/ritiro_rifiuti.png'),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  // Metodi helper per i popup (come in _MyHomePageState)
+  void _showEmergencyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.emergency, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
+              const Text('Numeri di Emergenza',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildEmergencyItem('Numero unico emergenza (NUE)', 'Tel. 112', null),
+                const Divider(),
+                _buildEmergencyItem('Pronto intervento – soccorso sanitario', 'Tel. 118', null),
+                const Divider(),
+                _buildEmergencyItem('Carabinieri', 'Tel. 112', 'www.carabinieri.it'),
+                const Divider(),
+                _buildEmergencyItem('Polizia di Stato', 'Tel. 113', 'www.poliziadistato.it'),
+                const Divider(),
+                _buildEmergencyItem('Vigili del Fuoco', 'Tel. 115', 'www.vigilfuoco.it'),
+                const Divider(),
+                _buildEmergencyItem('Guardia di Finanza', 'Tel. 117', 'www.gdf.gov.it'),
+                const Divider(),
+                _buildEmergencyItem('Guardia Costiera – soccorso in mare', 'Tel. 1530', 'www.guardiacostiera.gov.it'),
+                const Divider(),
+                _buildEmergencyItem('SOS elettricità (ENEL)', 'Tel. 803 500', 'www.enel.it'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Chiudi', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmergencyItem(String title, String phone, String? website) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Text(phone,
+              style: const TextStyle(fontSize: 16, color: AppColors.primary)),
+          if (website != null) ...[
+            const SizedBox(height: 2),
+            Text(website,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showMedicalServicesDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.local_hospital, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Servizi Sanitari',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Guardia medica Portobello',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                const Text('Dott. Luigi Pansini',
+                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+                const SizedBox(height: 8),
+                const Text(
+                    'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
+                    style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 8),
+                const Text('Cell. +39 327 796 4108',
+                    style: TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                const Divider(height: 24),
+                _buildMedicalSection('ASL Gallura – Ambulatorio continuità assistenziale', [
+                  'Vignola Mare, Camping Saragosa\nTel. +39 079 678463',
+                  'Santa Teresa di Gallura - Via Carlo Felice\nTel. +39 0789 552 021',
+                  'Isola Rossa - Corso Trinità\nTel. +39 079 678 464',
+                ]),
+                const Divider(height: 24),
+                _buildMedicalSection('Guardia medica', [
+                  'Arzachena - Via J. di Scanu\nTel. +39 0789 552 600',
+                  'Calangianus - via Madrid\nTel. +39 079 660 234',
+                  'Luogosanto - Via Trieste\nTel. +39 079 678 404; +39 079 678 403',
+                  'Palau - Via degli Achei\nTel. +39 0789 552 809',
+                  'Santa Teresa - Via Carlo Felice, 112\nTel. +39 0789 552 867',
+                  'Sant\'Antonio di Gallura - Via G. Galilei\nTel. +39 366 812 3023',
+                  'Tempio Pausania – Ospedale Paolo Dettori\nTel. +39 079 678 306',
+                  'Trinità d\'Agultu - Vicolo Bortigiadas\nTel. +39 079 678 479',
+                ]),
+                const Divider(height: 24),
+                const Text('Ospedale Giovanni Paolo II, Olbia',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 4),
+                const Text('Via Bazzoni – Sircana, 2/2A\nTel. +39 0789 552 200',
+                    style: TextStyle(fontSize: 13)),
+                const Divider(height: 24),
+                _buildMedicalSection('Farmacie', [
+                  'Farmacia Collu - Via Tempio 12, Aglientu\nTel. +39 079 654 445',
+                  'Farmacia Grixoni - Via Al Mare 25, Trinità D\'Agultu\nTel. +39 079 681 214',
+                  'Farmacia Orecchioni - Via Vittorio Emanuele 45, Luogosanto\nTel. +39 079 652 029',
+                  'Farmacia Bulciolu - Piazza S. Vittorio 2, Santa Teresa\nTel. +39 0789 754 365',
+                  'Farmacia Pinna - Via San Paolo 2, Tempio Pausania\nTel. +39 079 631 156',
+                  'Farmacia Spano - Piazza Gallura 20, Tempio Pausania\nTel. +39 079 631 254',
+                ]),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Chiudi', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMedicalSection(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        ...items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(item, style: const TextStyle(fontSize: 13)),
+            )),
+      ],
     );
   }
 
@@ -6413,16 +6766,24 @@ class ContactOptionsScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => EmailFormTab(
-                userName: userName,
-                userEmail: userEmail,
-                subject: label,
+          // Gestisci casi speciali per Emergenze e Assistenza medica
+          if (label == "Emergenze") {
+            _showEmergencyDialog(context);
+          } else if (label == "Assistenza medica" || label == "Servizi sanitari") {
+            _showMedicalServicesDialog(context);
+          } else {
+            // Per gli altri servizi, apri il form email
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EmailFormTab(
+                  userName: userName,
+                  userEmail: userEmail,
+                  subject: label,
+                ),
               ),
-            ),
-          );
+            );
+          }
         },
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

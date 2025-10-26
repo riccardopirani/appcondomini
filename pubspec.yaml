@@ -36,6 +36,9 @@ flutter:
     - assets/ritiro-rifiuti.png
     - assets/segnalazione-guasto.png
     - assets/ormeggio.png
+    - assets/emergenza.png
+    - assets/guasto.png
+    - assets/ritiro_rifiuti.png
   
   fonts:
     - family: Karla
