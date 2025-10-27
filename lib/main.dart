@@ -2897,7 +2897,8 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
-  late List<dynamic> posts = [];
+  late List<dynamic> posts = []; // Tutti i post
+  late List<dynamic> urgentPosts = []; // Solo post URGENTI per Home (max 5)
   late List<dynamic> translatedPosts = []; // Post tradotti
   String currentLanguage = 'it';
   bool isLoggedIn = false;
@@ -2909,6 +2910,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final Set<int> _notifiedUrgentPostIds = {};
   Timer? _notificationTimer;
   Timer? _loadingTimeoutTimer;
+  
+  // Cache locale
+  DateTime? lastCacheUpdate;
+  static const String CACHE_KEY_POSTS = 'cached_posts';
+  static const String CACHE_KEY_TIMESTAMP = 'cache_timestamp';
 
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
@@ -3549,56 +3555,171 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Carica post dalla cache locale
+  Future<List<dynamic>> _loadPostsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJson = prefs.getString(CACHE_KEY_POSTS);
+      final timestamp = prefs.getInt(CACHE_KEY_TIMESTAMP);
+      
+      if (cachedJson != null && timestamp != null) {
+        lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
+        final List<dynamic> cachedPosts = json.decode(cachedJson);
+        debugPrint('📦 Cache caricata: ${cachedPosts.length} post - Ultimo aggiornamento: $lastCacheUpdate');
+        return cachedPosts;
+      }
+    } catch (e) {
+      debugPrint('❌ Errore caricamento cache: $e');
+    }
+    return [];
+  }
+  
+  /// Salva post nella cache locale
+  Future<void> _savePostsToCache(List<dynamic> postsToCache) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = json.encode(postsToCache);
+      await prefs.setString(CACHE_KEY_POSTS, jsonString);
+      await prefs.setInt(CACHE_KEY_TIMESTAMP, DateTime.now().millisecondsSinceEpoch);
+      lastCacheUpdate = DateTime.now();
+      debugPrint('💾 Cache salvata: ${postsToCache.length} post');
+    } catch (e) {
+      debugPrint('❌ Errore salvataggio cache: $e');
+    }
+  }
+  
+  /// Estrae solo i post URGENTI (ultimi 5)
+  List<dynamic> _extractUrgentPosts(List<dynamic> allPosts) {
+    final urgent = allPosts.where((post) => _isUrgent(post)).toList();
+    
+    // Ordina per data (più recenti prima)
+    urgent.sort((a, b) {
+      final dateA = DateTime.parse(a['date'] ?? DateTime.now().toIso8601String());
+      final dateB = DateTime.parse(b['date'] ?? DateTime.now().toIso8601String());
+      return dateB.compareTo(dateA); // Decrescente
+    });
+    
+    // Prendi solo i primi 5
+    final top5 = urgent.take(5).toList();
+    debugPrint('🚨 Post URGENTI trovati: ${urgent.length}, mostrati in Home: ${top5.length}');
+    return top5;
+  }
+  
+  /// Aggiorna la cache solo con nuovi post
+  Future<void> _updateCacheWithNewPosts(List<dynamic> newPosts) async {
+    if (newPosts.isEmpty) return;
+    
+    // Carica cache esistente
+    final cachedPosts = await _loadPostsFromCache();
+    
+    // Crea mappa ID → Post per confronto veloce
+    final cachedIds = cachedPosts.map((p) => p['id']).toSet();
+    
+    // Trova solo post veramente nuovi
+    final reallyNewPosts = newPosts.where((p) => !cachedIds.contains(p['id'])).toList();
+    
+    if (reallyNewPosts.isNotEmpty) {
+      debugPrint('✨ Trovati ${reallyNewPosts.length} nuovi post da aggiungere alla cache');
+      
+      // Unisci: nuovi post + vecchi post
+      final updatedCache = [...newPosts, ...cachedPosts];
+      
+      // Rimuovi duplicati (mantieni il più recente)
+      final Map<int, dynamic> uniquePosts = {};
+      for (var post in updatedCache) {
+        uniquePosts[post['id']] = post;
+      }
+      
+      // Salva cache aggiornata
+      await _savePostsToCache(uniquePosts.values.toList());
+    } else {
+      debugPrint('📦 Nessun nuovo post, cache già aggiornata');
+    }
+  }
+
   Future<void> fetchPosts() async {
     try {
-      debugPrint('=== INIZIO DOWNLOAD POST ===');
-      debugPrint(
-          'JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
-
+      debugPrint('=== INIZIO DOWNLOAD POST CON CACHE ===');
+      
+      // 🎯 STEP 1: Carica dalla cache locale (immediato)
+      final cachedPosts = await _loadPostsFromCache();
+      if (cachedPosts.isNotEmpty) {
+        debugPrint('✅ Cache trovata: ${cachedPosts.length} post');
+        setState(() {
+          posts = cachedPosts;
+          urgentPosts = _extractUrgentPosts(cachedPosts);
+          translatedPosts = cachedPosts;
+          isLoadingPosts = false;
+        });
+      } else {
+        debugPrint('📭 Nessuna cache trovata, scarico dal server...');
+      }
+      
+      // 🌐 STEP 2: Prova a scaricare nuovi post dal server (in background)
+      debugPrint('JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
+      
+      // Salva i post precedenti per confronto
+      final previousPostIds = posts.map((p) => p['id']).toSet();
+      final tempPosts = <dynamic>[];
+      
       // Prima verifica che l'API REST sia accessibile
       await _testWordPressAPI();
 
       // Usa sempre l'autenticazione se disponibile
       if (jwtToken != null && jwtToken!.isNotEmpty) {
-        debugPrint(
-            'Caricamento post con autenticazione utente per WordPress 6.8.2');
+        debugPrint('Caricamento post con autenticazione...');
         await _tryFetchUserSpecificPosts();
+        tempPosts.addAll(posts);
       } else {
-        debugPrint(
-            'Nessun token di autenticazione disponibile - prova senza auth');
+        debugPrint('Caricamento post senza autenticazione...');
         await _tryFetchPostsWithoutAuth();
+        tempPosts.addAll(posts);
       }
-
-      debugPrint('Post scaricati dopo primo tentativo: ${posts.length}');
 
       // Se non ha funzionato, prova endpoint alternativi
-      if (posts.isEmpty) {
-        debugPrint('Nessun post trovato, provo endpoint alternativi...');
+      if (tempPosts.isEmpty) {
+        debugPrint('Provo endpoint alternativi...');
         await _tryFetchPostsAlternative();
-        debugPrint('Post scaricati dopo endpoint alternativi: ${posts.length}');
+        tempPosts.addAll(posts);
       }
 
-      // Se ancora non ci sono post, prova a rifare il login in background e ricarica
-      if (posts.isEmpty) {
-        debugPrint(
-            '⚠️ Nessun post caricato, tentativo login automatico in background...');
+      // Se ancora non ci sono post, prova login automatico
+      if (tempPosts.isEmpty && cachedPosts.isEmpty) {
+        debugPrint('⚠️ Tentativo login automatico...');
         final loginSuccess = await _autoLoginWithFallbackCredentials();
-        if (loginSuccess) {
-          debugPrint('✅ Login automatico riuscito, ricarico i post...');
-          // Riprova a caricare i post con il nuovo token
-          if (jwtToken != null && jwtToken!.isNotEmpty) {
-            await _tryFetchUserSpecificPosts();
-            if (posts.isEmpty) {
-              await _tryFetchPostsAlternative();
-            }
+        if (loginSuccess && jwtToken != null) {
+          await _tryFetchUserSpecificPosts();
+          tempPosts.addAll(posts);
+          if (tempPosts.isEmpty) {
+            await _tryFetchPostsAlternative();
+            tempPosts.addAll(posts);
           }
-          debugPrint('Post dopo login automatico: ${posts.length}');
-        } else {
-          debugPrint('❌ Login automatico fallito');
         }
       }
+      
+      // 🔄 STEP 3: Aggiorna cache solo se ci sono nuovi post
+      if (tempPosts.isNotEmpty) {
+        final newPostIds = tempPosts.map((p) => p['id']).toSet();
+        final hasNewPosts = !newPostIds.every((id) => previousPostIds.contains(id));
+        
+        if (hasNewPosts || cachedPosts.isEmpty) {
+          debugPrint('✨ Aggiornamento cache con nuovi post...');
+          await _updateCacheWithNewPosts(tempPosts);
+          
+          // Ricarica dalla cache aggiornata
+          final updatedCache = await _loadPostsFromCache();
+          setState(() {
+            posts = updatedCache;
+            urgentPosts = _extractUrgentPosts(updatedCache);
+          });
+        } else {
+          debugPrint('📦 Nessun nuovo post, uso cache esistente');
+        }
+      } else if (cachedPosts.isNotEmpty) {
+        debugPrint('⚠️ Server non risponde, uso cache offline');
+      }
 
-      debugPrint('=== FINE DOWNLOAD POST: ${posts.length} post trovati ===');
+      debugPrint('=== FINE DOWNLOAD POST: ${posts.length} totali, ${urgentPosts.length} urgenti per Home ===');
 
       // Traduci i post se la lingua non è italiano (2 alla volta)
       if (currentLanguage != 'it' && posts.isNotEmpty) {
@@ -4970,8 +5091,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
   // COMUNICAZIONI CONTENT - Post
   Widget _comunicazioniContent() {
-    // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
-    if (posts.isEmpty && isLoadingPosts) {
+    // 🚨 HOME: Mostra solo ultimi 5 post URGENTI
+    
+    // Mostra indicatore di caricamento
+    if (urgentPosts.isEmpty && isLoadingPosts) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -4981,7 +5104,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Caricamento comunicazioni...',
+              'Caricamento comunicazioni urgenti...',
               style: TextStyle(
                 fontSize: 16,
                 color: Color(0xFF666666),
@@ -5002,7 +5125,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       );
     }
 
-    final visiblePosts = posts.where((post) {
+    // Usa solo urgentPosts (max 5, già filtrati e ordinati)
+    final visiblePosts = urgentPosts.where((post) {
       final title =
           decodeHtmlEntities(post['title']?['rendered'] ?? '').toLowerCase();
       final content = decodeHtmlEntities(post['content']?['rendered'] ?? '');
@@ -5015,22 +5139,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       final isVisible = !hasRestrictedTitle && !hasRestrictedContent;
 
-      if (!isVisible) {
-        debugPrint(
-            '📰 Post filtrato: "${post['title']?['rendered']}" - restrictedTitle: $hasRestrictedTitle, restrictedContent: $hasRestrictedContent');
-      }
-
       return isVisible;
     }).toList();
 
     debugPrint(
-        '📰 _comunicazioniContent: posts totali=${posts.length}, visiblePosts=${visiblePosts.length}');
-
-    if (visiblePosts.isNotEmpty) {
-      debugPrint('📰 Rendering ${visiblePosts.length} post visibili');
-    } else {
-      debugPrint('📰 Nessun post visibile, mostro messaggio vuoto');
-    }
+        '🚨 HOME: urgentPosts=${urgentPosts.length}, visibili=${visiblePosts.length}');
 
     // Mostra indicatore durante il rendering iniziale se necessario
     if (visiblePosts.isNotEmpty && isLoadingPosts) {
@@ -5041,20 +5154,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             CircularProgressIndicator(),
             SizedBox(height: 16),
             Text(
-              'Rendering comunicazioni...',
+              'Rendering comunicazioni urgenti...',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],
         ),
       );
     }
-
-    // Urgenti in alto
-    visiblePosts.sort((a, b) {
-      final aUrg = _isUrgent(a) ? 1 : 0;
-      final bUrg = _isUrgent(b) ? 1 : 0;
-      return bUrg.compareTo(aUrg);
-    });
 
     return Container(
       width: double.infinity,
