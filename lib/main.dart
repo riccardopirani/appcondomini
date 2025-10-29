@@ -1,17 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+
+import 'package:condominio/app_theme.dart';
+import 'package:condominio/l10n/app_localizations.dart';
+import 'package:condominio/language_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'l10n/app_localizations.dart';
-import 'language_provider.dart';
-import 'app_theme.dart';
 
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
 String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
+
+// 🔐 Credenziali ADMIN per scaricare TUTTI i post del condominio
+const String adminUsername = 'admin';  // CAMBIA CON USERNAME ADMIN WORDPRESS
+const String adminAppPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';  // CAMBIA SE DIVERSO
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -640,12 +645,14 @@ class ModernArticlesScreen extends StatefulWidget {
   final List<dynamic> posts;
   final String userName;
   final String userEmail;
+  final bool showDirectList; // true = mostra lista post, false = mostra categorie
 
   const ModernArticlesScreen({
     super.key,
     required this.posts,
     required this.userName,
     required this.userEmail,
+    this.showDirectList = false, // default: mostra categorie
   });
 
   @override
@@ -670,6 +677,13 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     super.initState();
     translatedPosts = widget.posts;
     currentLanguage = languageProvider.locale.languageCode;
+    
+    // 🔥 Se showDirectList = true, mostra direttamente i post (non le categorie)
+    if (widget.showDirectList) {
+      showCategories = false;
+      currentCategory = 'Tutti i post';
+    }
+    
     if (currentLanguage != 'it') {
       _translatePostsOnInit();
     } else {
@@ -984,33 +998,34 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   Widget _buildArticlesView() {
     return Column(
       children: [
-        // Pulsante Back per tornare alle categorie
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.white,
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-                onPressed: _goBackToCategories,
-                tooltip: 'Torna alle categorie',
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  currentCategory,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+        // Pulsante Back per tornare alle categorie (solo se NON showDirectList)
+        if (!widget.showDirectList)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.white,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+                  onPressed: _goBackToCategories,
+                  tooltip: 'Torna alle categorie',
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    currentCategory,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C3E50),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
         // Barra di ricerca espandibile
         if (isSearchExpanded)
           Container(
@@ -3606,8 +3621,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (cachedJson != null && timestamp != null) {
         lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
         final List<dynamic> cachedPosts = json.decode(cachedJson);
+        
+        // Conta urgenti vs normali
+        int urgenti = cachedPosts.where((p) => _isUrgent(p)).length;
+        int normali = cachedPosts.length - urgenti;
         debugPrint(
-            '📦 Cache caricata: ${cachedPosts.length} post - Ultimo aggiornamento: $lastCacheUpdate');
+            '📦 Cache caricata: ${cachedPosts.length} post ($urgenti urgenti + $normali normali) - Ultimo aggiornamento: $lastCacheUpdate');
         return cachedPosts;
       }
     } catch (e) {
@@ -3625,9 +3644,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       await prefs.setInt(
           CACHE_KEY_TIMESTAMP, DateTime.now().millisecondsSinceEpoch);
       lastCacheUpdate = DateTime.now();
-      debugPrint('💾 Cache salvata: ${postsToCache.length} post');
+      
+      // Conta urgenti vs normali
+      int urgenti = postsToCache.where((p) => _isUrgent(p)).length;
+      int normali = postsToCache.length - urgenti;
+      debugPrint('💾 Cache salvata: ${postsToCache.length} post ($urgenti urgenti + $normali normali)');
     } catch (e) {
       debugPrint('❌ Errore salvataggio cache: $e');
+    }
+  }
+
+  /// Cancella la cache dei post
+  Future<void> _clearPostsCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(CACHE_KEY_POSTS);
+      await prefs.remove(CACHE_KEY_TIMESTAMP);
+      debugPrint('🗑️ Cache cancellata - verrà scaricata nuovamente dal server');
+    } catch (e) {
+      debugPrint('❌ Errore cancellazione cache: $e');
     }
   }
 
@@ -3879,26 +3914,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> _tryFetchPostsWithBasicAuth() async {
     try {
-      debugPrint('=== TENTATIVO CON BASIC AUTH ===');
+      debugPrint('=== TENTATIVO CON BASIC AUTH (ADMIN per scaricare TUTTI i post) ===');
 
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('username');
+      // 🔥 USA CREDENZIALI ADMIN per scaricare TUTTI i post del condominio
+      final basicAuth = createBasicAuth(adminUsername, adminAppPassword);
+      debugPrint('Basic Auth creata per ADMIN: $adminUsername (scarica TUTTI i post)');
 
-      if (username == null) {
-        debugPrint('Username non trovato per Basic Auth');
-        return;
-      }
-
-      final basicAuth = createBasicAuth(username, appPassword);
-      debugPrint('Basic Auth creata per utente: $username');
-
-      // Lista di endpoint da provare con Basic Auth
+      // 🔥 Lista di endpoint che scaricano TUTTI i post del condominio (non filtrati per author)
       final endpoints = [
-        '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=20&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=20',
+        '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc',
+        '$urlSito/wp-json/wp/v2/posts?per_page=100',
       ];
 
       for (final endpoint in endpoints) {
@@ -4031,25 +4059,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _tryFetchPostsViaREST(int? userId) async {
-    // Endpoint per post specifici dell'utente con autenticazione
+    // Endpoint SENZA filtro author per vedere TUTTI i post del condominio
     List<String> endpoints = [];
 
-    if (userId != null) {
-      // Se abbiamo l'ID utente, prova prima i post specifici dell'utente
-      endpoints.addAll([
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&per_page=20&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&per_page=20&orderby=date&order=desc',
-      ]);
-    }
-
-    // Poi prova endpoint generali con autenticazione
+    // 🔥 SCARICA TUTTI I POST DEL CONDOMINIO (SENZA filtro author)
     endpoints.addAll([
-      '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish&_embed=wp:term&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=20&_embed=wp:term&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=20',
+      '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc',
+      '$urlSito/wp-json/wp/v2/posts?per_page=100',
     ]);
 
     for (final endpoint in endpoints) {
@@ -4230,12 +4249,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       return;
     }
 
-    // Log di tutti i post ricevuti
+    // Log di tutti i post ricevuti CON INFO URGENZA
+    int urgentiCount = 0;
+    int normaliCount = 0;
     for (int i = 0; i < data.length; i++) {
       final post = data[i];
+      final isUrg = _isUrgent(post);
+      if (isUrg) urgentiCount++;
+      else normaliCount++;
+      
       debugPrint(
-          'Post $i: "${post['title']['rendered']}" - Status: ${post['status']} - Author: ${post['author']}');
+          'Post $i: "${post['title']['rendered']}" - Status: ${post['status']} - ${isUrg ? "⚠️ URGENTE" : "📰 normale"}');
     }
+    debugPrint('⚠️⚠️ DALL\'API: $urgentiCount urgenti + $normaliCount normali = ${data.length} TOTALI');
+
 
     // Con autenticazione, accetta tutti i post (pubblici e privati)
     final filtered = data.where((post) {
@@ -4264,12 +4291,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     debugPrint('Post filtrati: ${filtered.length}');
 
-    // Log dettagliato dei post che verranno mostrati
+    // Log dettagliato dei post che verranno mostrati CON INFO URGENZA
+    int urgentiFiltrati = 0;
+    int normaliFiltrati = 0;
     for (int i = 0; i < filtered.length && i < 5; i++) {
       final post = filtered[i];
+      final isUrg = _isUrgent(post);
+      if (isUrg) urgentiFiltrati++;
+      else normaliFiltrati++;
+      
       debugPrint(
-          'Post finale ${i + 1}: "${post['title']['rendered']}" (${post['status']}) - Author: ${post['author']}');
+          'Post finale ${i + 1}: "${post['title']['rendered']}" (${post['status']}) - ${isUrg ? "⚠️ URGENTE" : "📰 normale"}');
     }
+    debugPrint('⚠️⚠️ DOPO FILTRAGGIO: $urgentiFiltrati urgenti + $normaliFiltrati normali nei primi 5');
 
     if (mounted) {
       setState(() {
@@ -4322,22 +4356,41 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case 0:
         return _homeContent(); // Solo pulsanti servizi
       case 1:
-        // 🏠 HOME: DEBUG - Solo post URGENTI
-        debugPrint(
-            '🏠 HOME DEBUG: posts.length=${posts.length}, urgentPosts.length=${urgentPosts.length}');
-        return _comunicazioniContent(); // Post
+        // 📰 NEWS: Mostra TUTTI i post come lista diretta
+        final allPostsNews = translatedPosts.isNotEmpty ? translatedPosts : posts;
+        debugPrint('📰 NEWS: Mostrando ${allPostsNews.length} post come lista diretta');
+        
+        return allPostsNews.isNotEmpty
+            ? ModernArticlesScreen(
+                posts: allPostsNews,
+                userName: userData?['name'] ?? '',
+                userEmail: userData?['email'] ?? '',
+                showDirectList: true, // 🔥 NEWS: lista diretta di tutti i post
+              )
+            : const NoAccessMessage();
       case 2:
         return ContactOptionsScreen(
           userName: userData?['name'] ?? '',
           userEmail: userData?['email'] ?? '',
         );
       case 3:
-        // 📰 NEWS: Mostra TUTTI i post (non solo urgenti)
+        // 📁 ARTICOLI: Mostra categorie (come prima)
         final allPosts = translatedPosts.isNotEmpty ? translatedPosts : posts;
         
-        debugPrint('📰 NEWS: posts.length=${posts.length}, translatedPosts.length=${translatedPosts.length}');
-        debugPrint('📰 NEWS: urgentPosts.length=${urgentPosts.length}');
-        debugPrint('📰 NEWS: Passando ${allPosts.length} post TOTALI a ModernArticlesScreen');
+        debugPrint('🔍🔍🔍 ===== DEBUG NEWS SECTION =====');
+        debugPrint('📰 posts.length=${posts.length}');
+        debugPrint('📰 translatedPosts.length=${translatedPosts.length}');
+        debugPrint('📰 urgentPosts.length=${urgentPosts.length}');
+        debugPrint('📰 allPosts.length=${allPosts.length} (questo viene passato a ModernArticlesScreen)');
+        
+        // Log TUTTI i titoli dei post in allPosts
+        debugPrint('📰 LISTA COMPLETA POST in allPosts:');
+        for (int i = 0; i < allPosts.length; i++) {
+          final title = allPosts[i]['title']?['rendered'] ?? 'Senza titolo';
+          final isUrg = _isUrgent(allPosts[i]);
+          debugPrint('   ${i + 1}. "$title" - ${isUrg ? "⚠️ URGENTE" : "✅ NORMALE"}');
+        }
+        debugPrint('🔍🔍🔍 ===== FINE DEBUG NEWS =====');
         
         // Conta urgenti vs normali
         if (allPosts.isNotEmpty) {
@@ -4359,6 +4412,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 posts: allPosts,
                 userName: userData?['name'] ?? '',
                 userEmail: userData?['email'] ?? '',
+                showDirectList: false, // 📁 ARTICOLI: mostra categorie (come prima)
               )
             : const NoAccessMessage();
       case 4:

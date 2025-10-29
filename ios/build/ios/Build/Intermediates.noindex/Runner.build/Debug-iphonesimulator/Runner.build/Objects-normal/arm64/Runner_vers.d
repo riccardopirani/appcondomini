@@ -1,0 +1,2 @@
+dependencies: \
+  /Users/riccardo/Desktop/Progetti/TeoJurina/condominio/ios/build/ios/Build/Intermediates.noindex/Runner.build/Debug-iphonesimulator/Runner.build/DerivedSources/Runner_vers.c

@@ -1,0 +1,6 @@
+framework module flutter_mailer {
+  umbrella header "flutter_mailer-umbrella.h"
+
+  export *
+  module * { export * }
+}
