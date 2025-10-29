@@ -826,6 +826,18 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
             return false;
           }
         }).toList();
+
+        // Ordina i post per data (più recente prima)
+        filteredPosts.sort((a, b) {
+          try {
+            final dateA = DateTime.parse(a['date'] ?? '');
+            final dateB = DateTime.parse(b['date'] ?? '');
+            return dateB
+                .compareTo(dateA); // Ordine decrescente (più recente prima)
+          } catch (e) {
+            return 0;
+          }
+        });
       });
     } catch (e) {
       debugPrint('Errore nella funzione _filterPosts: $e');
@@ -972,6 +984,33 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   Widget _buildArticlesView() {
     return Column(
       children: [
+        // Pulsante Back per tornare alle categorie
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.white,
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+                onPressed: _goBackToCategories,
+                tooltip: 'Torna alle categorie',
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  currentCategory,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C3E50),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
         // Barra di ricerca espandibile
         if (isSearchExpanded)
           Container(
@@ -2082,7 +2121,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       'Visualizza le ultime novità, comunicazioni e aggiornamenti riguardanti il tuo condominio.',
                       const Color(0xFFE74C3C),
                     ),
-                  
                   ],
                 ),
               ),
@@ -2708,7 +2746,7 @@ class _SplashScreenState extends State<SplashScreen>
     // Se l'utente ha fatto login almeno una volta, mantienilo loggato
     if (isLoggedIn && username != null && password != null) {
       debugPrint('✅ Utente precedentemente loggato, mantengo la sessione');
-      
+
       // Carica il token se presente
       if (savedToken != null && savedToken.isNotEmpty) {
         jwtToken = savedToken;
@@ -2910,7 +2948,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final Set<int> _notifiedUrgentPostIds = {};
   Timer? _notificationTimer;
   Timer? _loadingTimeoutTimer;
-  
+
   // Cache locale
   DateTime? lastCacheUpdate;
   static const String CACHE_KEY_POSTS = 'cached_posts';
@@ -3070,9 +3108,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
-    
+
     debugPrint('🔐 isLoggedIn: $isLoggedIn, username: $username');
-    
+
     // Se l'utente è loggato, assicurati che abbia un token valido
     if (isLoggedIn && username != null && password != null) {
       await reloadTokenFromStorage();
@@ -3411,11 +3449,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Salva i dati dell'utente originale prima del login automatico
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Se non esistono ancora dati originali, salva quelli attuali
       String? originalUsername = prefs.getString('originalUsername');
       String? originalEmail = prefs.getString('originalEmail');
-      
+
       if (originalUsername == null || originalEmail == null) {
         // Salva l'utente corrente come originale
         final currentUsername = prefs.getString('username');
@@ -3424,7 +3462,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           await prefs.setString('originalEmail', currentUsername);
           originalUsername = currentUsername;
           originalEmail = currentUsername;
-          debugPrint('✅ Salvati dati utente corrente come originali: $currentUsername');
+          debugPrint(
+              '✅ Salvati dati utente corrente come originali: $currentUsername');
         }
       }
 
@@ -3495,9 +3534,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           if (originalUsername != null && originalEmail != null) {
             await prefs.setString('originalUsername', originalUsername);
             await prefs.setString('originalEmail', originalEmail);
-            debugPrint('✅ Dati utente originale preservati per la UI: $originalUsername');
-            debugPrint('   (Credenziali fallback usate solo per scaricare i post)');
-            
+            debugPrint(
+                '✅ Dati utente originale preservati per la UI: $originalUsername');
+            debugPrint(
+                '   (Credenziali fallback usate solo per scaricare i post)');
+
             // Aggiorna userData per mostrare l'utente originale nella UI
             if (mounted) {
               setState(() {
@@ -3561,11 +3602,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final cachedJson = prefs.getString(CACHE_KEY_POSTS);
       final timestamp = prefs.getInt(CACHE_KEY_TIMESTAMP);
-      
+
       if (cachedJson != null && timestamp != null) {
         lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
         final List<dynamic> cachedPosts = json.decode(cachedJson);
-        debugPrint('📦 Cache caricata: ${cachedPosts.length} post - Ultimo aggiornamento: $lastCacheUpdate');
+        debugPrint(
+            '📦 Cache caricata: ${cachedPosts.length} post - Ultimo aggiornamento: $lastCacheUpdate');
         return cachedPosts;
       }
     } catch (e) {
@@ -3573,63 +3615,69 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
     return [];
   }
-  
+
   /// Salva post nella cache locale
   Future<void> _savePostsToCache(List<dynamic> postsToCache) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = json.encode(postsToCache);
       await prefs.setString(CACHE_KEY_POSTS, jsonString);
-      await prefs.setInt(CACHE_KEY_TIMESTAMP, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+          CACHE_KEY_TIMESTAMP, DateTime.now().millisecondsSinceEpoch);
       lastCacheUpdate = DateTime.now();
       debugPrint('💾 Cache salvata: ${postsToCache.length} post');
     } catch (e) {
       debugPrint('❌ Errore salvataggio cache: $e');
     }
   }
-  
+
   /// Estrae solo i post URGENTI (ultimi 5)
   List<dynamic> _extractUrgentPosts(List<dynamic> allPosts) {
     final urgent = allPosts.where((post) => _isUrgent(post)).toList();
-    
+
     // Ordina per data (più recenti prima)
     urgent.sort((a, b) {
-      final dateA = DateTime.parse(a['date'] ?? DateTime.now().toIso8601String());
-      final dateB = DateTime.parse(b['date'] ?? DateTime.now().toIso8601String());
+      final dateA =
+          DateTime.parse(a['date'] ?? DateTime.now().toIso8601String());
+      final dateB =
+          DateTime.parse(b['date'] ?? DateTime.now().toIso8601String());
       return dateB.compareTo(dateA); // Decrescente
     });
-    
+
     // Prendi solo i primi 5
     final top5 = urgent.take(5).toList();
-    debugPrint('🚨 Post URGENTI trovati: ${urgent.length}, mostrati in Home: ${top5.length}');
+    debugPrint(
+        '🚨 Post URGENTI trovati: ${urgent.length}, mostrati in Home: ${top5.length}');
     return top5;
   }
-  
+
   /// Aggiorna la cache solo con nuovi post
   Future<void> _updateCacheWithNewPosts(List<dynamic> newPosts) async {
     if (newPosts.isEmpty) return;
-    
+
     // Carica cache esistente
     final cachedPosts = await _loadPostsFromCache();
-    
+
     // Crea mappa ID → Post per confronto veloce
     final cachedIds = cachedPosts.map((p) => p['id']).toSet();
-    
+
     // Trova solo post veramente nuovi
-    final reallyNewPosts = newPosts.where((p) => !cachedIds.contains(p['id'])).toList();
-    
+    final reallyNewPosts =
+        newPosts.where((p) => !cachedIds.contains(p['id'])).toList();
+
     if (reallyNewPosts.isNotEmpty) {
-      debugPrint('✨ Trovati ${reallyNewPosts.length} nuovi post da aggiungere alla cache');
-      
+      debugPrint(
+          '✨ Trovati ${reallyNewPosts.length} nuovi post da aggiungere alla cache');
+
       // Unisci: nuovi post + vecchi post
       final updatedCache = [...newPosts, ...cachedPosts];
-      
+
       // Rimuovi duplicati (mantieni il più recente)
       final Map<int, dynamic> uniquePosts = {};
       for (var post in updatedCache) {
         uniquePosts[post['id']] = post;
       }
-      
+
       // Salva cache aggiornata
       await _savePostsToCache(uniquePosts.values.toList());
     } else {
@@ -3640,7 +3688,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> fetchPosts() async {
     try {
       debugPrint('=== INIZIO DOWNLOAD POST CON CACHE ===');
-      
+
       // 🎯 STEP 1: Carica dalla cache locale (immediato)
       final cachedPosts = await _loadPostsFromCache();
       if (cachedPosts.isNotEmpty) {
@@ -3654,14 +3702,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       } else {
         debugPrint('📭 Nessuna cache trovata, scarico dal server...');
       }
-      
+
       // 🌐 STEP 2: Prova a scaricare nuovi post dal server (in background)
-      debugPrint('JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
-      
+      debugPrint(
+          'JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
+
       // Salva i post precedenti per confronto
       final previousPostIds = posts.map((p) => p['id']).toSet();
       final tempPosts = <dynamic>[];
-      
+
       // Prima verifica che l'API REST sia accessibile
       await _testWordPressAPI();
 
@@ -3696,16 +3745,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           }
         }
       }
-      
+
       // 🔄 STEP 3: Aggiorna cache solo se ci sono nuovi post
       if (tempPosts.isNotEmpty) {
         final newPostIds = tempPosts.map((p) => p['id']).toSet();
-        final hasNewPosts = !newPostIds.every((id) => previousPostIds.contains(id));
-        
+        final hasNewPosts =
+            !newPostIds.every((id) => previousPostIds.contains(id));
+
         if (hasNewPosts || cachedPosts.isEmpty) {
           debugPrint('✨ Aggiornamento cache con nuovi post...');
           await _updateCacheWithNewPosts(tempPosts);
-          
+
           // Ricarica dalla cache aggiornata
           final updatedCache = await _loadPostsFromCache();
           setState(() {
@@ -3719,7 +3769,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint('⚠️ Server non risponde, uso cache offline');
       }
 
-      debugPrint('=== FINE DOWNLOAD POST: ${posts.length} totali, ${urgentPosts.length} urgenti per Home ===');
+      debugPrint(
+          '=== FINE DOWNLOAD POST: ${posts.length} totali, ${urgentPosts.length} urgenti per Home ===');
 
       // Traduci i post se la lingua non è italiano (2 alla volta)
       if (currentLanguage != 'it' && posts.isNotEmpty) {
@@ -4271,6 +4322,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case 0:
         return _homeContent(); // Solo pulsanti servizi
       case 1:
+        // 🏠 HOME: DEBUG - Solo post URGENTI
+        debugPrint(
+            '🏠 HOME DEBUG: posts.length=${posts.length}, urgentPosts.length=${urgentPosts.length}');
         return _comunicazioniContent(); // Post
       case 2:
         return ContactOptionsScreen(
@@ -4278,9 +4332,31 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           userEmail: userData?['email'] ?? '',
         );
       case 3:
-        return posts.isNotEmpty
+        // 📰 NEWS: Mostra TUTTI i post (non solo urgenti)
+        final allPosts = translatedPosts.isNotEmpty ? translatedPosts : posts;
+        
+        debugPrint('📰 NEWS: posts.length=${posts.length}, translatedPosts.length=${translatedPosts.length}');
+        debugPrint('📰 NEWS: urgentPosts.length=${urgentPosts.length}');
+        debugPrint('📰 NEWS: Passando ${allPosts.length} post TOTALI a ModernArticlesScreen');
+        
+        // Conta urgenti vs normali
+        if (allPosts.isNotEmpty) {
+          int urgentCount = allPosts.where((p) => _isUrgent(p)).length;
+          int normalCount = allPosts.length - urgentCount;
+          debugPrint('📰 NEWS: $urgentCount urgenti + $normalCount normali = ${allPosts.length} totali');
+          
+          // Log primi 5 post
+          for (int i = 0; i < allPosts.length && i < 5; i++) {
+            final post = allPosts[i];
+            final title = post['title']?['rendered'] ?? 'Senza titolo';
+            final isUrg = _isUrgent(post);
+            debugPrint('📰 NEWS: Post ${i + 1}: "$title" (${isUrg ? "URGENTE" : "normale"})');
+          }
+        }
+
+        return allPosts.isNotEmpty
             ? ModernArticlesScreen(
-                posts: translatedPosts.isNotEmpty ? translatedPosts : posts,
+                posts: allPosts,
                 userName: userData?['name'] ?? '',
                 userEmail: userData?['email'] ?? '',
               )
@@ -4510,15 +4586,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         );
 
                         if (conferma == true && context.mounted) {
-                        await clearLoginData();
+                          await clearLoginData();
 
                           // Usa pushAndRemoveUntil per pulire tutto lo stack e tornare alla login
-                        if (context.mounted) {
+                          if (context.mounted) {
                             Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
+                              MaterialPageRoute(
                                   builder: (context) => const LoginScreen()),
                               (Route<dynamic> route) => false,
-                          );
+                            );
                           }
                         }
                       },
@@ -4595,15 +4671,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final categories = post['_embedded']?['wp:term']?[0];
     if (categories == null) return false;
     if (categories is! List) return false;
-    return categories.any((c) =>
-        (c['name'] as String?)?.toLowerCase().contains('urgenti') ?? false);
+    // Cerca sia "urgente" che "urgenti" (singolare e plurale)
+    return categories.any((c) {
+      final name = (c['name'] as String?)?.toLowerCase() ?? '';
+      return name
+          .contains('urgent'); // Copre: urgente, urgenti, urgent, urgency
+    });
   }
 
   // ---------------------------------------------------------------------------
   // HOME CONTENT - Pulsanti servizi + Post
   Widget _homeContent() {
-    // Mostra indicatore di caricamento se i post sono vuoti e stiamo ancora caricando
-    if (posts.isEmpty && isLoadingPosts) {
+    // Mostra indicatore di caricamento se i post urgenti sono vuoti e stiamo ancora caricando
+    if (urgentPosts.isEmpty && isLoadingPosts) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -4613,7 +4693,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Caricamento...',
+              'Caricamento comunicazioni urgenti...',
               style: TextStyle(
                 fontSize: 16,
                 color: Color(0xFF666666),
@@ -4625,7 +4705,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       );
     }
 
-    final visiblePosts = posts.where((post) {
+    final visiblePosts = urgentPosts.where((post) {
       final title =
           decodeHtmlEntities(post['title']?['rendered'] ?? '').toLowerCase();
       final content = decodeHtmlEntities(post['content']?['rendered'] ?? '');
@@ -4669,10 +4749,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                               context, "Emergenze", 'assets/emergenza.png'),
                           _buildButton(context, "Assistenza medica",
                               'assets/ritiro_rifiuti.png'),
-                          _buildButton(context, "Segnala Guasto",
-                              'assets/guasto.png'),
                           _buildButton(
-                              context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
+                              context, "Segnala Guasto", 'assets/guasto.png'),
+                          _buildButton(context, "Ritiro rifiuti",
+                              'assets/ritiro_rifiuti.png'),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -5043,12 +5123,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               : ListView(
                   children: [
                     const SizedBox(height: 8),
-                    _buildButton(
-                        context, "Emergenze", 'assets/emergenza.png'),
+                    _buildButton(context, "Emergenze", 'assets/emergenza.png'),
                     _buildButton(context, "Assistenza medica",
                         'assets/ritiro_rifiuti.png'),
-                    _buildButton(context, "Segnala Guasto",
-                        'assets/guasto.png'),
+                    _buildButton(
+                        context, "Segnala Guasto", 'assets/guasto.png'),
                     _buildButton(
                         context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
                     const SizedBox(height: 40),
@@ -5092,7 +5171,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // COMUNICAZIONI CONTENT - Post
   Widget _comunicazioniContent() {
     // 🚨 HOME: Mostra solo ultimi 5 post URGENTI
-    
+
     // Mostra indicatore di caricamento
     if (urgentPosts.isEmpty && isLoadingPosts) {
       return Center(
@@ -5641,7 +5720,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Icon(Icons.emergency, color: Colors.red, size: 28),
@@ -5655,21 +5735,29 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildEmergencyItem('Numero unico emergenza (NUE)', 'Tel. 112', null),
+                _buildEmergencyItem(
+                    'Numero unico emergenza (NUE)', 'Tel. 112', null),
                 const Divider(),
-                _buildEmergencyItem('Pronto intervento – soccorso sanitario', 'Tel. 118', null),
+                _buildEmergencyItem(
+                    'Pronto intervento – soccorso sanitario', 'Tel. 118', null),
                 const Divider(),
-                _buildEmergencyItem('Carabinieri', 'Tel. 112', 'www.carabinieri.it'),
+                _buildEmergencyItem(
+                    'Carabinieri', 'Tel. 112', 'www.carabinieri.it'),
                 const Divider(),
-                _buildEmergencyItem('Polizia di Stato', 'Tel. 113', 'www.poliziadistato.it'),
+                _buildEmergencyItem(
+                    'Polizia di Stato', 'Tel. 113', 'www.poliziadistato.it'),
                 const Divider(),
-                _buildEmergencyItem('Vigili del Fuoco', 'Tel. 115', 'www.vigilfuoco.it'),
+                _buildEmergencyItem(
+                    'Vigili del Fuoco', 'Tel. 115', 'www.vigilfuoco.it'),
                 const Divider(),
-                _buildEmergencyItem('Guardia di Finanza', 'Tel. 117', 'www.gdf.gov.it'),
+                _buildEmergencyItem(
+                    'Guardia di Finanza', 'Tel. 117', 'www.gdf.gov.it'),
                 const Divider(),
-                _buildEmergencyItem('Guardia Costiera – soccorso in mare', 'Tel. 1530', 'www.guardiacostiera.gov.it'),
+                _buildEmergencyItem('Guardia Costiera – soccorso in mare',
+                    'Tel. 1530', 'www.guardiacostiera.gov.it'),
                 const Divider(),
-                _buildEmergencyItem('SOS elettricità (ENEL)', 'Tel. 803 500', 'www.enel.it'),
+                _buildEmergencyItem(
+                    'SOS elettricità (ENEL)', 'Tel. 803 500', 'www.enel.it'),
               ],
             ),
           ),
@@ -5715,7 +5803,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Icon(Icons.local_hospital, color: Colors.red, size: 28),
@@ -5734,19 +5823,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Guardia medica Portobello',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 const Text('Dott. Luigi Pansini',
-                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+                    style:
+                        TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
                 const SizedBox(height: 8),
                 const Text(
                     'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
                 const Text('Cell. +39 327 796 4108',
-                    style: TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold)),
                 const Divider(height: 24),
-                _buildMedicalSection('ASL Gallura – Ambulatorio continuità assistenziale', [
+                _buildMedicalSection(
+                    'ASL Gallura – Ambulatorio continuità assistenziale', [
                   'Vignola Mare, Camping Saragosa\nTel. +39 079 678463',
                   'Santa Teresa di Gallura - Via Carlo Felice\nTel. +39 0789 552 021',
                   'Isola Rossa - Corso Trinità\nTel. +39 079 678 464',
@@ -5764,7 +5859,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 ]),
                 const Divider(height: 24),
                 const Text('Ospedale Giovanni Paolo II, Olbia',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 4),
                 const Text('Via Bazzoni – Sircana, 2/2A\nTel. +39 0789 552 200',
                     style: TextStyle(fontSize: 13)),
@@ -5798,10 +5894,57 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         Text(title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
-        ...items.map((item) => Padding(
+        ...items.map((item) {
+          // Cerca pattern di numeri di telefono nel testo
+          final phonePattern = RegExp(r'(Tel\.\s*\+?\d[\d\s]+)');
+          final match = phonePattern.firstMatch(item);
+
+          if (match != null) {
+            // Dividi il testo in parti prima e dopo il numero
+            final beforePhone = item.substring(0, match.start);
+            final phoneText = match.group(0)!;
+            final afterPhone = item.substring(match.end);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 13, color: Colors.black),
+                  children: [
+                    TextSpan(text: beforePhone),
+                    WidgetSpan(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final phoneNumber =
+                              phoneText.replaceAll(RegExp(r'[^\d+]'), '');
+                          final Uri telUri = Uri.parse('tel:$phoneNumber');
+                          if (await canLaunchUrl(telUri)) {
+                            await launchUrl(telUri);
+                          }
+                        },
+                        child: Text(
+                          phoneText,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                    TextSpan(text: afterPhone),
+                  ],
+                ),
+              ),
+            );
+          } else {
+            // Nessun numero trovato, mostra il testo normale
+            return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(item, style: const TextStyle(fontSize: 13)),
-            )),
+            );
+          }
+        }),
       ],
     );
   }
@@ -5844,7 +5987,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           // Gestisci casi speciali per Emergenze e Assistenza medica
           if (label == "Emergenze") {
             _showEmergencyDialog(context);
-          } else if (label == "Assistenza medica" || label == "Servizi sanitari") {
+          } else if (label == "Assistenza medica" ||
+              label == "Servizi sanitari") {
             _showMedicalServicesDialog(context);
           } else {
             // Per gli altri servizi, apri il form email
@@ -5919,10 +6063,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
         title: Text(
           title,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-              fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -5962,7 +6104,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text(
-                'Sezioni Utili',
+                'Sito Online',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -6652,10 +6794,9 @@ class ContactOptionsScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                _buildButton(context, "Emergenze",
-                    'assets/emergenza.png'),
-                _buildButton(context, "Assistenza medica",
-                    'assets/ritiro_rifiuti.png'),
+                _buildButton(context, "Emergenze", 'assets/emergenza.png'),
+                _buildButton(
+                    context, "Assistenza medica", 'assets/ritiro_rifiuti.png'),
                 _buildButton(context, AppLocalizations.of(context).malfunction,
                     'assets/guasto.png'),
                 _buildButton(context, AppLocalizations.of(context).waste,
@@ -6674,7 +6815,8 @@ class ContactOptionsScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Icon(Icons.emergency, color: Colors.red, size: 28),
@@ -6688,21 +6830,29 @@ class ContactOptionsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildEmergencyItem('Numero unico emergenza (NUE)', 'Tel. 112', null),
+                _buildEmergencyItem(
+                    'Numero unico emergenza (NUE)', 'Tel. 112', null),
                 const Divider(),
-                _buildEmergencyItem('Pronto intervento – soccorso sanitario', 'Tel. 118', null),
+                _buildEmergencyItem(
+                    'Pronto intervento – soccorso sanitario', 'Tel. 118', null),
                 const Divider(),
-                _buildEmergencyItem('Carabinieri', 'Tel. 112', 'www.carabinieri.it'),
+                _buildEmergencyItem(
+                    'Carabinieri', 'Tel. 112', 'www.carabinieri.it'),
                 const Divider(),
-                _buildEmergencyItem('Polizia di Stato', 'Tel. 113', 'www.poliziadistato.it'),
+                _buildEmergencyItem(
+                    'Polizia di Stato', 'Tel. 113', 'www.poliziadistato.it'),
                 const Divider(),
-                _buildEmergencyItem('Vigili del Fuoco', 'Tel. 115', 'www.vigilfuoco.it'),
+                _buildEmergencyItem(
+                    'Vigili del Fuoco', 'Tel. 115', 'www.vigilfuoco.it'),
                 const Divider(),
-                _buildEmergencyItem('Guardia di Finanza', 'Tel. 117', 'www.gdf.gov.it'),
+                _buildEmergencyItem(
+                    'Guardia di Finanza', 'Tel. 117', 'www.gdf.gov.it'),
                 const Divider(),
-                _buildEmergencyItem('Guardia Costiera – soccorso in mare', 'Tel. 1530', 'www.guardiacostiera.gov.it'),
+                _buildEmergencyItem('Guardia Costiera – soccorso in mare',
+                    'Tel. 1530', 'www.guardiacostiera.gov.it'),
                 const Divider(),
-                _buildEmergencyItem('SOS elettricità (ENEL)', 'Tel. 803 500', 'www.enel.it'),
+                _buildEmergencyItem(
+                    'SOS elettricità (ENEL)', 'Tel. 803 500', 'www.enel.it'),
               ],
             ),
           ),
@@ -6728,8 +6878,21 @@ class ContactOptionsScreen extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
-          Text(phone,
-              style: const TextStyle(fontSize: 16, color: AppColors.primary)),
+          GestureDetector(
+            onTap: () async {
+              // Estrai solo i numeri dal testo (rimuovi "Tel. ", spazi, ecc.)
+              final phoneNumber = phone.replaceAll(RegExp(r'[^\d+]'), '');
+              final Uri telUri = Uri.parse('tel:$phoneNumber');
+              if (await canLaunchUrl(telUri)) {
+                await launchUrl(telUri);
+              }
+            },
+            child: Text(phone,
+                style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.primary,
+                    decoration: TextDecoration.underline)),
+          ),
           if (website != null) ...[
             const SizedBox(height: 2),
             Text(website,
@@ -6747,7 +6910,8 @@ class ContactOptionsScreen extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Icon(Icons.local_hospital, color: Colors.red, size: 28),
@@ -6766,19 +6930,25 @@ class ContactOptionsScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('Guardia medica Portobello',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 const Text('Dott. Luigi Pansini',
-                    style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+                    style:
+                        TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
                 const SizedBox(height: 8),
                 const Text(
                     'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
                 const Text('Cell. +39 327 796 4108',
-                    style: TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold)),
                 const Divider(height: 24),
-                _buildMedicalSection('ASL Gallura – Ambulatorio continuità assistenziale', [
+                _buildMedicalSection(
+                    'ASL Gallura – Ambulatorio continuità assistenziale', [
                   'Vignola Mare, Camping Saragosa\nTel. +39 079 678463',
                   'Santa Teresa di Gallura - Via Carlo Felice\nTel. +39 0789 552 021',
                   'Isola Rossa - Corso Trinità\nTel. +39 079 678 464',
@@ -6796,7 +6966,8 @@ class ContactOptionsScreen extends StatelessWidget {
                 ]),
                 const Divider(height: 24),
                 const Text('Ospedale Giovanni Paolo II, Olbia',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 4),
                 const Text('Via Bazzoni – Sircana, 2/2A\nTel. +39 0789 552 200',
                     style: TextStyle(fontSize: 13)),
@@ -6830,10 +7001,57 @@ class ContactOptionsScreen extends StatelessWidget {
         Text(title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
-        ...items.map((item) => Padding(
+        ...items.map((item) {
+          // Cerca pattern di numeri di telefono nel testo
+          final phonePattern = RegExp(r'(Tel\.\s*\+?\d[\d\s]+)');
+          final match = phonePattern.firstMatch(item);
+
+          if (match != null) {
+            // Dividi il testo in parti prima e dopo il numero
+            final beforePhone = item.substring(0, match.start);
+            final phoneText = match.group(0)!;
+            final afterPhone = item.substring(match.end);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 13, color: Colors.black),
+                  children: [
+                    TextSpan(text: beforePhone),
+                    WidgetSpan(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final phoneNumber =
+                              phoneText.replaceAll(RegExp(r'[^\d+]'), '');
+                          final Uri telUri = Uri.parse('tel:$phoneNumber');
+                          if (await canLaunchUrl(telUri)) {
+                            await launchUrl(telUri);
+                          }
+                        },
+                        child: Text(
+                          phoneText,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                    TextSpan(text: afterPhone),
+                  ],
+                ),
+              ),
+            );
+          } else {
+            // Nessun numero trovato, mostra il testo normale
+            return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(item, style: const TextStyle(fontSize: 13)),
-            )),
+            );
+          }
+        }),
       ],
     );
   }
@@ -6875,7 +7093,8 @@ class ContactOptionsScreen extends StatelessWidget {
           // Gestisci casi speciali per Emergenze e Assistenza medica
           if (label == "Emergenze") {
             _showEmergencyDialog(context);
-          } else if (label == "Assistenza medica" || label == "Servizi sanitari") {
+          } else if (label == "Assistenza medica" ||
+              label == "Servizi sanitari") {
             _showMedicalServicesDialog(context);
           } else {
             // Per gli altri servizi, apri il form email
@@ -6952,7 +7171,29 @@ class _EmailFormTabState extends State<EmailFormTab> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.userEmail);
-    _nameController = TextEditingController(text: widget.userName);
+    // Estrai nome e cognome dall'email
+    final extractedName = _extractNameFromEmail(widget.userEmail);
+    _nameController = TextEditingController(text: extractedName);
+  }
+
+  // Funzione helper per estrarre nome e cognome dall'email
+  String _extractNameFromEmail(String email) {
+    if (email.isEmpty) return '';
+
+    // Prendi la parte prima della @
+    final atIndex = email.indexOf('@');
+    if (atIndex == -1) return email;
+
+    final localPart = email.substring(0, atIndex);
+
+    // Sostituisci . _ - con spazi e capitalizza ogni parola
+    final parts = localPart.split(RegExp(r'[._-]'));
+    final capitalizedParts = parts.map((part) {
+      if (part.isEmpty) return '';
+      return part[0].toUpperCase() + part.substring(1).toLowerCase();
+    }).where((part) => part.isNotEmpty);
+
+    return capitalizedParts.join(' ');
   }
 
   @override
