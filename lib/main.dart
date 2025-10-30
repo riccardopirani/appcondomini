@@ -12,11 +12,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
-String appPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';
+String appPassword = 'fCVv 7j1Y sQbP MWZZ fc1T 7XMe';
 
 // 🔐 Credenziali ADMIN per scaricare TUTTI i post del condominio
-const String adminUsername = 'admin';  // CAMBIA CON USERNAME ADMIN WORDPRESS
-const String adminAppPassword = 'oNod nxLF mW9Y vMkv DQrU wKwi';  // CAMBIA SE DIVERSO
+const String adminUsername = 'PdGadmin';  // CAMBIA CON USERNAME ADMIN WORDPRESS
+const String adminAppPassword = 'fCVv 7j1Y sQbP MWZZ fc1T 7XMe';  // CAMBIA SE DIVERSO
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -1148,19 +1148,30 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
               ? const Center(child: CircularProgressIndicator())
               : filteredPosts.isEmpty
                   ? _buildEmptyState()
-                  : RefreshIndicator(
-                      onRefresh: _refreshPosts,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filteredPosts.length,
-                        itemBuilder: (context, index) {
-                          if (index >= filteredPosts.length) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildArticleCard(filteredPosts[index]);
-                        },
-                      ),
-                    ),
+                  : widget.showDirectList
+                      ? ListView.builder( // NEWS: niente pull-to-refresh
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredPosts.length,
+                          itemBuilder: (context, index) {
+                            if (index >= filteredPosts.length) {
+                              return const SizedBox.shrink();
+                            }
+                            return _buildArticleCard(filteredPosts[index]);
+                          },
+                        )
+                      : RefreshIndicator( // ARTICOLI: con pull-to-refresh
+                          onRefresh: _refreshPosts,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: filteredPosts.length,
+                            itemBuilder: (context, index) {
+                              if (index >= filteredPosts.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return _buildArticleCard(filteredPosts[index]);
+                            },
+                          ),
+                        ),
         ),
       ],
     );
@@ -1206,6 +1217,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       final status = post['status'] ?? '';
       final url = post['link'] ?? '';
       final date = post['date'] ?? '';
+      final bool isUrgente = _isPostUrgent(post);
 
       // Estrai categoria
       final categories = post['_embedded']?['wp:term']?[0];
@@ -1219,12 +1231,16 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: isUrgente
+                  ? const Color(0xFFE53935).withOpacity(0.3)
+                  : Colors.black.withOpacity(0.08),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: isUrgente
+                  ? const Color(0xFFE53935).withOpacity(0.15)
+                  : Colors.black.withOpacity(0.04),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -1249,23 +1265,33 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: status == 'private'
-                    ? const LinearGradient(
-                        colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : const LinearGradient(
-                        colors: [Colors.white, Color(0xFFFAFAFA)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                border: status == 'private'
-                    ? Border.all(
-                        color: const Color(0xFFFF9800).withOpacity(0.3),
-                        width: 1.5,
-                      )
+                color: isUrgente
+                    ? const Color(0xFFFFEBEE)
                     : null,
+                gradient: isUrgente
+                    ? null
+                    : (status == 'private'
+                        ? const LinearGradient(
+                            colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Colors.white, Color(0xFFFAFAFA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )),
+                border: isUrgente
+                    ? Border.all(
+                        color: const Color(0xFFE53935),
+                        width: 3,
+                      )
+                    : (status == 'private'
+                        ? Border.all(
+                            color: const Color(0xFFFF9800).withOpacity(0.3),
+                            width: 1.5,
+                          )
+                        : null),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -1313,19 +1339,29 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: status == 'private'
-                                ? const Color(0xFFFF9800).withOpacity(0.1)
-                                : const Color(0xFF4CAF50).withOpacity(0.1),
+                            color: isUrgente
+                                ? const Color(0xFFE53935).withOpacity(0.1)
+                                : (status == 'private'
+                                    ? const Color(0xFFFF9800)
+                                        .withOpacity(0.1)
+                                    : const Color(0xFF4CAF50)
+                                        .withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            status == 'private' ? 'Privato' : 'Pubblico',
+                            isUrgente
+                                ? 'Urgente'
+                                : (status == 'private'
+                                    ? 'Privato'
+                                    : 'Pubblico'),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: status == 'private'
-                                  ? const Color(0xFFFF9800)
-                                  : const Color(0xFF4CAF50),
+                              color: isUrgente
+                                  ? const Color(0xFFE53935)
+                                  : (status == 'private'
+                                      ? const Color(0xFFFF9800)
+                                      : const Color(0xFF4CAF50)),
                             ),
                           ),
                         ),
@@ -1470,6 +1506,16 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'")
         .trim();
+  }
+
+  bool _isPostUrgent(Map<String, dynamic> post) {
+    final categories = post['_embedded']?['wp:term']?[0];
+    if (categories == null) return false;
+    if (categories is! List) return false;
+    return categories.any((c) {
+      final name = (c['name'] as String?)?.toLowerCase() ?? '';
+      return name.contains('urgent'); // copre: urgente, urgenti, urgent, urgency
+    });
   }
 }
 
