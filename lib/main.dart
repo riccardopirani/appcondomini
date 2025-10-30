@@ -9,6 +9,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 String? jwtToken;
 String urlSito = 'https://www.new.portobellodigallura.it';
@@ -3009,6 +3010,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final Set<int> _notifiedUrgentPostIds = {};
   Timer? _notificationTimer;
   Timer? _loadingTimeoutTimer;
+  Timer? _postsRefreshTimer;
 
   // Cache locale
   DateTime? lastCacheUpdate;
@@ -3097,6 +3099,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
 
     _initializeWithTokenReload();
+    _startPeriodicPostsRefresh();
   }
 
   Future<void> _onLanguageChanged() async {
@@ -3158,6 +3161,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _notificationTimer?.cancel();
     _loadingTimeoutTimer?.cancel();
+    _postsRefreshTimer?.cancel();
     _isRendering = false;
     super.dispose();
   }
@@ -3207,6 +3211,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('App riattivata dalla pausa, verifica sessione...');
       _checkSessionAndReauth();
     }
+  }
+
+  Future<bool> _isDeviceOnline() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) return false;
+      return true;
+    } catch (e) {
+      debugPrint('Errore controllo connettività: $e');
+      return false;
+    }
+  }
+
+  void _startPeriodicPostsRefresh() {
+    _postsRefreshTimer?.cancel();
+    _postsRefreshTimer = Timer.periodic(const Duration(minutes: 3), (timer) async {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final online = await _isDeviceOnline();
+      if (!online) {
+        debugPrint('⏱️ Skip refresh post: dispositivo offline');
+        return;
+      }
+      debugPrint('⏱️ Refresh periodico post (3 min)');
+      try {
+        await fetchPosts();
+      } catch (e) {
+        debugPrint('Errore nel refresh periodico dei post: $e');
+      }
+    });
   }
 
   Future<void> _checkSessionAndReauth() async {
