@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:condominio/app_theme.dart';
 import 'package:condominio/l10n/app_localizations.dart';
 import 'package:condominio/language_provider.dart';
+import 'package:condominio/setttings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
@@ -11,18 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
-String? jwtToken;
-String urlSito = 'https://www.new.portobellodigallura.it';
-String appPassword = 'fCVv 7j1Y sQbP MWZZ fc1T 7XMe';
-
-// 🔐 Credenziali ADMIN per scaricare TUTTI i post del condominio
-const String adminUsername = 'PdGadmin';  // CAMBIA CON USERNAME ADMIN WORDPRESS
-const String adminAppPassword = 'fCVv 7j1Y sQbP MWZZ fc1T 7XMe';  // CAMBIA SE DIVERSO
-
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
-
-const String _translationApiUrl = 'https://api.mymemory.translated.net/get';
 
 // Funzione per tradurre il testo usando MyMemory Translation API
 Future<String> translateText(String text, String targetLanguage) async {
@@ -52,7 +43,8 @@ Future<String> translateText(String text, String targetLanguage) async {
     }
 
     // Chiamata API MyMemory (GET request)
-    final uri = Uri.parse(_translationApiUrl).replace(queryParameters: {
+    final uri =
+        Uri.parse(AppSettings.translationApiUrl).replace(queryParameters: {
       'q': cleanText,
       'langpair': 'it|$targetLanguage',
     });
@@ -155,10 +147,32 @@ Future<void> sendEmail({
     },
   );
 
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } else {
-    // mostra un messaggio all'utente
+  try {
+    // Aggiungi timeout per evitare blocchi
+    final canLaunch = await canLaunchUrl(uri).timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => false,
+    );
+
+    if (canLaunch) {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('Timeout nell\'apertura dell\'app email');
+        },
+      );
+    } else {
+      throw Exception('Nessuna app email disponibile');
+    }
+  } on TimeoutException catch (e) {
+    debugPrint('Timeout in sendEmail: $e');
+    rethrow;
+  } catch (e) {
+    debugPrint('Errore in sendEmail: $e');
+    rethrow;
   }
 }
 
@@ -477,11 +491,12 @@ Future<void> reloadTokenFromStorage() async {
     debugPrint('- Password: ${password != null ? "Presente" : "Mancante"}');
 
     if (savedToken != null && savedToken.isNotEmpty && isLoggedIn) {
-      jwtToken = savedToken;
+      appSettings.setToken(savedToken);
       debugPrint('Token ricaricato dalle SharedPreferences');
-      debugPrint('Token valido: ${jwtToken!.contains('wordpress_logged_in')}');
+      debugPrint(
+          'Token valido: ${appSettings.jwtToken?.contains('wordpress_logged_in')}');
     } else {
-      jwtToken = null;
+      appSettings.clearToken();
       debugPrint('Nessun token valido trovato nelle SharedPreferences');
       if (savedToken == null) debugPrint('Motivo: Token null');
       if (savedToken != null && savedToken.isEmpty)
@@ -490,7 +505,7 @@ Future<void> reloadTokenFromStorage() async {
     }
   } catch (e) {
     debugPrint('Errore ricaricamento token: $e');
-    jwtToken = null;
+    appSettings.clearToken();
   }
 }
 
@@ -504,10 +519,9 @@ Future<void> regenerateToken() async {
     try {
       // Prima ottieni il nonce necessario per il login
       final nonceResponse = await http.get(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -526,18 +540,17 @@ Future<void> regenerateToken() async {
 
       // Effettua nuovo login con il nonce
       final loginResponse = await http.post(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse(appSettings.urlLogin),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '$urlSito/wp-login.php',
+          'Referer': appSettings.urlLogin,
         },
         body: nonce.isNotEmpty
-            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
-            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
       );
 
       debugPrint(
@@ -553,8 +566,8 @@ Future<void> regenerateToken() async {
             loginResponse.headers['location']?.contains('wp-admin') == true ||
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
-          jwtToken = cookies;
-          await prefs.setString('jwtToken', jwtToken!);
+          appSettings.setToken(cookies);
+          await prefs.setString('jwtToken', appSettings.jwtToken!);
           await prefs.setBool('isLoggedIn', true);
           debugPrint('Cookie rigenerati con successo');
 
@@ -585,11 +598,10 @@ Future<void> _verifyLoginSuccess() async {
 
     // Prova ad accedere a wp-admin per verificare il login
     final adminResponse = await http.get(
-      Uri.parse('$urlSito/wp-admin/'),
+      Uri.parse(appSettings.urlAdmin),
       headers: {
-        'Cookie': jwtToken!,
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Cookie': appSettings.jwtToken!,
+        'User-Agent': AppSettings.userAgent,
       },
     );
 
@@ -616,7 +628,7 @@ Future<void> clearLoginData() async {
   await prefs.remove('originalUsername');
   await prefs.remove('originalEmail');
   await prefs.setBool('isLoggedIn', false);
-  jwtToken = null;
+  appSettings.clearToken();
   debugPrint('✅ Tutti i dati utente cancellati');
 }
 
@@ -646,7 +658,8 @@ class ModernArticlesScreen extends StatefulWidget {
   final List<dynamic> posts;
   final String userName;
   final String userEmail;
-  final bool showDirectList; // true = mostra lista post, false = mostra categorie
+  final bool
+      showDirectList; // true = mostra lista post, false = mostra categorie
 
   const ModernArticlesScreen({
     super.key,
@@ -678,13 +691,13 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     super.initState();
     translatedPosts = widget.posts;
     currentLanguage = languageProvider.locale.languageCode;
-    
+
     // 🔥 Se showDirectList = true, mostra direttamente i post (non le categorie)
     if (widget.showDirectList) {
       showCategories = false;
       currentCategory = 'Tutti i post';
     }
-    
+
     if (currentLanguage != 'it') {
       _translatePostsOnInit();
     } else {
@@ -1150,7 +1163,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
               : filteredPosts.isEmpty
                   ? _buildEmptyState()
                   : widget.showDirectList
-                      ? ListView.builder( // NEWS: niente pull-to-refresh
+                      ? ListView.builder(
+                          // NEWS: niente pull-to-refresh
                           padding: const EdgeInsets.all(16),
                           itemCount: filteredPosts.length,
                           itemBuilder: (context, index) {
@@ -1160,7 +1174,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             return _buildArticleCard(filteredPosts[index]);
                           },
                         )
-                      : RefreshIndicator( // ARTICOLI: con pull-to-refresh
+                      : RefreshIndicator(
+                          // ARTICOLI: con pull-to-refresh
                           onRefresh: _refreshPosts,
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
@@ -1266,9 +1281,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                color: isUrgente
-                    ? const Color(0xFFFFEBEE)
-                    : null,
+                color: isUrgente ? const Color(0xFFFFEBEE) : null,
                 gradient: isUrgente
                     ? null
                     : (status == 'private'
@@ -1343,10 +1356,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             color: isUrgente
                                 ? const Color(0xFFE53935).withOpacity(0.1)
                                 : (status == 'private'
-                                    ? const Color(0xFFFF9800)
-                                        .withOpacity(0.1)
-                                    : const Color(0xFF4CAF50)
-                                        .withOpacity(0.1)),
+                                    ? const Color(0xFFFF9800).withOpacity(0.1)
+                                    : const Color(0xFF4CAF50).withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -1515,7 +1526,8 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     if (categories is! List) return false;
     return categories.any((c) {
       final name = (c['name'] as String?)?.toLowerCase() ?? '';
-      return name.contains('urgent'); // copre: urgente, urgenti, urgent, urgency
+      return name
+          .contains('urgent'); // copre: urgente, urgenti, urgent, urgency
     });
   }
 }
@@ -1897,7 +1909,7 @@ class WebcamScreen extends StatelessWidget {
                   ),
                   onTap: () {
                     _openInAppBrowser(
-                      'https://player.castr.com/live_c8ab600012f411f08aa09953068f9db6',
+                      AppSettings.webcamPorto,
                     );
                   },
                 ),
@@ -1913,7 +1925,7 @@ class WebcamScreen extends StatelessWidget {
                   ),
                   onTap: () {
                     _openInAppBrowser(
-                      'https://player.castr.com/live_e63170f014a311f0bf78a9d871469680',
+                      AppSettings.webcamPanoramica,
                     );
                   },
                 ),
@@ -1930,7 +1942,7 @@ class WebcamScreen extends StatelessWidget {
                   ),
                   onTap: () {
                     _openInAppBrowser(
-                      'https://stazioni5.soluzionimeteo.it/portobellodigallura/',
+                      AppSettings.stazioneMeteo,
                     );
                   },
                 ),
@@ -2345,10 +2357,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Step 1: Ottieni il nonce necessario per il login
       final nonceResponse = await http.get(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -2367,18 +2378,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // Step 2: Effettua login con il nonce
       final loginResponse = await http.post(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '$urlSito/wp-login.php',
+          'Referer': '${appSettings.urlLogin}',
         },
         body: nonce.isNotEmpty
-            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
-            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
       );
 
       debugPrint('Login response status: ${loginResponse.statusCode}');
@@ -2396,11 +2406,11 @@ class _LoginScreenState extends State<LoginScreen> {
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
           // Login riuscito - salva i cookie
-          jwtToken = cookies;
+          appSettings.setToken(cookies);
 
           // Salva le credenziali e i cookie
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setString('jwtToken', appSettings.jwtToken!);
           await prefs.setString('username', username);
           await prefs.setString('password', password);
           await prefs.setBool('isLoggedIn', true);
@@ -2686,7 +2696,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextButton(
                                 onPressed: () {
                                   launchUrl(Uri.parse(
-                                      '$urlSito/wp-login.php?action=register'));
+                                      '${appSettings.urlLogin}?action=register'));
                                 },
                                 child: const Text(
                                   'Registrati',
@@ -2699,7 +2709,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextButton(
                                 onPressed: () {
                                   launchUrl(Uri.parse(
-                                      '$urlSito/wp-login.php?action=lostpassword'));
+                                      '${appSettings.urlLogin}?action=lostpassword'));
                                 },
                                 child: const Text(
                                   'Password\ndimenticata?',
@@ -2811,7 +2821,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Carica il token se presente
       if (savedToken != null && savedToken.isNotEmpty) {
-        jwtToken = savedToken;
+        appSettings.setToken(savedToken);
         debugPrint('🔐 Token caricato dalla memoria');
       } else {
         debugPrint('⚠️ Token mancante, genero nuovo token...');
@@ -2849,11 +2859,10 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Prova ad accedere a un endpoint che richiede autenticazione
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
+        Uri.parse('${appSettings.urlApi}users/me'),
         headers: {
-          'Cookie': jwtToken!,
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Cookie': appSettings.jwtToken!,
+          'User-Agent': AppSettings.userAgent,
         },
       );
 
@@ -2878,10 +2887,9 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Prima ottieni il nonce necessario per il login
       final nonceResponse = await http.get(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -2900,18 +2908,17 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Effettua login automatico con il nonce
       final loginResponse = await http.post(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '$urlSito/wp-login.php',
+          'Referer': '${appSettings.urlLogin}',
         },
         body: nonce.isNotEmpty
-            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
-            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
       );
 
       debugPrint('Auto re-login response status: ${loginResponse.statusCode}');
@@ -2926,9 +2933,9 @@ class _SplashScreenState extends State<SplashScreen>
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
           // Riautenticazione riuscita
-          jwtToken = cookies;
+          appSettings.setToken(cookies);
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setString('jwtToken', appSettings.jwtToken!);
           await prefs.setString('username', username);
           await prefs.setString('password', password);
           await prefs.setBool('isLoggedIn', true);
@@ -3069,7 +3076,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final originalEmail = prefs.getString('originalEmail');
 
     if (savedToken != null) {
-      jwtToken = savedToken;
+      appSettings.setToken(savedToken);
       isLoggedIn = true;
     }
 
@@ -3181,21 +3188,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       await reloadTokenFromStorage();
 
       debugPrint(
-          'Token dopo ricarica: ${jwtToken != null ? "Presente" : "Mancante"}');
-      if (jwtToken != null) {
+          'Token dopo ricarica: ${appSettings.jwtToken != null ? "Presente" : "Mancante"}');
+      if (appSettings.jwtToken != null) {
         debugPrint(
-            'Token contiene wordpress_logged_in: ${jwtToken!.contains('wordpress_logged_in')}');
-        debugPrint('Token length: ${jwtToken!.length}');
+            'Token contiene wordpress_logged_in: ${appSettings.jwtToken!.contains('wordpress_logged_in')}');
+        debugPrint('Token length: ${appSettings.jwtToken!.length}');
       }
 
       // Se il token è mancante o non valido, rigeneralo
-      if (jwtToken == null || !jwtToken!.contains('wordpress_logged_in')) {
+      if (appSettings.jwtToken == null ||
+          !appSettings.jwtToken!.contains('wordpress_logged_in')) {
         debugPrint(
             '⚠️ Token mancante o non valido, rigenerazione automatica...');
         await regenerateToken();
         await reloadTokenFromStorage();
         debugPrint(
-            '✅ Token dopo rigenerazione: ${jwtToken != null ? "Presente" : "Mancante"}');
+            '✅ Token dopo rigenerazione: ${appSettings.jwtToken != null ? "Presente" : "Mancante"}');
       }
     } else {
       debugPrint('❌ Utente non loggato o credenziali mancanti');
@@ -3226,7 +3234,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void _startPeriodicPostsRefresh() {
     _postsRefreshTimer?.cancel();
-    _postsRefreshTimer = Timer.periodic(const Duration(minutes: 3), (timer) async {
+    _postsRefreshTimer =
+        Timer.periodic(const Duration(minutes: 3), (timer) async {
       if (!mounted) {
         timer.cancel();
         return;
@@ -3267,10 +3276,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Prima ottieni il nonce necessario per il login
       final nonceResponse = await http.get(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -3289,18 +3297,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Effettua login automatico con il nonce
       final loginResponse = await http.post(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '$urlSito/wp-login.php',
+          'Referer': '${appSettings.urlLogin}',
         },
         body: nonce.isNotEmpty
-            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
-            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
+            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
       );
 
       debugPrint('Home re-login response status: ${loginResponse.statusCode}');
@@ -3314,9 +3321,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             loginResponse.headers['location']?.contains('wp-admin') == true ||
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
-          jwtToken = cookies;
+          appSettings.setToken(cookies);
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setString('jwtToken', appSettings.jwtToken!);
           await prefs.setString('username', username);
           await prefs.setString('password', password);
           await prefs.setBool('isLoggedIn', true);
@@ -3467,7 +3474,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Test endpoint base
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/'),
+        Uri.parse('${appSettings.urlApi}'),
         headers: {
           'User-Agent': 'Flutter App/1.0',
           'Accept': 'application/json',
@@ -3497,7 +3504,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Test endpoint post base
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/posts?per_page=5'),
+        Uri.parse('${appSettings.urlApi}posts?per_page=5'),
         headers: {
           'User-Agent': 'Flutter App/1.0',
           'Accept': 'application/json',
@@ -3529,7 +3536,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         timer.cancel();
         return;
       }
-      if (jwtToken != null && !jwtToken!.contains('wordpress_logged_in')) {
+      if (appSettings.jwtToken != null &&
+          !appSettings.jwtToken!.contains('wordpress_logged_in')) {
         debugPrint('Cookie di sessione scaduto, rigenerazione automatica');
         await regenerateToken();
       }
@@ -3569,10 +3577,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Step 1: Ottieni il nonce necessario per il login
       final nonceResponse = await http.get(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
@@ -3592,18 +3599,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Step 2: Effettua login con il nonce
       final loginResponse = await http.post(
-        Uri.parse('$urlSito/wp-login.php'),
+        Uri.parse('${appSettings.urlLogin}'),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': AppSettings.userAgent,
           'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '$urlSito/wp-login.php',
+          'Referer': '${appSettings.urlLogin}',
         },
         body: nonce.isNotEmpty
-            ? 'log=$fallbackUsername&pwd=$fallbackPassword&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1&_wpnonce=$nonce'
-            : 'log=$fallbackUsername&pwd=$fallbackPassword&wp-submit=Log+In&redirect_to=$urlSito/wp-admin/&testcookie=1',
+            ? 'log=$fallbackUsername&pwd=$fallbackPassword&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
+            : 'log=$fallbackUsername&pwd=$fallbackPassword&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
       );
 
       debugPrint('Auto-login response status: ${loginResponse.statusCode}');
@@ -3619,10 +3625,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             loginResponse.body.contains('wp-admin') ||
             cookies.contains('wordpress_logged_in')) {
           // Login riuscito - salva i cookie
-          jwtToken = cookies;
+          appSettings.setToken(cookies);
 
           // Salva solo le credenziali per l'autenticazione, NON sovrascrivere i dati originali dell'utente
-          await prefs.setString('jwtToken', jwtToken!);
+          await prefs.setString('jwtToken', appSettings.jwtToken!);
           await prefs.setString('username', fallbackUsername);
           await prefs.setString('password', fallbackPassword);
           await prefs.setBool('isLoggedIn', true);
@@ -3668,9 +3674,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Future<void> fetchWpMenu() async {
     try {
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/menu-items'),
+        Uri.parse('${appSettings.urlApi}menu-items'),
         headers: {
-          'Authorization': createBasicAuth('condominio', appPassword),
+          'Authorization':
+              createBasicAuth('condominio', AppSettings.appPassword),
           'Content-Type': 'application/json',
         },
       );
@@ -3703,7 +3710,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (cachedJson != null && timestamp != null) {
         lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
         final List<dynamic> cachedPosts = json.decode(cachedJson);
-        
+
         // Conta urgenti vs normali
         int urgenti = cachedPosts.where((p) => _isUrgent(p)).length;
         int normali = cachedPosts.length - urgenti;
@@ -3726,11 +3733,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       await prefs.setInt(
           CACHE_KEY_TIMESTAMP, DateTime.now().millisecondsSinceEpoch);
       lastCacheUpdate = DateTime.now();
-      
+
       // Conta urgenti vs normali
       int urgenti = postsToCache.where((p) => _isUrgent(p)).length;
       int normali = postsToCache.length - urgenti;
-      debugPrint('💾 Cache salvata: ${postsToCache.length} post ($urgenti urgenti + $normali normali)');
+      debugPrint(
+          '💾 Cache salvata: ${postsToCache.length} post ($urgenti urgenti + $normali normali)');
     } catch (e) {
       debugPrint('❌ Errore salvataggio cache: $e');
     }
@@ -3742,7 +3750,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(CACHE_KEY_POSTS);
       await prefs.remove(CACHE_KEY_TIMESTAMP);
-      debugPrint('🗑️ Cache cancellata - verrà scaricata nuovamente dal server');
+      debugPrint(
+          '🗑️ Cache cancellata - verrà scaricata nuovamente dal server');
     } catch (e) {
       debugPrint('❌ Errore cancellazione cache: $e');
     }
@@ -3822,7 +3831,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // 🌐 STEP 2: Prova a scaricare nuovi post dal server (in background)
       debugPrint(
-          'JWT Token disponibile: ${jwtToken != null && jwtToken!.isNotEmpty}');
+          'JWT Token disponibile: ${appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty}');
 
       // Salva i post precedenti per confronto
       final previousPostIds = posts.map((p) => p['id']).toSet();
@@ -3832,7 +3841,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       await _testWordPressAPI();
 
       // Usa sempre l'autenticazione se disponibile
-      if (jwtToken != null && jwtToken!.isNotEmpty) {
+      if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
         debugPrint('Caricamento post con autenticazione...');
         await _tryFetchUserSpecificPosts();
         tempPosts.addAll(posts);
@@ -3853,7 +3862,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (tempPosts.isEmpty && cachedPosts.isEmpty) {
         debugPrint('⚠️ Tentativo login automatico...');
         final loginSuccess = await _autoLoginWithFallbackCredentials();
-        if (loginSuccess && jwtToken != null) {
+        if (loginSuccess && appSettings.jwtToken != null) {
           await _tryFetchUserSpecificPosts();
           tempPosts.addAll(posts);
           if (tempPosts.isEmpty) {
@@ -3949,7 +3958,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('Tentativo 1: Caricamento post senza autenticazione');
 
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/posts?per_page=20&status=publish'),
+        Uri.parse('${appSettings.urlApi}posts?per_page=20&status=publish'),
       );
 
       debugPrint('Status code (no auth): ${response.statusCode}');
@@ -3996,19 +4005,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> _tryFetchPostsWithBasicAuth() async {
     try {
-      debugPrint('=== TENTATIVO CON BASIC AUTH (ADMIN per scaricare TUTTI i post) ===');
+      debugPrint(
+          '=== TENTATIVO CON BASIC AUTH (ADMIN per scaricare TUTTI i post) ===');
 
       // 🔥 USA CREDENZIALI ADMIN per scaricare TUTTI i post del condominio
-      final basicAuth = createBasicAuth(adminUsername, adminAppPassword);
-      debugPrint('Basic Auth creata per ADMIN: $adminUsername (scarica TUTTI i post)');
+      final basicAuth = createBasicAuth(
+          AppSettings.adminUsername, AppSettings.adminAppPassword);
+      debugPrint(
+          'Basic Auth creata per ADMIN: $AppSettings.adminUsername (scarica TUTTI i post)');
 
       // 🔥 Lista di endpoint che scaricano TUTTI i post del condominio (non filtrati per author)
       final endpoints = [
-        '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?per_page=100',
+        '${appSettings.urlApi}posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?per_page=100&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?per_page=100',
       ];
 
       for (final endpoint in endpoints) {
@@ -4055,7 +4067,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     try {
       debugPrint('Caricamento post utente per categoria: $categoryId');
 
-      if (jwtToken == null || jwtToken!.isEmpty) {
+      if (appSettings.jwtToken == null || appSettings.jwtToken!.isEmpty) {
         debugPrint('Nessun token disponibile per caricamento post categoria');
         return;
       }
@@ -4064,10 +4076,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final userId = await _getCurrentUserId();
 
       final endpoints = [
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
-        '$urlSito/wp-json/wp/v2/posts?categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?categories=$categoryId&per_page=20&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?author=$userId&categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
+        '${appSettings.urlApi}posts?categories=$categoryId&per_page=20&_embed=wp:term&orderby=date&order=desc',
       ];
 
       for (final endpoint in endpoints) {
@@ -4077,7 +4089,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           final response = await http.get(
             Uri.parse(endpoint),
             headers: {
-              'Cookie': jwtToken!,
+              'Cookie': appSettings.jwtToken!,
               'Content-Type': 'application/json',
               'User-Agent': 'Flutter App/1.0',
               'Accept': 'application/json',
@@ -4109,13 +4121,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('Tentativo di recupero post via wp-admin-ajax...');
 
       final response = await http.post(
-        Uri.parse('$urlSito/wp-admin/admin-ajax.php'),
+        Uri.parse('${appSettings.urlAdmin}admin-ajax.php'),
         headers: {
-          'Cookie': jwtToken!,
+          'Cookie': appSettings.jwtToken!,
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': '$urlSito/wp-admin/',
+          'User-Agent': AppSettings.userAgent,
+          'Referer': '${appSettings.urlAdmin}',
         },
         body:
             'action=query_posts&post_type=post&post_status=publish,private&posts_per_page=20&orderby=date&order=desc',
@@ -4146,11 +4157,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     // 🔥 SCARICA TUTTI I POST DEL CONDOMINIO (SENZA filtro author)
     endpoints.addAll([
-      '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc',
-      '$urlSito/wp-json/wp/v2/posts?per_page=100',
+      '${appSettings.urlApi}posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
+      '${appSettings.urlApi}posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
+      '${appSettings.urlApi}posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
+      '${appSettings.urlApi}posts?per_page=100&orderby=date&order=desc',
+      '${appSettings.urlApi}posts?per_page=100',
     ]);
 
     for (final endpoint in endpoints) {
@@ -4160,7 +4171,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         final response = await http.get(
           Uri.parse(endpoint),
           headers: {
-            'Cookie': jwtToken!,
+            'Cookie': appSettings.jwtToken!,
             'Content-Type': 'application/json',
             'User-Agent': 'Flutter App/1.0',
             'Accept': 'application/json',
@@ -4196,16 +4207,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     try {
       debugPrint('Verifica autenticazione...');
 
-      if (jwtToken == null || jwtToken!.isEmpty) {
+      if (appSettings.jwtToken == null || appSettings.jwtToken!.isEmpty) {
         debugPrint('Nessun token disponibile per verifica autenticazione');
         return;
       }
 
       // Prova a verificare l'autenticazione con diversi endpoint
       final endpoints = [
-        '$urlSito/wp-json/wp/v2/users/me',
-        '$urlSito/wp-admin/admin-ajax.php?action=heartbeat',
-        '$urlSito/wp-json/wp/v2/',
+        '${appSettings.urlApi}users/me',
+        '${appSettings.urlAdmin}admin-ajax.php?action=heartbeat',
+        '${appSettings.urlApi}',
       ];
 
       for (final endpoint in endpoints) {
@@ -4215,7 +4226,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           final response = await http.get(
             Uri.parse(endpoint),
             headers: {
-              'Cookie': jwtToken!,
+              'Cookie': appSettings.jwtToken!,
               'Content-Type': 'application/json',
               'User-Agent': 'Flutter App/1.0',
               'Accept': 'application/json',
@@ -4249,16 +4260,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     try {
       debugPrint('Recupero ID utente corrente...');
 
-      if (jwtToken == null || jwtToken!.isEmpty) {
+      if (appSettings.jwtToken == null || appSettings.jwtToken!.isEmpty) {
         debugPrint('Nessun token disponibile per recupero ID utente');
         return null;
       }
 
       // Endpoint per ottenere l'utente corrente
       final response = await http.get(
-        Uri.parse('$urlSito/wp-json/wp/v2/users/me'),
+        Uri.parse('${appSettings.urlApi}users/me'),
         headers: {
-          'Cookie': jwtToken!,
+          'Cookie': appSettings.jwtToken!,
           'Content-Type': 'application/json',
           'User-Agent': 'Flutter App/1.0',
           'Accept': 'application/json',
@@ -4294,7 +4305,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Prova endpoint diversi
       final endpoints = [
-        '$urlSito/wp-json/wp/v2/posts',
+        '${appSettings.urlApi}posts',
       ];
 
       for (final endpoint in endpoints) {
@@ -4337,14 +4348,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     for (int i = 0; i < data.length; i++) {
       final post = data[i];
       final isUrg = _isUrgent(post);
-      if (isUrg) urgentiCount++;
-      else normaliCount++;
-      
+      if (isUrg)
+        urgentiCount++;
+      else
+        normaliCount++;
+
       debugPrint(
           'Post $i: "${post['title']['rendered']}" - Status: ${post['status']} - ${isUrg ? "⚠️ URGENTE" : "📰 normale"}');
     }
-    debugPrint('⚠️⚠️ DALL\'API: $urgentiCount urgenti + $normaliCount normali = ${data.length} TOTALI');
-
+    debugPrint(
+        '⚠️⚠️ DALL\'API: $urgentiCount urgenti + $normaliCount normali = ${data.length} TOTALI');
 
     // Con autenticazione, accetta tutti i post (pubblici e privati)
     final filtered = data.where((post) {
@@ -4379,13 +4392,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     for (int i = 0; i < filtered.length && i < 5; i++) {
       final post = filtered[i];
       final isUrg = _isUrgent(post);
-      if (isUrg) urgentiFiltrati++;
-      else normaliFiltrati++;
-      
+      if (isUrg)
+        urgentiFiltrati++;
+      else
+        normaliFiltrati++;
+
       debugPrint(
           'Post finale ${i + 1}: "${post['title']['rendered']}" (${post['status']}) - ${isUrg ? "⚠️ URGENTE" : "📰 normale"}');
     }
-    debugPrint('⚠️⚠️ DOPO FILTRAGGIO: $urgentiFiltrati urgenti + $normaliFiltrati normali nei primi 5');
+    debugPrint(
+        '⚠️⚠️ DOPO FILTRAGGIO: $urgentiFiltrati urgenti + $normaliFiltrati normali nei primi 5');
 
     if (mounted) {
       setState(() {
@@ -4404,7 +4420,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // Prova a caricare i post direttamente dalla pagina principale
       final response = await http.get(
-        Uri.parse('$urlSito/'),
+        Uri.parse(appSettings.urlHome),
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; Flutter App)',
         },
@@ -4439,9 +4455,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return _homeContent(); // Solo pulsanti servizi
       case 1:
         // 📰 NEWS: Mostra TUTTI i post come lista diretta
-        final allPostsNews = translatedPosts.isNotEmpty ? translatedPosts : posts;
-        debugPrint('📰 NEWS: Mostrando ${allPostsNews.length} post come lista diretta');
-        
+        final allPostsNews =
+            translatedPosts.isNotEmpty ? translatedPosts : posts;
+        debugPrint(
+            '📰 NEWS: Mostrando ${allPostsNews.length} post come lista diretta');
+
         return allPostsNews.isNotEmpty
             ? ModernArticlesScreen(
                 posts: allPostsNews,
@@ -4458,34 +4476,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       case 3:
         // 📁 ARTICOLI: Mostra categorie (come prima)
         final allPosts = translatedPosts.isNotEmpty ? translatedPosts : posts;
-        
+
         debugPrint('🔍🔍🔍 ===== DEBUG NEWS SECTION =====');
         debugPrint('📰 posts.length=${posts.length}');
         debugPrint('📰 translatedPosts.length=${translatedPosts.length}');
         debugPrint('📰 urgentPosts.length=${urgentPosts.length}');
-        debugPrint('📰 allPosts.length=${allPosts.length} (questo viene passato a ModernArticlesScreen)');
-        
+        debugPrint(
+            '📰 allPosts.length=${allPosts.length} (questo viene passato a ModernArticlesScreen)');
+
         // Log TUTTI i titoli dei post in allPosts
         debugPrint('📰 LISTA COMPLETA POST in allPosts:');
         for (int i = 0; i < allPosts.length; i++) {
           final title = allPosts[i]['title']?['rendered'] ?? 'Senza titolo';
           final isUrg = _isUrgent(allPosts[i]);
-          debugPrint('   ${i + 1}. "$title" - ${isUrg ? "⚠️ URGENTE" : "✅ NORMALE"}');
+          debugPrint(
+              '   ${i + 1}. "$title" - ${isUrg ? "⚠️ URGENTE" : "✅ NORMALE"}');
         }
         debugPrint('🔍🔍🔍 ===== FINE DEBUG NEWS =====');
-        
+
         // Conta urgenti vs normali
         if (allPosts.isNotEmpty) {
           int urgentCount = allPosts.where((p) => _isUrgent(p)).length;
           int normalCount = allPosts.length - urgentCount;
-          debugPrint('📰 NEWS: $urgentCount urgenti + $normalCount normali = ${allPosts.length} totali');
-          
+          debugPrint(
+              '📰 NEWS: $urgentCount urgenti + $normalCount normali = ${allPosts.length} totali');
+
           // Log primi 5 post
           for (int i = 0; i < allPosts.length && i < 5; i++) {
             final post = allPosts[i];
             final title = post['title']?['rendered'] ?? 'Senza titolo';
             final isUrg = _isUrgent(post);
-            debugPrint('📰 NEWS: Post ${i + 1}: "$title" (${isUrg ? "URGENTE" : "normale"})');
+            debugPrint(
+                '📰 NEWS: Post ${i + 1}: "$title" (${isUrg ? "URGENTE" : "normale"})');
           }
         }
 
@@ -4494,7 +4516,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 posts: allPosts,
                 userName: userData?['name'] ?? '',
                 userEmail: userData?['email'] ?? '',
-                showDirectList: false, // 📁 ARTICOLI: mostra categorie (come prima)
+                showDirectList:
+                    false, // 📁 ARTICOLI: mostra categorie (come prima)
               )
             : const NoAccessMessage();
       case 4:
@@ -4617,8 +4640,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             color: AppColors.secondaryBlue,
                             onTap: () {
                               Navigator.pop(context);
-                              _openInAppBrowser(
-                                  'https://www.new.portobellodigallura.it/numeri-util/');
+                              _openInAppBrowser(appSettings.urlParcoPortobello);
                             },
                           ),
                           const SizedBox(height: 12),
@@ -4692,7 +4714,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             fontWeight: FontWeight.bold),
                       ),
                       onTap: () async {
-                        // Chiudi il drawer prima di fare logout
                         Navigator.of(context).pop();
 
                         // Mostra dialogo di conferma
@@ -6252,16 +6273,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               'Identità',
               'Dove siamo e chi siamo',
               Icons.location_on,
-              () => _openInAppBrowser(
-                  'https://www.new.portobellodigallura.it/dove-siamo/'),
+              () => _openInAppBrowser(appSettings.urlDoveSiamo),
             ),
             _buildUsefulSectionItem(
               context,
               'Numeri Utili',
               'Contatti e informazioni',
               Icons.phone,
-              () => _openInAppBrowser(
-                  'https://www.new.portobellodigallura.it/numeri-util/'),
+              () => _openInAppBrowser(appSettings.urlNumeriUtili),
             ),
           ],
         ),
@@ -7372,7 +7391,7 @@ Inviato dall'app Portobello di Gallura
 
       // Apri l'app email del dispositivo
       await sendEmail(
-        to: 'webmaster@portobellodigallura.it',
+        to: AppSettings.emailWebmaster,
         subject: '${widget.subject} - $name',
         body: emailBody,
       );

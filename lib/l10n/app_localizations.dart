@@ -19,7 +19,7 @@ class AppLocalizations {
       'porto_di_gallura': 'Porto di Gallura',
 
       // Menu laterale
-      'useful_sections': 'Sezioni Utili',
+      'useful_sections': 'Sito online',
       'links_and_resources': 'Link e risorse',
       'contacts': 'Contatti',
       'contact_the_port': 'Contatta il porto',
@@ -114,7 +114,7 @@ class AppLocalizations {
       'porto_di_gallura': 'Port of Gallura',
 
       // Side menu
-      'useful_sections': 'Useful Sections',
+      'useful_sections': 'Online Site',
       'links_and_resources': 'Links and resources',
       'contacts': 'Contacts',
       'contact_the_port': 'Contact the port',
@@ -209,7 +209,7 @@ class AppLocalizations {
       'porto_di_gallura': 'Port de Gallura',
 
       // Menu latéral
-      'useful_sections': 'Sections Utiles',
+      'useful_sections': 'Site en ligne',
       'links_and_resources': 'Liens et ressources',
       'contacts': 'Contacts',
       'contact_the_port': 'Contactez le port',
@@ -305,7 +305,7 @@ class AppLocalizations {
       'porto_di_gallura': '加卢拉港',
 
       // 侧边菜单
-      'useful_sections': '实用部分',
+      'useful_sections': '在线网站',
       'links_and_resources': '链接和资源',
       'contacts': '联系方式',
       'contact_the_port': '联系港口',
