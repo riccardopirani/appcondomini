@@ -4397,12 +4397,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       else
         normaliFiltrati++;
 
-      debugPrint(
-          'Post finale ${i + 1}: "${post['title']['rendered']}" (${post['status']}) - ${isUrg ? "⚠️ URGENTE" : "📰 normale"}');
-    }
-    debugPrint(
-        '⚠️⚠️ DOPO FILTRAGGIO: $urgentiFiltrati urgenti + $normaliFiltrati normali nei primi 5');
-
     if (mounted) {
       setState(() {
         posts = filtered;
