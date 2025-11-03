@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -649,8 +650,98 @@ Future<void> _openInAppBrowser(String url) async {
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final LanguageProvider languageProvider = LanguageProvider();
 
-void main() {
+// Inizializzazione plugin notifiche locali
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+// Funzione per inizializzare le notifiche locali
+Future<void> initializeNotifications() async {
+  // Configurazione Android
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  // Configurazione iOS
+  const DarwinInitializationSettings initializationSettingsIOS =
+      DarwinInitializationSettings(
+    requestAlertPermission: true,
+    requestBadgePermission: true,
+    requestSoundPermission: true,
+  );
+
+  // Configurazione completa
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
+  );
+
+  // Inizializza il plugin
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      debugPrint('Notifica tappata: ${response.payload}');
+    },
+  );
+
+  // Richiedi permessi per iOS
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin>()
+      ?.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+}
+
+// Funzione per mostrare una notifica locale
+Future<void> showLocalNotification({
+  required int id,
+  required String title,
+  required String body,
+  String? payload,
+}) async {
+  // Configurazione Android
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'urgent_channel', // ID canale
+    'Comunicazioni Urgenti', // Nome canale
+    channelDescription: 'Notifiche per comunicazioni urgenti del condominio',
+    importance: Importance.max,
+    priority: Priority.high,
+    showWhen: true,
+    icon: '@mipmap/ic_launcher',
+  );
+
+  // Configurazione iOS
+  const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+  );
+
+  // Configurazione completa
+  const NotificationDetails notificationDetails = NotificationDetails(
+    android: androidDetails,
+    iOS: iosDetails,
+  );
+
+  // Mostra la notifica
+  await flutterLocalNotificationsPlugin.show(
+    id,
+    title,
+    body,
+    notificationDetails,
+    payload: payload,
+  );
+
+  debugPrint('📱 Notifica locale mostrata: $title - $body');
+}
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inizializza le notifiche locali
+  await initializeNotifications();
+  
   runApp(const MyApp());
 }
 
@@ -3041,28 +3132,28 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return isUrgente && !_notifiedUrgentPostIds.contains(id);
       }).toList();
 
-      if (urgentPosts.isNotEmpty && context.mounted) {
+      if (urgentPosts.isNotEmpty) {
         final latest = urgentPosts.first;
         final id = latest['id'];
         _notifiedUrgentPostIds.add(id);
 
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('🚨 Comunicazione urgente'),
-            content: const Text('Nuova comunicazione urgente disponibile'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Chiudi'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Apri'),
-              ),
-            ],
-          ),
+        // Estrai il titolo del post
+        final dynamic titleData = latest['title'];
+        final String title = titleData != null && titleData is Map
+            ? (titleData['rendered'] ?? 'Comunicazione urgente')
+            : 'Comunicazione urgente';
+        // Rimuovi i tag HTML dal titolo
+        final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+
+        // Mostra notifica locale nativa per iOS e Android
+        showLocalNotification(
+          id: id,
+          title: '🚨 Comunicazione urgente',
+          body: cleanTitle,
+          payload: 'post_$id',
         );
+
+        debugPrint('🚨 Notifica urgente inviata: Post ID=$id, Titolo=$cleanTitle');
       }
     });
   }
@@ -4392,10 +4483,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     for (int i = 0; i < filtered.length && i < 5; i++) {
       final post = filtered[i];
       final isUrg = _isUrgent(post);
-      if (isUrg)
+      if (isUrg) {
         urgentiFiltrati++;
-      else
+      } else {
         normaliFiltrati++;
+      }
+    }
 
     if (mounted) {
       setState(() {
