@@ -3153,9 +3153,87 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           payload: 'post_$id',
         );
 
+        // Mostra popup in-app se l'app è aperta
+        if (context.mounted) {
+          _showUrgentNotificationDialog(context, cleanTitle, id);
+        }
+
         debugPrint('🚨 Notifica urgente inviata: Post ID=$id, Titolo=$cleanTitle');
       }
     });
+  }
+
+  void _showUrgentNotificationDialog(BuildContext context, String title, int postId) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              const Text(
+                '🚨',
+                style: TextStyle(fontSize: 24),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Comunicazione Urgente',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFE74C3C),
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF2C3E50),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Chiudi',
+                style: TextStyle(
+                  color: AppColors.secondaryBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                // Naviga al post urgente
+                setState(() {
+                  _selectedIndex = 0; // Vai alla schermata Home
+                });
+                // Qui potresti anche scorrere automaticamente al post
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE74C3C),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Visualizza',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> fetchUserData() async {
