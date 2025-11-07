@@ -682,7 +682,33 @@ Future<void> initializeNotifications() async {
     },
   );
 
-  // Richiedi permessi per iOS
+  // ANDROID: Crea il canale notifiche per Android 8.0+ (Oreo)
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'urgent_channel', // ID canale (deve corrispondere a quello usato nelle notifiche)
+    'Comunicazioni Urgenti', // Nome canale
+    description: 'Notifiche per comunicazioni urgenti del condominio',
+    importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
+    showBadge: true,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  // ANDROID: Richiedi permessi per Android 13+ (Tiramisu)
+  final androidImplementation = flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+  
+  if (androidImplementation != null) {
+    final bool? granted = await androidImplementation.requestNotificationsPermission();
+    debugPrint('🔔 Permesso notifiche Android: ${granted == true ? "✅ CONCESSO" : "❌ NEGATO"}');
+  }
+
+  // iOS: Richiedi permessi
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin>()
@@ -691,6 +717,8 @@ Future<void> initializeNotifications() async {
         badge: true,
         sound: true,
       );
+  
+  debugPrint('✅ Sistema notifiche inizializzato correttamente');
 }
 
 // Funzione per mostrare una notifica locale
@@ -3123,44 +3151,100 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void startUrgentNotificationWatcher(
-      BuildContext context, List<dynamic> posts) {
+      BuildContext context, List<dynamic> initialPosts) {
     _notificationTimer?.cancel();
-    _notificationTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      final urgentPosts = posts.where((post) {
+    
+    // Controlla ogni 5 secondi
+    _notificationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      final now = DateTime.now();
+      final tenSecondsAgo = now.subtract(const Duration(seconds: 10));
+      
+      debugPrint('🔍 Controllo post urgenti NUOVI... (posts totali: ${posts.length})');
+      
+      // USA SEMPRE I POST AGGIORNATI DALLO STATO (posts variabile di stato)
+      // NON i post passati come parametro che potrebbero essere vecchi
+      final currentPosts = posts; // Usa i post dallo stato attuale
+      
+      // Filtra SOLO i post urgenti APPENA PUBBLICATI (ultimi 10 secondi) e non ancora notificati
+      final urgentPosts = currentPosts.where((post) {
         final isUrgente = _isUrgent(post);
         final id = post['id'];
-        return isUrgente && !_notifiedUrgentPostIds.contains(id);
+        
+        // Verifica se già notificato
+        if (_notifiedUrgentPostIds.contains(id)) {
+          return false;
+        }
+        
+        // Verifica se è urgente
+        if (!isUrgente) {
+          return false;
+        }
+        
+        // IMPORTANTE: Verifica che sia stato pubblicato RECENTEMENTE (ultimi 10 secondi)
+        // 10 secondi coprono: refresh (3s) + watcher (5s) + margine (2s)
+        try {
+          final dateString = post['date_gmt'] ?? post['date'];
+          if (dateString != null) {
+            final postDate = DateTime.parse(dateString);
+            final isRecent = postDate.isAfter(tenSecondsAgo);
+            
+            if (isRecent) {
+              debugPrint('📅 Post urgente NUOVO rilevato: ID=$id pubblicato $postDate (${now.difference(postDate).inSeconds}s fa)');
+            }
+            
+            return isRecent;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Errore parsing data per post ID=$id: $e');
+        }
+        
+        return false;
       }).toList();
 
       if (urgentPosts.isNotEmpty) {
-        final latest = urgentPosts.first;
-        final id = latest['id'];
-        _notifiedUrgentPostIds.add(id);
+        debugPrint('🚨 Trovati ${urgentPosts.length} post urgenti NUOVI da mostrare');
+        
+        // Mostra popup SOLO per post urgenti APPENA PUBBLICATI
+        for (var post in urgentPosts) {
+          final id = post['id'];
+          _notifiedUrgentPostIds.add(id);
 
-        // Estrai il titolo del post
-        final dynamic titleData = latest['title'];
-        final String title = titleData != null && titleData is Map
-            ? (titleData['rendered'] ?? 'Comunicazione urgente')
-            : 'Comunicazione urgente';
-        // Rimuovi i tag HTML dal titolo
-        final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+          // Estrai il titolo del post
+          final dynamic titleData = post['title'];
+          final String title = titleData != null && titleData is Map
+              ? (titleData['rendered'] ?? 'Comunicazione urgente')
+              : 'Comunicazione urgente';
+          // Rimuovi i tag HTML dal titolo
+          final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
 
-        // Mostra notifica locale nativa per iOS e Android
-        showLocalNotification(
-          id: id,
-          title: '🚨 Comunicazione urgente',
-          body: cleanTitle,
-          payload: 'post_$id',
-        );
-
-        // Mostra popup in-app se l'app è aperta
-        if (context.mounted) {
-          _showUrgentNotificationDialog(context, cleanTitle, id);
+          // POPUP: Mostra SOLO per post urgenti appena pubblicati
+          // Usa il navigatorKey per avere sempre un context valido
+          final currentContext = navigatorKey.currentContext;
+          if (currentContext != null) {
+            // Mostra popup anche se siamo in altre schermate
+            _showUrgentNotificationDialog(currentContext, cleanTitle, id);
+            debugPrint('🔔 Popup urgente mostrato: ID=$id, Titolo="$cleanTitle"');
+            debugPrint('   ⏰ Post pubblicato pochi secondi fa');
+            debugPrint('   📍 Popup mostrato ovunque nell\'app ci si trovi');
+          } else {
+            debugPrint('⚠️ NavigatorKey context non disponibile per popup ID=$id');
+            // Rimuovi da notificati per riprovare al prossimo ciclo
+            _notifiedUrgentPostIds.remove(id);
+          }
         }
-
-        debugPrint('🚨 Notifica urgente inviata: Post ID=$id, Titolo=$cleanTitle');
       }
     });
+    
+    debugPrint('✅ Watcher popup urgenti avviato (controllo ogni 5 secondi)');
+    debugPrint('   🔔 Popup mostrati SOLO per nuove pubblicazioni urgenti (< 10 secondi)');
+    debugPrint('   ⏰ Finestra 10s copre: refresh 3s + watcher 5s + margine 2s');
+    debugPrint('   ❌ Post urgenti vecchi (> 10s) NON generano popup');
+    debugPrint('   📍 Funziona in qualsiasi schermata grazie a navigatorKey');
   }
 
   void _showUrgentNotificationDialog(BuildContext context, String title, int postId) {
@@ -3403,8 +3487,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void _startPeriodicPostsRefresh() {
     _postsRefreshTimer?.cancel();
+    // Controlla ogni 3 secondi per rilevare rapidamente nuovi post urgenti
     _postsRefreshTimer =
-        Timer.periodic(const Duration(minutes: 3), (timer) async {
+        Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!mounted) {
         timer.cancel();
         return;
@@ -3414,7 +3499,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint('⏱️ Skip refresh post: dispositivo offline');
         return;
       }
-      debugPrint('⏱️ Refresh periodico post (3 min)');
+      debugPrint('⏱️ Refresh periodico post (ogni 3 secondi per rilevare urgenti)');
       try {
         await fetchPosts();
       } catch (e) {
