@@ -5,13 +5,13 @@ import 'package:condominio/app_theme.dart';
 import 'package:condominio/l10n/app_localizations.dart';
 import 'package:condominio/language_provider.dart';
 import 'package:condominio/setttings.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -3204,6 +3204,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   DateTime? lastCacheUpdate;
   static const String CACHE_KEY_POSTS = 'cached_posts';
   static const String CACHE_KEY_TIMESTAMP = 'cache_timestamp';
+  static const String CACHE_KEY_NOTIFIED = 'notified_urgent_posts';
 
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
@@ -3220,49 +3221,44 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _notificationTimer?.cancel();
     }
     
-    // Salva il timestamp di avvio - mostreremo popup SOLO per post pubblicati DOPO questo momento
+    // Salva il timestamp di avvio - ora serve solo come backup
     _watcherStartTime = DateTime.now();
-    debugPrint('🚀🚀🚀 AVVIO WATCHER POPUP URGENTI con ${posts.length} post 🚀🚀🚀');
-    debugPrint('⏰ Timestamp avvio watcher: $_watcherStartTime');
-    debugPrint('📢 Mostrerò popup SOLO per post urgenti pubblicati DOPO questo momento');
+    debugPrint('🔔 BACKUP WATCHER: Avvio come backup con ${posts.length} post');
+    debugPrint(
+        '📢 Popup primari ora vengono mostrati durante il download dei post');
 
-    // Esegui SUBITO il primo controllo
-    debugPrint('▶️ Eseguo SUBITO il primo controllo...');
-    _checkForUrgentPosts();
-
-    // Poi controlla ogni 5 secondi
-    debugPrint('⏰ Creo timer periodic (ogni 5 secondi)...');
-    _notificationTimer =
-        Timer.periodic(const Duration(seconds: 5), (timer) {
-      debugPrint('⏰⏰⏰ TIMER CALLBACK ESEGUITO - mounted=$mounted, posts=${posts.length} ⏰⏰⏰');
-      
+    // RIDOTTO: Controlla ogni 30 secondi solo come backup
+    debugPrint('⏰ Creo timer periodic BACKUP (ogni 30 secondi)...');
+    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (!mounted) {
-        debugPrint('❌ Widget non mounted, cancello timer');
+        debugPrint('❌ Widget non mounted, cancello timer backup');
         timer.cancel();
         return;
       }
-
+      debugPrint('🔔 BACKUP: Controllo post urgenti come backup...');
       _checkForUrgentPosts();
     });
     
-    debugPrint('✅ Timer periodic creato con successo');
+    debugPrint('✅ Timer backup creato con successo');
   }
 
   void _checkForUrgentPosts() {
     debugPrint(
-        '🔍 Controllo post urgenti NUOVI... (posts totali: ${posts.length})');
+        '🔔 BACKUP: Controllo post urgenti... (posts totali: ${posts.length})');
+    debugPrint('🔔 BACKUP: Post già notificati: $_notifiedUrgentPostIds');
 
     // USA SEMPRE I POST AGGIORNATI DALLO STATO (posts variabile di stato)
     // NON i post passati come parametro che potrebbero essere vecchi
     final currentPosts = posts; // Usa i post dallo stato attuale
 
-    // Filtra SOLO i post urgenti pubblicati DOPO l'avvio del watcher e non ancora notificati
+    // Filtra SOLO i post urgenti NON ancora notificati
     final urgentPosts = currentPosts.where((post) {
       final isUrgente = _isUrgent(post);
       final id = post['id'];
 
-      // Verifica se già notificato
+      // PRIMA verifica se già notificato - STOP se sì
       if (_notifiedUrgentPostIds.contains(id)) {
+        debugPrint('🔔 BACKUP: SKIP post ID=$id - già notificato');
         return false;
       }
 
@@ -3271,7 +3267,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return false;
       }
 
-      // CRUCIALE: Mostra popup SOLO per post pubblicati DOPO l'avvio del watcher
+      // BACKUP: Il watcher ora serve solo come backup
+      // I popup primari vengono mostrati durante il download in _processPosts()
       if (_watcherStartTime != null) {
         try {
           final dateString = post['date_gmt'] ?? post['date'];
@@ -3284,10 +3281,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               final String title = titleData != null && titleData is Map
                   ? (titleData['rendered'] ?? 'Post #$id')
                   : 'Post #$id';
+
               debugPrint(
-                  '🆕 POST URGENTE NUOVO RILEVATO: ID=$id - "$title"');
-              debugPrint('   📅 Pubblicato: $postDate (${DateTime.now().difference(postDate).inSeconds}s fa)');
-              debugPrint('   🚀 Watcher avviato: $_watcherStartTime');
+                  '🔔 BACKUP: POST URGENTE NUOVO RILEVATO: ID=$id - "$title"');
+              debugPrint(
+                  '   📅 Pubblicato: $postDate (${DateTime.now().difference(postDate).inSeconds}s fa)');
+              debugPrint('   🚀 Watcher backup avviato: $_watcherStartTime');
               return true;
             } else {
               // Post pubblicato prima dell'avvio del watcher - non mostrare popup
@@ -3304,15 +3303,29 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     if (urgentPosts.isNotEmpty) {
       debugPrint(
-          '🚨🚨🚨 TROVATI ${urgentPosts.length} POST URGENTI NUOVI DA MOSTRARE! 🚨🚨🚨');
+          '🔔 BACKUP WATCHER: TROVATI ${urgentPosts.length} POST URGENTI DA BACKUP! 🔔');
 
-      // Mostra popup per TUTTI i nuovi post urgenti (pubblicati dopo l'avvio del watcher)
+      // Mostra popup BACKUP per post urgenti persi dal download principale
       // Ma mostra MAX 1 popup per ciclo per non bombardare l'utente
-      debugPrint('📢 Mostro POPUP ROSSO per il primo post urgente nuovo...');
+      debugPrint(
+          '🔔 BACKUP: Mostro popup per post urgente perso dal download primario...');
       
       final post = urgentPosts.first; // Prendi solo il primo
       final id = post['id'];
+
+      // DOPPIO CONTROLLO: Se è già notificato, STOP
+      if (_notifiedUrgentPostIds.contains(id)) {
+        debugPrint('🔔 BACKUP: ABORT - Post ID=$id trovato ma già notificato!');
+        return;
+      }
+
+      // Aggiungi SUBITO alla lista notificati per evitare duplicati
       _notifiedUrgentPostIds.add(id);
+      debugPrint(
+          '🔔 BACKUP: Aggiunto ID=$id alla lista notificati: $_notifiedUrgentPostIds');
+
+      // Salva la lista aggiornata in cache persistente
+      _saveNotifiedPostsToCache();
 
       // Estrai il titolo del post
       final dynamic titleData = post['title'];
@@ -3323,51 +3336,101 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
 
       final currentContext = navigatorKey.currentContext;
+      debugPrint('🔍🔍🔍 DEBUG POPUP DETTAGLIATO 🔍🔍🔍');
       debugPrint(
-          '🔍 DEBUG Popup: currentContext != null: ${currentContext != null}');
-      debugPrint(
-          '🔍 DEBUG Popup: currentContext.mounted: ${currentContext?.mounted}');
+          '📍 navigatorKey.currentContext != null: ${currentContext != null}');
+      debugPrint('📍 currentContext?.mounted: ${currentContext?.mounted}');
+      debugPrint('📍 this.mounted: $mounted');
+      debugPrint('📍 Post ID da mostrare: $id');
+      debugPrint('📍 Titolo da mostrare: "$cleanTitle"');
+      debugPrint('📍 _notifiedUrgentPostIds: $_notifiedUrgentPostIds');
       
       if (currentContext != null && currentContext.mounted) {
-        debugPrint('✅ MOSTRO POPUP ROSSO URGENTE ID=$id...');
+        debugPrint(
+            '✅ TUTTE LE CONDIZIONI OK - MOSTRO POPUP ROSSO URGENTE ID=$id...');
         
         // Mostra SUBITO il popup rosso
+        debugPrint('⏰ Chiamo Future.microtask per mostrare popup...');
         Future.microtask(() {
-          if (!mounted) return;
+          debugPrint('🎯 DENTRO Future.microtask - mounted=$mounted');
+          if (!mounted) {
+            debugPrint('❌ Widget non mounted dentro microtask');
+            return;
+          }
+
           final ctx = navigatorKey.currentContext;
+          debugPrint(
+              '🎯 navigatorKey.currentContext dentro microtask: ${ctx != null}');
+          debugPrint('🎯 ctx?.mounted dentro microtask: ${ctx?.mounted}');
+
           if (ctx != null && ctx.mounted) {
             try {
+              debugPrint(
+                  '🚀🚀🚀 CHIAMANDO _showUrgentNotificationDialog per ID=$id 🚀🚀🚀');
               _showUrgentNotificationDialog(ctx, cleanTitle, id);
-              debugPrint('✅✅✅ POPUP ROSSO MOSTRATO CON SUCCESSO! ✅✅✅');
+              debugPrint('✅✅✅ POPUP ROSSO CHIAMATO CON SUCCESSO! ✅✅✅');
             } catch (e) {
-              debugPrint('❌ Errore nel mostrare il popup: $e');
+              debugPrint('❌❌❌ ERRORE CRITICO nel mostrare il popup: $e');
+              debugPrint('❌ Stack trace: ${e.toString()}');
             }
+          } else {
+            debugPrint(
+                '❌❌❌ Context non valido dentro microtask - ctx=$ctx, mounted=${ctx?.mounted}');
           }
         });
+
+        debugPrint('⏰ Future.microtask schedulato con successo');
         
         debugPrint(
-            '🔔 Popup urgente mostrato: ID=$id, Titolo="$cleanTitle"');
-        debugPrint('   📍 Popup mostrato ovunque nell\'app ci si trovi');
+            '🔔 BACKUP: Popup urgente backup mostrato: ID=$id, Titolo="$cleanTitle"');
+        debugPrint('   📍 Popup backup mostrato ovunque nell\'app ci si trovi');
       } else {
         debugPrint(
-            '⚠️ Context non valido per popup ID=$id - currentContext=$currentContext, mounted=${currentContext?.mounted}');
-        // Rimuovi da notificati per riprovare al prossimo ciclo
-        _notifiedUrgentPostIds.remove(id);
+            '⚠️ Context non valido per popup backup ID=$id - currentContext=$currentContext, mounted=${currentContext?.mounted}');
+        debugPrint('🔔 BACKUP: Context non valido ma post rimane notificato per evitare loop');
+        // NON rimuovere da notificati - altrimenti causa loop infiniti!
       }
       
-      // Se ci sono altri post urgenti, saranno mostrati nei prossimi cicli
+      // Se ci sono altri post urgenti, saranno mostrati nei prossimi cicli backup
       if (urgentPosts.length > 1) {
-        debugPrint('⏳ Altri ${urgentPosts.length - 1} post urgenti in coda, saranno mostrati nei prossimi cicli (ogni 5 secondi)');
+        debugPrint(
+            '⏳ Altri ${urgentPosts.length - 1} post urgenti backup in coda, saranno mostrati nei prossimi cicli (ogni 30 secondi)');
       }
     } else {
-      debugPrint('✅ Nessun post urgente nuovo da mostrare');
+      debugPrint('🔔 BACKUP: Nessun post urgente nuovo da mostrare nel backup');
     }
   }
 
   void _showUrgentNotificationDialog(
       BuildContext context, String title, int postId) {
-    debugPrint('🎬 Mostrando dialog urgente...');
+    debugPrint('🎬🎬🎬 INIZIO _showUrgentNotificationDialog 🎬🎬🎬');
+    debugPrint('🎬 Context ricevuto: $context');
+    debugPrint('🎬 Context.mounted: ${context.mounted}');
+    debugPrint('🎬 Titolo: "$title"');
+    debugPrint('🎬 Post ID: $postId');
+    debugPrint('🎬 Posts disponibili: ${posts.length}');
+
+    // Trova il post completo per ottenere il contenuto
+    Map<String, dynamic>? currentPost;
+    for (final post in posts) {
+      if (post['id'] == postId) {
+        currentPost = post;
+        break;
+      }
+    }
+
+    debugPrint('🎬 Post trovato per ID $postId: ${currentPost != null}');
+    if (currentPost != null) {
+      final content = currentPost['content']?['rendered'] ?? '';
+      final hasVideoContent = content.toLowerCase().contains('iframe') ||
+          content.toLowerCase().contains('<video') ||
+          content.toLowerCase().contains('youtube') ||
+          content.toLowerCase().contains('embed');
+      debugPrint('🎬 Post ha contenuto video: $hasVideoContent');
+    }
+
     try {
+      debugPrint('🎬 Chiamo showDialog...');
       showDialog(
         context: context,
         barrierDismissible: true,
@@ -3395,11 +3458,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            content: Text(
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
               title,
               style: const TextStyle(
                 fontSize: 16,
+                      fontWeight: FontWeight.w600,
                 color: Color(0xFF2C3E50),
+                    ),
+                  ),
+                  if (currentPost != null) ...[
+                    const SizedBox(height: 16),
+                    _buildUrgentContentWidget(currentPost),
+                  ],
+                ],
               ),
             ),
             actions: [
@@ -3416,11 +3493,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  // Naviga al post urgente
+                  // Naviga al post urgente e aprilo nel browser per mostrare i video
+                  final postUrl = currentPost?['link'] ?? '';
+                  if (postUrl.isNotEmpty) {
+                    launchUrl(Uri.parse(postUrl));
+                  } else {
+                    // Fallback: vai alla schermata Home
                   setState(() {
-                    _selectedIndex = 0; // Vai alla schermata Home
+                      _selectedIndex = 0;
                   });
-                  // Qui potresti anche scorrere automaticamente al post
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE74C3C),
@@ -3430,7 +3512,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ),
                 ),
                 child: const Text(
-                  'Visualizza',
+                  'Visualizza Completo',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -3438,9 +3520,164 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           );
         },
       );
-      debugPrint('✅ Dialog mostrato con successo');
+      debugPrint(
+          '✅✅✅ showDialog() completato con successo! Dialog dovrebbe essere visibile ora! ✅✅✅');
     } catch (e) {
-      debugPrint('❌ Errore mostrando dialog: $e');
+      debugPrint('❌❌❌ ERRORE CRITICO in showDialog(): $e');
+      debugPrint('❌ Stack trace completo: $e');
+      rethrow;
+    }
+  }
+
+  Widget _buildUrgentContentWidget(Map<String, dynamic> post) {
+    final content = post['content']?['rendered'] ?? '';
+    final excerpt = post['excerpt']?['rendered'] ?? '';
+
+    // Controlla se il contenuto contiene video/iframe
+    final hasVideo = content.toLowerCase().contains('iframe') ||
+        content.toLowerCase().contains('<video') ||
+        content.toLowerCase().contains('youtube') ||
+        content.toLowerCase().contains('embed');
+
+    if (hasVideo) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.play_circle_outline,
+                    color: Color(0xFFE74C3C), size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Contenuto Video Rilevato',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFE74C3C),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Questo post contiene contenuti video. Tocca "Visualizza Completo" per vedere i video nel browser.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[700],
+              ),
+            ),
+            if (excerpt.isNotEmpty && excerpt != content) ...[
+              const SizedBox(height: 12),
+              Text(
+                _removeHtmlTags(excerpt),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF2C3E50),
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
+      );
+    } else {
+      // Nessun video, mostra il contenuto normale
+      final displayText = excerpt.isNotEmpty ? excerpt : content;
+      return Container(
+        constraints: const BoxConstraints(maxHeight: 200),
+        child: SingleChildScrollView(
+          child: Text(
+            _removeHtmlTags(displayText),
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF2C3E50),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _testUrgentPopup() {
+    debugPrint('🧪🧪🧪 TEST POPUP URGENTE MANUALE 🧪🧪🧪');
+
+    // Trova il primo post urgente
+    final urgentPost = posts.firstWhere(
+      (post) => _isUrgent(post),
+      orElse: () => null,
+    );
+
+    if (urgentPost != null) {
+      final id = urgentPost['id'];
+      final dynamic titleData = urgentPost['title'];
+      final String title = titleData != null && titleData is Map
+          ? (titleData['rendered'] ?? 'Test Comunicazione Urgente')
+          : 'Test Comunicazione Urgente';
+      final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+
+      debugPrint(
+          '🧪 Trovato post urgente per test: ID=$id, Titolo="$cleanTitle"');
+      debugPrint('🧪 Post già notificato? ${_notifiedUrgentPostIds.contains(id)}');
+
+      // Se già notificato, informa e chiedi conferma per ripetere
+      if (_notifiedUrgentPostIds.contains(id)) {
+        debugPrint('⚠️ Post ID=$id già notificato. Lo mostro lo stesso per test...');
+      }
+      
+      // Aggiungi alla lista notificati per evitare duplicati futuri
+      _notifiedUrgentPostIds.add(id);
+      _saveNotifiedPostsToCache();
+      debugPrint('🧪 Aggiunto ID=$id alla lista notificati: $_notifiedUrgentPostIds');
+
+      final currentContext = navigatorKey.currentContext;
+      debugPrint('🧪 currentContext: $currentContext');
+      debugPrint('🧪 currentContext?.mounted: ${currentContext?.mounted}');
+      debugPrint('🧪 this.mounted: $mounted');
+
+      if (currentContext != null && currentContext.mounted) {
+        debugPrint('🧪 Mostro popup di test...');
+        try {
+          _showUrgentNotificationDialog(currentContext, cleanTitle, id);
+          debugPrint('✅ POPUP DI TEST MOSTRATO CON SUCCESSO!');
+        } catch (e) {
+          debugPrint('❌ Errore nel test popup: $e');
+        }
+      } else {
+        debugPrint('❌ Context non valido per test popup');
+
+        // Prova con il context del widget corrente
+        try {
+          _showUrgentNotificationDialog(context, cleanTitle, id);
+          debugPrint('✅ POPUP DI TEST MOSTRATO CON CONTEXT WIDGET!');
+        } catch (e) {
+          debugPrint('❌ Errore anche con context widget: $e');
+        }
+      }
+    } else {
+      debugPrint('❌ Nessun post urgente trovato per il test');
+
+      // Crea un popup di test con dati fittizi
+      final currentContext = navigatorKey.currentContext;
+      if (currentContext != null && currentContext.mounted) {
+        debugPrint('🧪 Mostro popup di test con dati fittizi...');
+        try {
+          _showUrgentNotificationDialog(
+              currentContext, 'Test Comunicazione Urgente', 99999);
+          debugPrint('✅ POPUP DI TEST FITTIZIO MOSTRATO CON SUCCESSO!');
+        } catch (e) {
+          debugPrint('❌ Errore nel test popup fittizio: $e');
+        }
+      } else {
+        debugPrint('❌ Impossibile mostrare popup di test - context non valido');
+      }
     }
   }
 
@@ -3479,6 +3716,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       translatedPosts = posts;
     }
 
+    _loadNotifiedPostsFromCache();
     _initializeWithTokenReload();
     _startPeriodicPostsRefresh();
   }
@@ -4134,6 +4372,74 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Carica la lista dei post urgenti già notificati dalla cache
+  Future<void> _loadNotifiedPostsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notifiedList = prefs.getStringList(CACHE_KEY_NOTIFIED);
+
+      if (notifiedList != null) {
+        _notifiedUrgentPostIds.clear();
+        _notifiedUrgentPostIds.addAll(notifiedList.map((id) => int.parse(id)));
+        debugPrint(
+            '📦 Caricati ${_notifiedUrgentPostIds.length} post urgenti già notificati: $_notifiedUrgentPostIds');
+      } else {
+        debugPrint('📦 Nessun post notificato salvato in cache');
+      }
+    } catch (e) {
+      debugPrint('❌ Errore caricamento post notificati: $e');
+      _notifiedUrgentPostIds.clear();
+    }
+  }
+
+  /// Salva la lista dei post urgenti notificati nella cache
+  Future<void> _saveNotifiedPostsToCache() async {
+    try {
+      // Limita la lista a massimo 50 post notificati per evitare accumulo eccessivo
+      final limitedList = _notifiedUrgentPostIds.toList();
+      if (limitedList.length > 50) {
+        limitedList.removeRange(0, limitedList.length - 50);
+        _notifiedUrgentPostIds.clear();
+        _notifiedUrgentPostIds.addAll(limitedList);
+        debugPrint('🧹 Lista notificati limitata a ${_notifiedUrgentPostIds.length} elementi');
+      }
+      
+      final prefs = await SharedPreferences.getInstance();
+      final notifiedList =
+          _notifiedUrgentPostIds.map((id) => id.toString()).toList();
+      await prefs.setStringList(CACHE_KEY_NOTIFIED, notifiedList);
+      debugPrint(
+          '💾 Salvati ${_notifiedUrgentPostIds.length} post notificati in cache: $_notifiedUrgentPostIds');
+    } catch (e) {
+      debugPrint('❌ Errore salvataggio post notificati: $e');
+    }
+  }
+
+  /// SOLO PER DEBUG: Reset della lista post notificati
+  Future<void> _resetNotifiedPostsForDebug() async {
+    debugPrint('🔄 RESET DEBUG: Cancello tutti i post notificati per test...');
+    _notifiedUrgentPostIds.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(CACHE_KEY_NOTIFIED);
+    debugPrint('✅ Lista post notificati resettata completamente');
+  }
+
+  /// Pulisce la lista dei post notificati rimuovendo quelli che non esistono più
+  void _cleanNotifiedPostsList() {
+    final currentPostIds = posts.map((p) => p['id']).toSet();
+    final toRemove = _notifiedUrgentPostIds
+        .where((id) => !currentPostIds.contains(id))
+        .toList();
+
+    if (toRemove.isNotEmpty) {
+      _notifiedUrgentPostIds.removeAll(toRemove);
+      debugPrint(
+          '🧹 Rimossi ${toRemove.length} post notificati non più esistenti: $toRemove');
+      debugPrint('🧹 Lista notificati pulita: $_notifiedUrgentPostIds');
+      _saveNotifiedPostsToCache();
+    }
+  }
+
   /// Estrae solo i post URGENTI (ultimi 5)
   List<dynamic> _extractUrgentPosts(List<dynamic> allPosts) {
     final urgent = allPosts.where((post) => _isUrgent(post)).toList();
@@ -4735,6 +5041,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       return;
     }
 
+    // 🔥 STEP 1: Salva i post urgenti correnti per confronto
+    final previousUrgentPostIds =
+        posts.where((p) => _isUrgent(p)).map((p) => p['id']).toSet();
+    debugPrint('🔍 Post urgenti PRIMA del download: $previousUrgentPostIds');
+
     // Log di tutti i post ricevuti CON INFO URGENZA
     int urgentiCount = 0;
     int normaliCount = 0;
@@ -4799,12 +5110,99 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       });
       debugPrint('=== POST AGGIORNATI NELLO STATE: ${posts.length} ===');
 
-      // Riavvia il watcher dei popup urgenti con i nuovi post
+      // 🔥 STEP 2: Rileva i NUOVI post urgenti scaricati
+      final newUrgentPostIds =
+          filtered.where((p) => _isUrgent(p)).map((p) => p['id']).toSet();
+      final reallyNewUrgentIds =
+          newUrgentPostIds.difference(previousUrgentPostIds);
+
+      debugPrint('🔍 Post urgenti DOPO il download: $newUrgentPostIds');
+      debugPrint('🆕 Post urgenti VERAMENTE NUOVI: $reallyNewUrgentIds');
+
+      // 🚨 STEP 3: Mostra popup IMMEDIATAMENTE per ogni nuovo post urgente (NON ancora notificato)
+      if (reallyNewUrgentIds.isNotEmpty) {
+        debugPrint(
+            '🚨🚨🚨 TROVATI ${reallyNewUrgentIds.length} NUOVI POST URGENTI! 🚨🚨🚨');
+        debugPrint('🔍 Post già notificati: $_notifiedUrgentPostIds');
+
+        // Filtra SOLO i post urgenti che NON sono già stati notificati
+        final unnotifiedNewUrgentIds = reallyNewUrgentIds
+            .where((id) => !_notifiedUrgentPostIds.contains(id))
+            .toSet();
+
+        debugPrint(
+            '🚨 Post urgenti nuovi NON ancora notificati: $unnotifiedNewUrgentIds');
+
+        if (unnotifiedNewUrgentIds.isNotEmpty) {
+          debugPrint(
+              '🚨 Mostro popup per ${unnotifiedNewUrgentIds.length} post urgenti non notificati...');
+
+          for (final newUrgentId in unnotifiedNewUrgentIds) {
+            // Verifica DOPPIA che non sia già stato notificato
+            if (_notifiedUrgentPostIds.contains(newUrgentId)) {
+              debugPrint('⚠️ SKIP: Post ID=$newUrgentId già notificato');
+              continue;
+            }
+
+            // Aggiungi SUBITO alla lista dei notificati per evitare duplicati
+            _notifiedUrgentPostIds.add(newUrgentId);
+            debugPrint(
+                '✅ Aggiunto ID=$newUrgentId alla lista notificati: $_notifiedUrgentPostIds');
+
+            // Salva la lista aggiornata in cache persistente
+            _saveNotifiedPostsToCache();
+
+            // Trova il post completo
+            final newUrgentPost = filtered.firstWhere(
+              (p) => p['id'] == newUrgentId,
+              orElse: () => null,
+            );
+
+            if (newUrgentPost != null) {
+              final dynamic titleData = newUrgentPost['title'];
+              final String title = titleData != null && titleData is Map
+                  ? (titleData['rendered'] ?? 'Comunicazione urgente')
+                  : 'Comunicazione urgente';
+              final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+
+              debugPrint(
+                  '🆕🚨 NUOVO POST URGENTE SCARICATO: ID=$newUrgentId - "$cleanTitle"');
+
+              // Mostra popup IMMEDIATAMENTE
+              Future.microtask(() {
+                if (!mounted) return;
+                final ctx = navigatorKey.currentContext;
+                if (ctx != null && ctx.mounted) {
+                  debugPrint(
+                      '🚀 MOSTRO POPUP IMMEDIATO per nuovo post urgente ID=$newUrgentId');
+                  try {
+                    _showUrgentNotificationDialog(ctx, cleanTitle, newUrgentId);
+                    debugPrint(
+                        '✅ POPUP NUOVO POST URGENTE MOSTRATO per ID=$newUrgentId!');
+                  } catch (e) {
+                    debugPrint(
+                        '❌ Errore mostrando popup nuovo post urgente ID=$newUrgentId: $e');
+                  }
+                }
+              });
+            }
+          }
+        } else {
+          debugPrint('✅ Tutti i nuovi post urgenti sono già stati notificati');
+        }
+      } else {
+        debugPrint('✅ Nessun nuovo post urgente da mostrare via download');
+      }
+
+      // 🧹 STEP 4: Pulisci la lista dei post notificati (rimuovi post che non esistono più)
+      _cleanNotifiedPostsList();
+
+      // Mantieni il watcher solo come backup per eventuali post persi
       if (posts.isNotEmpty) {
         final currentContext = navigatorKey.currentContext;
         if (currentContext != null) {
           startUrgentNotificationWatcher(currentContext, posts);
-          debugPrint('🔔 Watcher popup riavviato dopo aggiornamento post');
+          debugPrint('🔔 Watcher popup riavviato come backup');
         }
       }
     } else {
