@@ -699,13 +699,15 @@ Future<void> initializeNotifications() async {
       ?.createNotificationChannel(channel);
 
   // ANDROID: Richiedi permessi per Android 13+ (Tiramisu)
-  final androidImplementation = flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
+  final androidImplementation =
+      flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
-  
+
   if (androidImplementation != null) {
-    final bool? granted = await androidImplementation.requestNotificationsPermission();
-    debugPrint('🔔 Permesso notifiche Android: ${granted == true ? "✅ CONCESSO" : "❌ NEGATO"}');
+    final bool? granted =
+        await androidImplementation.requestNotificationsPermission();
+    debugPrint(
+        '🔔 Permesso notifiche Android: ${granted == true ? "✅ CONCESSO" : "❌ NEGATO"}');
   }
 
   // iOS: Richiedi permessi
@@ -717,7 +719,7 @@ Future<void> initializeNotifications() async {
         badge: true,
         sound: true,
       );
-  
+
   debugPrint('✅ Sistema notifiche inizializzato correttamente');
 }
 
@@ -766,10 +768,10 @@ Future<void> showLocalNotification({
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inizializza le notifiche locali
   await initializeNotifications();
-  
+
   runApp(const MyApp());
 }
 
@@ -896,11 +898,22 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
 
   void _buildCategoryMap() {
     categoryMap.clear();
+
+    // Recupera la localizzazione in modo sicuro
+    String withoutCategoryText = 'Senza categoria';
+    try {
+      final localizations = AppLocalizations.of(context);
+      withoutCategoryText = localizations.withoutCategory;
+    } catch (e) {
+      debugPrint(
+          '⚠️ Errore caricamento localizzazioni in _buildCategoryMap: $e');
+    }
+
     for (final post in translatedPosts) {
       final categories = post['_embedded']?['wp:term']?[0];
       final names = (categories != null && categories.isNotEmpty)
           ? categories.map<String>((c) => c['name'] as String).toList()
-          : [AppLocalizations.of(context).withoutCategory];
+          : [withoutCategoryText];
 
       for (final name in names) {
         categoryMap.putIfAbsent(name, () => []).add(post);
@@ -1013,7 +1026,17 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   List<String> _getAvailableCategories() {
-    final Set<String> categories = {AppLocalizations.of(context).all};
+    // Recupera la localizzazione in modo sicuro
+    String allText = 'Tutti';
+    try {
+      final localizations = AppLocalizations.of(context);
+      allText = localizations.all;
+    } catch (e) {
+      debugPrint(
+          '⚠️ Errore caricamento localizzazioni in _getAvailableCategories: $e');
+    }
+
+    final Set<String> categories = {allText};
     for (final post in translatedPosts) {
       final postCategories = post['_embedded']?['wp:term']?[0];
       if (postCategories != null && postCategories.isNotEmpty) {
@@ -1101,13 +1124,27 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              '$postCount ${AppLocalizations.of(context).articles.toLowerCase()}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
+                            Builder(
+                              builder: (ctx) {
+                                String articlesText = 'articoli';
+                                try {
+                                  final localizations =
+                                      AppLocalizations.of(ctx);
+                                  articlesText =
+                                      localizations.articles.toLowerCase();
+                                } catch (e) {
+                                  debugPrint(
+                                      '⚠️ Errore caricamento localizzazioni: $e');
+                                }
+                                return Text(
+                                  '$postCount $articlesText',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -1166,33 +1203,44 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
             color: Colors.white,
             child: Column(
               children: [
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: AppLocalizations.of(context).searchArticles,
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              setState(() {
-                                searchQuery = '';
-                                _filterPosts();
-                              });
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFFF5F5F5),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      searchQuery = value;
-                      _filterPosts();
-                    });
+                Builder(
+                  builder: (ctx) {
+                    String searchHint = 'Cerca articoli...';
+                    try {
+                      final localizations = AppLocalizations.of(ctx);
+                      searchHint = localizations.searchArticles;
+                    } catch (e) {
+                      debugPrint('⚠️ Errore caricamento localizzazioni: $e');
+                    }
+                    return TextField(
+                      decoration: InputDecoration(
+                        hintText: searchHint,
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    searchQuery = '';
+                                    _filterPosts();
+                                  });
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value;
+                          _filterPosts();
+                        });
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -1313,6 +1361,19 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   Widget _buildEmptyState() {
+    // Controllo di sicurezza per evitare errori se il context non è disponibile
+    String noArticlesText = 'Nessun articolo trovato';
+    String tryModifyText = 'Prova a modificare i filtri di ricerca';
+
+    try {
+      final localizations = AppLocalizations.of(context);
+      noArticlesText = localizations.noArticlesFound;
+      tryModifyText = localizations.tryModifyFilters;
+    } catch (e) {
+      debugPrint(
+          '⚠️ Errore caricamento localizzazioni in _buildEmptyState: $e');
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1324,7 +1385,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            AppLocalizations.of(context).noArticlesFound,
+            noArticlesText,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -1333,7 +1394,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            AppLocalizations.of(context).tryModifyFilters,
+            tryModifyText,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
@@ -3152,39 +3213,43 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void startUrgentNotificationWatcher(
       BuildContext context, List<dynamic> initialPosts) {
+    // Cancella il timer precedente per evitare duplicati
     _notificationTimer?.cancel();
-    
+
+    debugPrint('🚀 Avvio watcher popup urgenti con ${posts.length} post');
+
     // Controlla ogni 5 secondi
     _notificationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      
+
       final now = DateTime.now();
       final tenSecondsAgo = now.subtract(const Duration(seconds: 10));
-      
-      debugPrint('🔍 Controllo post urgenti NUOVI... (posts totali: ${posts.length})');
-      
+
+      debugPrint(
+          '🔍 Controllo post urgenti NUOVI... (posts totali: ${posts.length})');
+
       // USA SEMPRE I POST AGGIORNATI DALLO STATO (posts variabile di stato)
       // NON i post passati come parametro che potrebbero essere vecchi
       final currentPosts = posts; // Usa i post dallo stato attuale
-      
+
       // Filtra SOLO i post urgenti APPENA PUBBLICATI (ultimi 10 secondi) e non ancora notificati
       final urgentPosts = currentPosts.where((post) {
         final isUrgente = _isUrgent(post);
         final id = post['id'];
-        
+
         // Verifica se già notificato
         if (_notifiedUrgentPostIds.contains(id)) {
           return false;
         }
-        
+
         // Verifica se è urgente
         if (!isUrgente) {
           return false;
         }
-        
+
         // IMPORTANTE: Verifica che sia stato pubblicato RECENTEMENTE (ultimi 10 secondi)
         // 10 secondi coprono: refresh (3s) + watcher (5s) + margine (2s)
         try {
@@ -3192,23 +3257,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           if (dateString != null) {
             final postDate = DateTime.parse(dateString);
             final isRecent = postDate.isAfter(tenSecondsAgo);
-            
+
             if (isRecent) {
-              debugPrint('📅 Post urgente NUOVO rilevato: ID=$id pubblicato $postDate (${now.difference(postDate).inSeconds}s fa)');
+              debugPrint(
+                  '📅 Post urgente NUOVO rilevato: ID=$id pubblicato $postDate (${now.difference(postDate).inSeconds}s fa)');
             }
-            
+
             return isRecent;
           }
         } catch (e) {
           debugPrint('⚠️ Errore parsing data per post ID=$id: $e');
         }
-        
+
         return false;
       }).toList();
 
       if (urgentPosts.isNotEmpty) {
-        debugPrint('🚨 Trovati ${urgentPosts.length} post urgenti NUOVI da mostrare');
-        
+        debugPrint(
+            '🚨 Trovati ${urgentPosts.length} post urgenti NUOVI da mostrare');
+
         // Mostra popup SOLO per post urgenti APPENA PUBBLICATI
         for (var post in urgentPosts) {
           final id = post['id'];
@@ -3228,26 +3295,30 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           if (currentContext != null) {
             // Mostra popup anche se siamo in altre schermate
             _showUrgentNotificationDialog(currentContext, cleanTitle, id);
-            debugPrint('🔔 Popup urgente mostrato: ID=$id, Titolo="$cleanTitle"');
+            debugPrint(
+                '🔔 Popup urgente mostrato: ID=$id, Titolo="$cleanTitle"');
             debugPrint('   ⏰ Post pubblicato pochi secondi fa');
             debugPrint('   📍 Popup mostrato ovunque nell\'app ci si trovi');
           } else {
-            debugPrint('⚠️ NavigatorKey context non disponibile per popup ID=$id');
+            debugPrint(
+                '⚠️ NavigatorKey context non disponibile per popup ID=$id');
             // Rimuovi da notificati per riprovare al prossimo ciclo
             _notifiedUrgentPostIds.remove(id);
           }
         }
       }
     });
-    
+
     debugPrint('✅ Watcher popup urgenti avviato (controllo ogni 5 secondi)');
-    debugPrint('   🔔 Popup mostrati SOLO per nuove pubblicazioni urgenti (< 10 secondi)');
+    debugPrint(
+        '   🔔 Popup mostrati SOLO per nuove pubblicazioni urgenti (< 10 secondi)');
     debugPrint('   ⏰ Finestra 10s copre: refresh 3s + watcher 5s + margine 2s');
     debugPrint('   ❌ Post urgenti vecchi (> 10s) NON generano popup');
     debugPrint('   📍 Funziona in qualsiasi schermata grazie a navigatorKey');
   }
 
-  void _showUrgentNotificationDialog(BuildContext context, String title, int postId) {
+  void _showUrgentNotificationDialog(
+      BuildContext context, String title, int postId) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -3499,7 +3570,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint('⏱️ Skip refresh post: dispositivo offline');
         return;
       }
-      debugPrint('⏱️ Refresh periodico post (ogni 3 secondi per rilevare urgenti)');
+      debugPrint(
+          '⏱️ Refresh periodico post (ogni 3 secondi per rilevare urgenti)');
       try {
         await fetchPosts();
       } catch (e) {
@@ -3673,7 +3745,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       });
 
       if (mounted) {
-        startUrgentNotificationWatcher(context, posts);
+        // Avvia il watcher DOPO che i post sono stati caricati
+        // Il watcher verrà riavviato automaticamente ad ogni aggiornamento dei post
         startTokenRefreshTimer();
       }
 
@@ -4079,6 +4152,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           translatedPosts = cachedPosts;
           isLoadingPosts = false;
         });
+
+        // Avvia il watcher anche quando si carica dalla cache
+        final currentContext = navigatorKey.currentContext;
+        if (currentContext != null) {
+          startUrgentNotificationWatcher(currentContext, cachedPosts);
+          debugPrint('🔔 Watcher popup avviato dopo caricamento da cache');
+        }
       } else {
         debugPrint('📭 Nessuna cache trovata, scarico dal server...');
       }
@@ -4142,6 +4222,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             posts = updatedCache;
             urgentPosts = _extractUrgentPosts(updatedCache);
           });
+
+          // Riavvia il watcher con i nuovi post
+          if (updatedCache.isNotEmpty) {
+            final currentContext = navigatorKey.currentContext;
+            if (currentContext != null) {
+              startUrgentNotificationWatcher(currentContext, updatedCache);
+              debugPrint('🔔 Watcher popup riavviato dopo aggiornamento cache');
+            }
+          }
         } else {
           debugPrint('📦 Nessun nuovo post, uso cache esistente');
         }
@@ -4659,6 +4748,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         isLoadingPosts = false;
       });
       debugPrint('=== POST AGGIORNATI NELLO STATE: ${posts.length} ===');
+
+      // Riavvia il watcher dei popup urgenti con i nuovi post
+      if (posts.isNotEmpty) {
+        final currentContext = navigatorKey.currentContext;
+        if (currentContext != null) {
+          startUrgentNotificationWatcher(currentContext, posts);
+          debugPrint('🔔 Watcher popup riavviato dopo aggiornamento post');
+        }
+      }
     } else {
       debugPrint('Widget non mounted, non aggiorno lo state');
     }
@@ -7199,13 +7297,12 @@ class ContactOptionsScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                _buildButton(context, "Emergenze", 'assets/emergenza.png'),
+                _buildButton(context, "Bombole Gas", 'assets/bombolegas.png'),
                 _buildButton(
-                    context, "Assistenza medica", 'assets/ritiro_rifiuti.png'),
-                _buildButton(context, AppLocalizations.of(context).malfunction,
-                    'assets/guasto.png'),
-                _buildButton(context, AppLocalizations.of(context).waste,
-                    'assets/ritiro_rifiuti.png'),
+                    context, "Ritiro Rifiuti", 'assets/ritiro_rifiuti.png'),
+                _buildButton(
+                    context, "Segnalazione Guasto", 'assets/guasto.png'),
+                _buildButton(context, "Ormeggio", 'assets/ormeggio.png'),
               ],
             ),
           ),
