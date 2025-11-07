@@ -3195,6 +3195,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   bool isLoadingPosts = true;
   bool _isRendering = false;
   final Set<int> _notifiedUrgentPostIds = {};
+  DateTime? _watcherStartTime; // Timestamp di quando parte il watcher
   Timer? _notificationTimer;
   Timer? _loadingTimeoutTimer;
   Timer? _postsRefreshTimer;
@@ -3214,181 +3215,233 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void startUrgentNotificationWatcher(
       BuildContext context, List<dynamic> initialPosts) {
     // Cancella il timer precedente per evitare duplicati
-    _notificationTimer?.cancel();
+    if (_notificationTimer != null && _notificationTimer!.isActive) {
+      debugPrint('⚠️ Cancello timer precedente ancora attivo');
+      _notificationTimer?.cancel();
+    }
+    
+    // Salva il timestamp di avvio - mostreremo popup SOLO per post pubblicati DOPO questo momento
+    _watcherStartTime = DateTime.now();
+    debugPrint('🚀🚀🚀 AVVIO WATCHER POPUP URGENTI con ${posts.length} post 🚀🚀🚀');
+    debugPrint('⏰ Timestamp avvio watcher: $_watcherStartTime');
+    debugPrint('📢 Mostrerò popup SOLO per post urgenti pubblicati DOPO questo momento');
 
-    debugPrint('🚀 Avvio watcher popup urgenti con ${posts.length} post');
+    // Esegui SUBITO il primo controllo
+    debugPrint('▶️ Eseguo SUBITO il primo controllo...');
+    _checkForUrgentPosts();
 
-    // Controlla ogni 5 secondi
-    _notificationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    // Poi controlla ogni 5 secondi
+    debugPrint('⏰ Creo timer periodic (ogni 5 secondi)...');
+    _notificationTimer =
+        Timer.periodic(const Duration(seconds: 5), (timer) {
+      debugPrint('⏰⏰⏰ TIMER CALLBACK ESEGUITO - mounted=$mounted, posts=${posts.length} ⏰⏰⏰');
+      
       if (!mounted) {
+        debugPrint('❌ Widget non mounted, cancello timer');
         timer.cancel();
         return;
       }
 
-      final now = DateTime.now();
-      final tenSecondsAgo = now.subtract(const Duration(seconds: 10));
+      _checkForUrgentPosts();
+    });
+    
+    debugPrint('✅ Timer periodic creato con successo');
+  }
 
-      debugPrint(
-          '🔍 Controllo post urgenti NUOVI... (posts totali: ${posts.length})');
+  void _checkForUrgentPosts() {
+    debugPrint(
+        '🔍 Controllo post urgenti NUOVI... (posts totali: ${posts.length})');
 
-      // USA SEMPRE I POST AGGIORNATI DALLO STATO (posts variabile di stato)
-      // NON i post passati come parametro che potrebbero essere vecchi
-      final currentPosts = posts; // Usa i post dallo stato attuale
+    // USA SEMPRE I POST AGGIORNATI DALLO STATO (posts variabile di stato)
+    // NON i post passati come parametro che potrebbero essere vecchi
+    final currentPosts = posts; // Usa i post dallo stato attuale
 
-      // Filtra SOLO i post urgenti APPENA PUBBLICATI (ultimi 10 secondi) e non ancora notificati
-      final urgentPosts = currentPosts.where((post) {
-        final isUrgente = _isUrgent(post);
-        final id = post['id'];
+    // Filtra SOLO i post urgenti pubblicati DOPO l'avvio del watcher e non ancora notificati
+    final urgentPosts = currentPosts.where((post) {
+      final isUrgente = _isUrgent(post);
+      final id = post['id'];
 
-        // Verifica se già notificato
-        if (_notifiedUrgentPostIds.contains(id)) {
-          return false;
-        }
+      // Verifica se già notificato
+      if (_notifiedUrgentPostIds.contains(id)) {
+        return false;
+      }
 
-        // Verifica se è urgente
-        if (!isUrgente) {
-          return false;
-        }
+      // Verifica se è urgente
+      if (!isUrgente) {
+        return false;
+      }
 
-        // IMPORTANTE: Verifica che sia stato pubblicato RECENTEMENTE (ultimi 10 secondi)
-        // 10 secondi coprono: refresh (3s) + watcher (5s) + margine (2s)
+      // CRUCIALE: Mostra popup SOLO per post pubblicati DOPO l'avvio del watcher
+      if (_watcherStartTime != null) {
         try {
           final dateString = post['date_gmt'] ?? post['date'];
           if (dateString != null) {
             final postDate = DateTime.parse(dateString);
-            final isRecent = postDate.isAfter(tenSecondsAgo);
+            final isNewPost = postDate.isAfter(_watcherStartTime!);
 
-            if (isRecent) {
+            if (isNewPost) {
+              final dynamic titleData = post['title'];
+              final String title = titleData != null && titleData is Map
+                  ? (titleData['rendered'] ?? 'Post #$id')
+                  : 'Post #$id';
               debugPrint(
-                  '📅 Post urgente NUOVO rilevato: ID=$id pubblicato $postDate (${now.difference(postDate).inSeconds}s fa)');
+                  '🆕 POST URGENTE NUOVO RILEVATO: ID=$id - "$title"');
+              debugPrint('   📅 Pubblicato: $postDate (${DateTime.now().difference(postDate).inSeconds}s fa)');
+              debugPrint('   🚀 Watcher avviato: $_watcherStartTime');
+              return true;
+            } else {
+              // Post pubblicato prima dell'avvio del watcher - non mostrare popup
+              return false;
             }
-
-            return isRecent;
           }
         } catch (e) {
           debugPrint('⚠️ Errore parsing data per post ID=$id: $e');
         }
-
-        return false;
-      }).toList();
-
-      if (urgentPosts.isNotEmpty) {
-        debugPrint(
-            '🚨 Trovati ${urgentPosts.length} post urgenti NUOVI da mostrare');
-
-        // Mostra popup SOLO per post urgenti APPENA PUBBLICATI
-        for (var post in urgentPosts) {
-          final id = post['id'];
-          _notifiedUrgentPostIds.add(id);
-
-          // Estrai il titolo del post
-          final dynamic titleData = post['title'];
-          final String title = titleData != null && titleData is Map
-              ? (titleData['rendered'] ?? 'Comunicazione urgente')
-              : 'Comunicazione urgente';
-          // Rimuovi i tag HTML dal titolo
-          final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
-
-          // POPUP: Mostra SOLO per post urgenti appena pubblicati
-          // Usa il navigatorKey per avere sempre un context valido
-          final currentContext = navigatorKey.currentContext;
-          if (currentContext != null) {
-            // Mostra popup anche se siamo in altre schermate
-            _showUrgentNotificationDialog(currentContext, cleanTitle, id);
-            debugPrint(
-                '🔔 Popup urgente mostrato: ID=$id, Titolo="$cleanTitle"');
-            debugPrint('   ⏰ Post pubblicato pochi secondi fa');
-            debugPrint('   📍 Popup mostrato ovunque nell\'app ci si trovi');
-          } else {
-            debugPrint(
-                '⚠️ NavigatorKey context non disponibile per popup ID=$id');
-            // Rimuovi da notificati per riprovare al prossimo ciclo
-            _notifiedUrgentPostIds.remove(id);
-          }
-        }
       }
-    });
 
-    debugPrint('✅ Watcher popup urgenti avviato (controllo ogni 5 secondi)');
-    debugPrint(
-        '   🔔 Popup mostrati SOLO per nuove pubblicazioni urgenti (< 10 secondi)');
-    debugPrint('   ⏰ Finestra 10s copre: refresh 3s + watcher 5s + margine 2s');
-    debugPrint('   ❌ Post urgenti vecchi (> 10s) NON generano popup');
-    debugPrint('   📍 Funziona in qualsiasi schermata grazie a navigatorKey');
+      return false;
+    }).toList();
+
+    if (urgentPosts.isNotEmpty) {
+      debugPrint(
+          '🚨🚨🚨 TROVATI ${urgentPosts.length} POST URGENTI NUOVI DA MOSTRARE! 🚨🚨🚨');
+
+      // Mostra popup per TUTTI i nuovi post urgenti (pubblicati dopo l'avvio del watcher)
+      // Ma mostra MAX 1 popup per ciclo per non bombardare l'utente
+      debugPrint('📢 Mostro POPUP ROSSO per il primo post urgente nuovo...');
+      
+      final post = urgentPosts.first; // Prendi solo il primo
+      final id = post['id'];
+      _notifiedUrgentPostIds.add(id);
+
+      // Estrai il titolo del post
+      final dynamic titleData = post['title'];
+      final String title = titleData != null && titleData is Map
+          ? (titleData['rendered'] ?? 'Comunicazione urgente')
+          : 'Comunicazione urgente';
+      // Rimuovi i tag HTML dal titolo
+      final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+
+      final currentContext = navigatorKey.currentContext;
+      debugPrint(
+          '🔍 DEBUG Popup: currentContext != null: ${currentContext != null}');
+      debugPrint(
+          '🔍 DEBUG Popup: currentContext.mounted: ${currentContext?.mounted}');
+      
+      if (currentContext != null && currentContext.mounted) {
+        debugPrint('✅ MOSTRO POPUP ROSSO URGENTE ID=$id...');
+        
+        // Mostra SUBITO il popup rosso
+        Future.microtask(() {
+          if (!mounted) return;
+          final ctx = navigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) {
+            try {
+              _showUrgentNotificationDialog(ctx, cleanTitle, id);
+              debugPrint('✅✅✅ POPUP ROSSO MOSTRATO CON SUCCESSO! ✅✅✅');
+            } catch (e) {
+              debugPrint('❌ Errore nel mostrare il popup: $e');
+            }
+          }
+        });
+        
+        debugPrint(
+            '🔔 Popup urgente mostrato: ID=$id, Titolo="$cleanTitle"');
+        debugPrint('   📍 Popup mostrato ovunque nell\'app ci si trovi');
+      } else {
+        debugPrint(
+            '⚠️ Context non valido per popup ID=$id - currentContext=$currentContext, mounted=${currentContext?.mounted}');
+        // Rimuovi da notificati per riprovare al prossimo ciclo
+        _notifiedUrgentPostIds.remove(id);
+      }
+      
+      // Se ci sono altri post urgenti, saranno mostrati nei prossimi cicli
+      if (urgentPosts.length > 1) {
+        debugPrint('⏳ Altri ${urgentPosts.length - 1} post urgenti in coda, saranno mostrati nei prossimi cicli (ogni 5 secondi)');
+      }
+    } else {
+      debugPrint('✅ Nessun post urgente nuovo da mostrare');
+    }
   }
 
   void _showUrgentNotificationDialog(
       BuildContext context, String title, int postId) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              const Text(
-                '🚨',
-                style: TextStyle(fontSize: 24),
+    debugPrint('🎬 Mostrando dialog urgente...');
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                const Text(
+                  '🚨',
+                  style: TextStyle(fontSize: 24),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Comunicazione Urgente',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE74C3C),
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF2C3E50),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Comunicazione Urgente',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFE74C3C),
-                    fontSize: 18,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text(
+                  'Chiudi',
+                  style: TextStyle(
+                    color: AppColors.secondaryBlue,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  // Naviga al post urgente
+                  setState(() {
+                    _selectedIndex = 0; // Vai alla schermata Home
+                  });
+                  // Qui potresti anche scorrere automaticamente al post
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE74C3C),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Visualizza',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
-          ),
-          content: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF2C3E50),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Chiudi',
-                style: TextStyle(
-                  color: AppColors.secondaryBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                // Naviga al post urgente
-                setState(() {
-                  _selectedIndex = 0; // Vai alla schermata Home
-                });
-                // Qui potresti anche scorrere automaticamente al post
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE74C3C),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Visualizza',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+          );
+        },
+      );
+      debugPrint('✅ Dialog mostrato con successo');
+    } catch (e) {
+      debugPrint('❌ Errore mostrando dialog: $e');
+    }
   }
 
   Future<void> fetchUserData() async {
@@ -3412,9 +3465,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       };
       isLoadingUserData = false;
     });
-
-    debugPrint('Dati utente caricati: $userData');
-    debugPrint('Utente originale mostrato: $originalUsername ($originalEmail)');
   }
 
   @override
