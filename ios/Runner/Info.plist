@@ -51,5 +51,7 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Ricevi comunicazioni urgenti e aggiornamenti importanti dal condominio.</string>
 </dict>
 </plist>

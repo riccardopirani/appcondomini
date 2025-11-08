@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-cimport 'package:condominio/config/constants.dart' show AppConstants, jwtToken;
+import 'package:condominio/config/constants.dart' show AppConstants, jwtToken;
 
 /// Crea l'autenticazione Basic Auth
 String createBasicAuth(String username, String password) {
@@ -164,4 +164,3 @@ Future<void> clearLoginData() async {
   jwtToken = null;
   debugPrint('✅ Tutti i dati utente cancellati');
 }
-

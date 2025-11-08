@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:condominio/app_theme.dart';
 import 'package:condominio/l10n/app_localizations.dart';
@@ -654,6 +655,75 @@ final LanguageProvider languageProvider = LanguageProvider();
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
+bool _notificationsPermissionGranted = false;
+bool _hasRequestedNotificationPermissions = false;
+bool _hasShownNotificationPermissionWarning = false;
+bool _androidNotificationsGranted = false;
+bool _iosNotificationsGranted = false;
+
+Future<bool> _updateNotificationPermissionStatus(
+    {bool requestUserPermission = false}) async {
+  bool androidGranted = _androidNotificationsGranted;
+  bool iosGranted = _iosNotificationsGranted;
+
+  if (Platform.isAndroid) {
+    final androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidImplementation != null) {
+      if (requestUserPermission || !_hasRequestedNotificationPermissions) {
+        final bool? permissionResult =
+            await androidImplementation.requestNotificationsPermission();
+        if (permissionResult != null) {
+          androidGranted = permissionResult;
+        }
+      }
+
+      final bool? areEnabled =
+          await androidImplementation.areNotificationsEnabled();
+      if (areEnabled != null) {
+        androidGranted = areEnabled;
+      }
+    } else {
+      androidGranted = true;
+    }
+  } else {
+    androidGranted = true;
+  }
+
+  if (Platform.isIOS) {
+    final iosImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+
+    if (iosImplementation != null) {
+      if (requestUserPermission || !_hasRequestedNotificationPermissions) {
+        final bool? permissionResult =
+            await iosImplementation.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        if (permissionResult != null) {
+          iosGranted = permissionResult;
+        }
+      }
+    } else {
+      iosGranted = true;
+    }
+  } else {
+    iosGranted = true;
+  }
+
+  _androidNotificationsGranted = androidGranted;
+  _iosNotificationsGranted = iosGranted;
+  _notificationsPermissionGranted = androidGranted && iosGranted;
+  debugPrint(
+      '🔐 Stato permessi notifiche -> Android: $androidGranted, iOS: $iosGranted, Totale: $_notificationsPermissionGranted');
+  return _notificationsPermissionGranted;
+}
+
 // Funzione per inizializzare le notifiche locali
 Future<void> initializeNotifications() async {
   // Configurazione Android
@@ -698,29 +768,15 @@ Future<void> initializeNotifications() async {
           AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  // ANDROID: Richiedi permessi per Android 13+ (Tiramisu)
-  final androidImplementation =
-      flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+  _notificationsPermissionGranted =
+      await _updateNotificationPermissionStatus(requestUserPermission: true);
+  _hasRequestedNotificationPermissions = true;
 
-  if (androidImplementation != null) {
-    final bool? granted =
-        await androidImplementation.requestNotificationsPermission();
-    debugPrint(
-        '🔔 Permesso notifiche Android: ${granted == true ? "✅ CONCESSO" : "❌ NEGATO"}');
+  if (_notificationsPermissionGranted) {
+    debugPrint('✅ Sistema notifiche inizializzato con permessi concessi');
+  } else {
+    debugPrint('⚠️ Sistema notifiche inizializzato ma permessi non concessi');
   }
-
-  // iOS: Richiedi permessi
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin>()
-      ?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-  debugPrint('✅ Sistema notifiche inizializzato correttamente');
 }
 
 // Funzione per mostrare una notifica locale
@@ -753,6 +809,34 @@ Future<void> showLocalNotification({
     android: androidDetails,
     iOS: iosDetails,
   );
+
+  if (!_notificationsPermissionGranted) {
+    await _updateNotificationPermissionStatus(
+      requestUserPermission: !_hasRequestedNotificationPermissions,
+    );
+    _hasRequestedNotificationPermissions = true;
+
+    if (!_notificationsPermissionGranted) {
+      final context = navigatorKey.currentContext;
+      if (context != null &&
+          context.mounted &&
+          !_hasShownNotificationPermissionWarning) {
+        _hasShownNotificationPermissionWarning = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Abilita le notifiche dalle impostazioni per ricevere gli avvisi urgenti.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      debugPrint(
+          '❌ Notifica locale non mostrata: permessi notifiche non concessi');
+      return;
+    }
+  }
 
   // Mostra la notifica
   await flutterLocalNotificationsPlugin.show(
@@ -3220,7 +3304,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('⚠️ Cancello timer precedente ancora attivo');
       _notificationTimer?.cancel();
     }
-    
+
     // Salva il timestamp di avvio - ora serve solo come backup
     _watcherStartTime = DateTime.now();
     debugPrint('🔔 BACKUP WATCHER: Avvio come backup con ${posts.length} post');
@@ -3238,7 +3322,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('🔔 BACKUP: Controllo post urgenti come backup...');
       _checkForUrgentPosts();
     });
-    
+
     debugPrint('✅ Timer backup creato con successo');
   }
 
@@ -3309,7 +3393,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       // Ma mostra MAX 1 popup per ciclo per non bombardare l'utente
       debugPrint(
           '🔔 BACKUP: Mostro popup per post urgente perso dal download primario...');
-      
+
       final post = urgentPosts.first; // Prendi solo il primo
       final id = post['id'];
 
@@ -3334,6 +3418,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           : 'Comunicazione urgente';
       // Rimuovi i tag HTML dal titolo
       final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+      final notificationBody = _buildNotificationBody(post);
 
       final currentContext = navigatorKey.currentContext;
       debugPrint('🔍🔍🔍 DEBUG POPUP DETTAGLIATO 🔍🔍🔍');
@@ -3344,11 +3429,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('📍 Post ID da mostrare: $id');
       debugPrint('📍 Titolo da mostrare: "$cleanTitle"');
       debugPrint('📍 _notifiedUrgentPostIds: $_notifiedUrgentPostIds');
-      
+
       if (currentContext != null && currentContext.mounted) {
         debugPrint(
             '✅ TUTTE LE CONDIZIONI OK - MOSTRO POPUP ROSSO URGENTE ID=$id...');
-        
+
+        unawaited(showLocalNotification(
+          id: id,
+          title: cleanTitle,
+          body: notificationBody,
+          payload: id.toString(),
+        ));
+
         // Mostra SUBITO il popup rosso
         debugPrint('⏰ Chiamo Future.microtask per mostrare popup...');
         Future.microtask(() {
@@ -3380,17 +3472,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         });
 
         debugPrint('⏰ Future.microtask schedulato con successo');
-        
+
         debugPrint(
             '🔔 BACKUP: Popup urgente backup mostrato: ID=$id, Titolo="$cleanTitle"');
         debugPrint('   📍 Popup backup mostrato ovunque nell\'app ci si trovi');
       } else {
         debugPrint(
             '⚠️ Context non valido per popup backup ID=$id - currentContext=$currentContext, mounted=${currentContext?.mounted}');
-        debugPrint('🔔 BACKUP: Context non valido ma post rimane notificato per evitare loop');
+        debugPrint(
+            '🔔 BACKUP: Context non valido ma post rimane notificato per evitare loop');
         // NON rimuovere da notificati - altrimenti causa loop infiniti!
       }
-      
+
       // Se ci sono altri post urgenti, saranno mostrati nei prossimi cicli backup
       if (urgentPosts.length > 1) {
         debugPrint(
@@ -3465,11 +3558,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
-                color: Color(0xFF2C3E50),
+                      color: Color(0xFF2C3E50),
                     ),
                   ),
                   if (currentPost != null) ...[
@@ -3499,9 +3592,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     launchUrl(Uri.parse(postUrl));
                   } else {
                     // Fallback: vai alla schermata Home
-                  setState(() {
+                    setState(() {
                       _selectedIndex = 0;
-                  });
+                    });
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -3622,20 +3715,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           ? (titleData['rendered'] ?? 'Test Comunicazione Urgente')
           : 'Test Comunicazione Urgente';
       final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+      final notificationBody = _buildNotificationBody(urgentPost);
 
       debugPrint(
           '🧪 Trovato post urgente per test: ID=$id, Titolo="$cleanTitle"');
-      debugPrint('🧪 Post già notificato? ${_notifiedUrgentPostIds.contains(id)}');
+      debugPrint(
+          '🧪 Post già notificato? ${_notifiedUrgentPostIds.contains(id)}');
 
       // Se già notificato, informa e chiedi conferma per ripetere
       if (_notifiedUrgentPostIds.contains(id)) {
-        debugPrint('⚠️ Post ID=$id già notificato. Lo mostro lo stesso per test...');
+        debugPrint(
+            '⚠️ Post ID=$id già notificato. Lo mostro lo stesso per test...');
       }
-      
+
       // Aggiungi alla lista notificati per evitare duplicati futuri
       _notifiedUrgentPostIds.add(id);
       _saveNotifiedPostsToCache();
-      debugPrint('🧪 Aggiunto ID=$id alla lista notificati: $_notifiedUrgentPostIds');
+      debugPrint(
+          '🧪 Aggiunto ID=$id alla lista notificati: $_notifiedUrgentPostIds');
 
       final currentContext = navigatorKey.currentContext;
       debugPrint('🧪 currentContext: $currentContext');
@@ -3645,6 +3742,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (currentContext != null && currentContext.mounted) {
         debugPrint('🧪 Mostro popup di test...');
         try {
+          unawaited(showLocalNotification(
+            id: id,
+            title: cleanTitle,
+            body: notificationBody,
+            payload: id.toString(),
+          ));
           _showUrgentNotificationDialog(currentContext, cleanTitle, id);
           debugPrint('✅ POPUP DI TEST MOSTRATO CON SUCCESSO!');
         } catch (e) {
@@ -3655,6 +3758,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         // Prova con il context del widget corrente
         try {
+          unawaited(showLocalNotification(
+            id: id,
+            title: cleanTitle,
+            body: notificationBody,
+            payload: id.toString(),
+          ));
           _showUrgentNotificationDialog(context, cleanTitle, id);
           debugPrint('✅ POPUP DI TEST MOSTRATO CON CONTEXT WIDGET!');
         } catch (e) {
@@ -4401,9 +4510,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         limitedList.removeRange(0, limitedList.length - 50);
         _notifiedUrgentPostIds.clear();
         _notifiedUrgentPostIds.addAll(limitedList);
-        debugPrint('🧹 Lista notificati limitata a ${_notifiedUrgentPostIds.length} elementi');
+        debugPrint(
+            '🧹 Lista notificati limitata a ${_notifiedUrgentPostIds.length} elementi');
       }
-      
+
       final prefs = await SharedPreferences.getInstance();
       final notifiedList =
           _notifiedUrgentPostIds.map((id) => id.toString()).toList();
@@ -5164,9 +5274,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ? (titleData['rendered'] ?? 'Comunicazione urgente')
                   : 'Comunicazione urgente';
               final cleanTitle = title.replaceAll(RegExp(r'<[^>]*>'), '');
+              final notificationBody = _buildNotificationBody(newUrgentPost);
 
               debugPrint(
                   '🆕🚨 NUOVO POST URGENTE SCARICATO: ID=$newUrgentId - "$cleanTitle"');
+
+              unawaited(showLocalNotification(
+                id: newUrgentId,
+                title: cleanTitle,
+                body: notificationBody,
+                payload: newUrgentId.toString(),
+              ));
 
               // Mostra popup IMMEDIATAMENTE
               Future.microtask(() {
@@ -5618,6 +5736,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         .replaceAll(regex, '')
         .replaceAll('::', '')
         .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
+  }
+
+  String _buildNotificationBody(Map<String, dynamic> post) {
+    final rawExcerpt = post['excerpt']?['rendered'] ?? '';
+    final rawContent = post['content']?['rendered'] ?? '';
+    final source = rawExcerpt.isNotEmpty ? rawExcerpt : rawContent;
+
+    var cleanText =
+        _removeHtmlTags(source).replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (cleanText.isEmpty) {
+      cleanText = 'Apri l\'app per leggere la comunicazione urgente.';
+    }
+
+    if (cleanText.length > 140) {
+      cleanText = '${cleanText.substring(0, 137)}...';
+    }
+
+    return cleanText;
   }
 
   bool _isUrgent(dynamic post) {
