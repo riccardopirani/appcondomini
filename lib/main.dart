@@ -148,7 +148,7 @@ Future<void> sendEmail({
   const smtpPort = 25;
   const smtpUsername = 'webmaster@portobellodigallura.it';
   const smtpPassword = 'FwPDvGt9';
-  
+
   try {
     // Configurazione del server SMTP
     final smtpServerConfig = SmtpServer(
@@ -166,7 +166,7 @@ Future<void> sendEmail({
       ..recipients.add(to)
       ..subject = subject ?? 'Messaggio dall\'app Portobello'
       ..text = body ?? '';
-    
+
     // Aggiungi reply-to se fornito
     if (replyTo != null && replyTo.isNotEmpty) {
       message.headers['Reply-To'] = replyTo;
@@ -680,6 +680,10 @@ Future<void> _openInAppBrowser(String url) async {
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final LanguageProvider languageProvider = LanguageProvider();
+final GlobalKey<_MyHomePageState> homePageKey = GlobalKey<_MyHomePageState>();
+
+// Variabile per gestire la navigazione dalle notifiche
+int? _pendingNotificationPostId;
 
 // Inizializzazione plugin notifiche locali
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -774,11 +778,42 @@ Future<void> initializeNotifications() async {
     iOS: initializationSettingsIOS,
   );
 
+  final NotificationAppLaunchDetails? launchDetails =
+      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+
+  if (launchDetails?.didNotificationLaunchApp ?? false) {
+    final payload = launchDetails?.notificationResponse?.payload;
+    if (payload != null && payload.isNotEmpty) {
+      final launchedPostId = int.tryParse(payload);
+      if (launchedPostId != null) {
+        _pendingNotificationPostId = launchedPostId;
+      }
+    }
+  }
+
   // Inizializza il plugin
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) {
       debugPrint('Notifica tappata: ${response.payload}');
+      // Naviga al post quando viene tappata la notifica
+      if (response.payload != null && response.payload!.isNotEmpty) {
+        final postId = int.tryParse(response.payload!);
+        if (postId != null) {
+          _pendingNotificationPostId = postId;
+          final homeState = homePageKey.currentState;
+          if (homeState != null) {
+            unawaited(homeState.openPostFromNotification(postId));
+          } else {
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const SplashScreen(),
+              ),
+              (route) => false,
+            );
+          }
+        }
+      }
     },
   );
 
@@ -2697,7 +2732,8 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => const MyHomePage(
+                builder: (context) => MyHomePage(
+                  key: homePageKey,
                   title: '',
                   userEmail: '',
                   userName: '',
@@ -3104,7 +3140,8 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const MyHomePage(
+            builder: (context) => MyHomePage(
+              key: homePageKey,
               title: '',
               userEmail: '',
               userName: '',
@@ -3222,7 +3259,8 @@ class _SplashScreenState extends State<SplashScreen>
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => const MyHomePage(
+                builder: (context) => MyHomePage(
+                  key: homePageKey,
                   title: '',
                   userEmail: '',
                   userName: '',
@@ -3290,6 +3328,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Timer? _notificationTimer;
   Timer? _loadingTimeoutTimer;
   Timer? _postsRefreshTimer;
+  bool _isHandlingPendingNotification = false;
 
   // Cache locale
   DateTime? lastCacheUpdate;
@@ -3395,13 +3434,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (urgentPosts.isNotEmpty) {
       debugPrint(
           '🔔 BACKUP WATCHER: TROVATI ${urgentPosts.length} POST URGENTI DA BACKUP! 🔔');
-      
+
       // Ordina i post urgenti per data (dal più recente)
       urgentPosts.sort((a, b) {
         try {
           final dateA = DateTime.parse(a['date_gmt'] ?? a['date']);
           final dateB = DateTime.parse(b['date_gmt'] ?? b['date']);
-          return dateB.compareTo(dateA); // Ordine decrescente (più recente prima)
+          return dateB
+              .compareTo(dateA); // Ordine decrescente (più recente prima)
         } catch (e) {
           return 0;
         }
@@ -3602,10 +3642,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  // Naviga al post urgente e aprilo nel browser per mostrare i video
-                  final postUrl = currentPost?['link'] ?? '';
-                  if (postUrl.isNotEmpty) {
-                    launchUrl(Uri.parse(postUrl));
+                  // Naviga al dettaglio del post nell'app
+                  if (currentPost != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PostDetailScreen(
+                          post: currentPost!,
+                          userName: widget.userName,
+                          userEmail: widget.userEmail,
+                        ),
+                      ),
+                    );
                   } else {
                     // Fallback: vai alla schermata Home
                     setState(() {
@@ -3621,7 +3669,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ),
                 ),
                 child: const Text(
-                  'Visualizza Completo',
+                  'Visualizza completo',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -3844,6 +3892,106 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     _loadNotifiedPostsFromCache();
     _initializeWithTokenReload();
     _startPeriodicPostsRefresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _schedulePendingNotificationNavigation();
+    });
+  }
+
+  Future<void> openPostFromNotification(int postId) async {
+    _pendingNotificationPostId = postId;
+    _schedulePendingNotificationNavigation();
+  }
+
+  void _schedulePendingNotificationNavigation() {
+    if (!mounted || _pendingNotificationPostId == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_openPendingNotificationPostIfAvailable());
+    });
+  }
+
+  Future<void> _openPendingNotificationPostIfAvailable() async {
+    if (_isHandlingPendingNotification) return;
+
+    final int? pendingId = _pendingNotificationPostId;
+    if (pendingId == null) return;
+
+    Map<String, dynamic>? targetPost = _findPostById(posts, pendingId) ??
+        _findPostById(translatedPosts, pendingId);
+
+    targetPost ??= await _fetchPostById(pendingId);
+
+    if (targetPost == null) {
+      debugPrint(
+          '⚠️ Post ID=$pendingId non trovato per apertura da notifica (verrà ritentato)');
+      return;
+    }
+
+    _isHandlingPendingNotification = true;
+    _pendingNotificationPostId = null;
+
+    final Map<String, dynamic> postToOpen =
+        Map<String, dynamic>.from(targetPost);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        _isHandlingPendingNotification = false;
+        return;
+      }
+      try {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(
+              post: postToOpen,
+              userName: widget.userName,
+              userEmail: widget.userEmail,
+            ),
+          ),
+        ).then((_) {
+          _isHandlingPendingNotification = false;
+        });
+      } catch (e) {
+        _isHandlingPendingNotification = false;
+        debugPrint('❌ Errore apertura post da notifica: $e');
+      }
+    });
+  }
+
+  Map<String, dynamic>? _findPostById(List<dynamic> source, int postId) {
+    for (final item in source) {
+      if (item is Map<String, dynamic> && item['id'] == postId) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _fetchPostById(int postId) async {
+    try {
+      final uri = Uri.parse(
+          '${appSettings.urlPosts}/$postId?_embed=wp:term,wp:featuredmedia');
+      final headers = <String, String>{
+        'User-Agent': AppSettings.userAgent,
+        if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty)
+          'Cookie': appSettings.jwtToken!,
+      };
+
+      final response = await http.get(uri, headers: headers);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) {
+          debugPrint('✅ Post ID=$postId scaricato da API per notifica');
+          return data;
+        }
+      } else {
+        debugPrint(
+            '⚠️ Errore ${response.statusCode} scaricando post ID=$postId per notifica');
+      }
+    } catch (e) {
+      debugPrint('❌ Errore fetch post ID=$postId per notifica: $e');
+    }
+    return null;
   }
 
   Future<void> _onLanguageChanged() async {
@@ -3955,6 +4103,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       debugPrint('App riattivata dalla pausa, verifica sessione...');
       _checkSessionAndReauth();
+      _schedulePendingNotificationNavigation();
     }
   }
 
@@ -4775,6 +4924,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Errore caricamento post: $e');
       await _fetchPostsAlternative();
+    } finally {
+      _schedulePendingNotificationNavigation();
     }
   }
 
@@ -5265,7 +5416,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
           // Prendi solo l'ultimo (più recente) post urgente
           final latestUrgentId = unnotifiedNewUrgentIds.last;
-          
+
           for (final newUrgentId in [latestUrgentId]) {
             // Verifica DOPPIA che non sia già stato notificato
             if (_notifiedUrgentPostIds.contains(newUrgentId)) {
@@ -5560,12 +5711,42 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             color: const Color(0xFF4CAF50),
                             onTap: () async {
                               Navigator.pop(context);
-                              final Uri uri = Uri.parse('https://www.portobellodigallura.it');
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
+                              final Uri uri = Uri.parse(
+                                  'https://www.portobellodigallura.it');
+                              try {
+                                final bool canLaunch = await canLaunchUrl(uri);
+                                if (canLaunch) {
+                                  await launchUrl(
+                                    uri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                } else {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Non è possibile aprire il sito web. Verifica la connessione internet.',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        backgroundColor: Colors.red,
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Errore nell\'apertura del sito: ${e.toString()}',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Colors.red,
+                                      duration: Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
                               }
                             },
                           ),
@@ -7312,7 +7493,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               const Text('C.F.: 82001540903'),
               const Text('P. IVA: 00348270901'),
               const Text('Lunedì-venerdì 8.30-12.00, 12.30-16.30'),
-              
               const SizedBox(height: 16),
               const Text(
                 'Amministratore – Avv. Paolo Orecchioni',
@@ -7324,7 +7504,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               const Text('Fax +39 079 656 666'),
               GestureDetector(
                 onTap: () async {
-                  final Uri emailUri = Uri.parse('mailto:amministratore@portobellodigallura.it');
+                  final Uri emailUri =
+                      Uri.parse('mailto:amministratore@portobellodigallura.it');
                   if (await canLaunchUrl(emailUri)) {
                     await launchUrl(emailUri);
                   }
@@ -7337,7 +7518,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-              
               const SizedBox(height: 16),
               const Text(
                 'Ufficio tecnico – Geom. Michele Cossu',
@@ -7347,7 +7527,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               const Text('Fax +39 079 656 666'),
               GestureDetector(
                 onTap: () async {
-                  final Uri emailUri = Uri.parse('mailto:segreteria@portobellodigallura.it');
+                  final Uri emailUri =
+                      Uri.parse('mailto:segreteria@portobellodigallura.it');
                   if (await canLaunchUrl(emailUri)) {
                     await launchUrl(emailUri);
                   }
@@ -7360,14 +7541,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-              
               const SizedBox(height: 16),
               const Text(
                 'Portineria est',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               _buildPhoneNumber('Cell. +39 389 784 7867'),
-              
               const SizedBox(height: 8),
               const Text(
                 'Portineria ovest',
@@ -8482,7 +8661,7 @@ Inviato dall'app Portobello di Gallura
         // Pulisci i campi
         _phoneController.clear();
         _messageController.clear();
-        
+
         // Torna alla schermata precedente
         Navigator.pop(context);
       }
@@ -8574,17 +8753,19 @@ Inviato dall'app Portobello di Gallura
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton.icon(
-                  icon: _isLoading 
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.send, color: Colors.white),
-                  label: Text(_isLoading ? 'Invio in corso...' : AppLocalizations.of(context).send),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.send, color: Colors.white),
+                  label: Text(_isLoading
+                      ? 'Invio in corso...'
+                      : AppLocalizations.of(context).send),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFD54F),
                     foregroundColor: Colors.black,
@@ -8662,8 +8843,18 @@ class PostDetailScreen extends StatelessWidget {
     try {
       final date = DateTime.parse(dateString);
       final months = [
-        'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
-        'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'
+        'gennaio',
+        'febbraio',
+        'marzo',
+        'aprile',
+        'maggio',
+        'giugno',
+        'luglio',
+        'agosto',
+        'settembre',
+        'ottobre',
+        'novembre',
+        'dicembre'
       ];
       return '${date.day} ${months[date.month - 1]} ${date.year}';
     } catch (e) {

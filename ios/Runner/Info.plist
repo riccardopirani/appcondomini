@@ -53,5 +53,12 @@
 	</array>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>Ricevi comunicazioni urgenti e aggiornamenti importanti dal condominio.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>tel</string>
+		<string>mailto</string>
+	</array>
 </dict>
 </plist>
