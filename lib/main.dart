@@ -13,6 +13,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:mailer/mailer.dart' as mailer;
+import 'package:mailer/smtp_server.dart';
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -139,42 +141,70 @@ Future<void> sendEmail({
   required String to,
   String? subject,
   String? body,
+  String? replyTo,
 }) async {
-  final uri = Uri(
-    scheme: 'mailto',
-    path: to,
-    queryParameters: {
-      if (subject != null) 'subject': subject,
-      if (body != null) 'body': body,
-    },
-  );
-
+  // SMTP Configuration
+  const smtpServer = 'pro.eu.turbo-smtp.com';
+  const smtpPort = 25;
+  const smtpUsername = 'webmaster@portobellodigallura.it';
+  const smtpPassword = 'FwPDvGt9';
+  
   try {
-    // Aggiungi timeout per evitare blocchi
-    final canLaunch = await canLaunchUrl(uri).timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => false,
+    // Configurazione del server SMTP
+    final smtpServerConfig = SmtpServer(
+      smtpServer,
+      port: smtpPort,
+      username: smtpUsername,
+      password: smtpPassword,
+      ignoreBadCertificate: true,
+      allowInsecure: true,
     );
 
-    if (canLaunch) {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw TimeoutException('Timeout nell\'apertura dell\'app email');
-        },
-      );
-    } else {
-      throw Exception('Nessuna app email disponibile');
+    // Crea il messaggio
+    final message = mailer.Message()
+      ..from = mailer.Address(smtpUsername, 'Portobello di Gallura')
+      ..recipients.add(to)
+      ..subject = subject ?? 'Messaggio dall\'app Portobello'
+      ..text = body ?? '';
+    
+    // Aggiungi reply-to se fornito
+    if (replyTo != null && replyTo.isNotEmpty) {
+      message.headers['Reply-To'] = replyTo;
     }
-  } on TimeoutException catch (e) {
-    debugPrint('Timeout in sendEmail: $e');
-    rethrow;
+
+    // Invia l'email
+    final sendReport = await mailer.send(message, smtpServerConfig);
+    debugPrint('Email inviata con successo via SMTP: ${sendReport.toString()}');
   } catch (e) {
-    debugPrint('Errore in sendEmail: $e');
-    rethrow;
+    debugPrint('Errore invio email via SMTP: $e');
+    // Fallback: prova ad aprire il client email locale
+    final uri = Uri(
+      scheme: 'mailto',
+      path: to,
+      queryParameters: {
+        if (subject != null) 'subject': subject,
+        if (body != null) 'body': body,
+      },
+    );
+
+    try {
+      final canLaunch = await canLaunchUrl(uri).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+
+      if (canLaunch) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        throw Exception('Impossibile inviare email');
+      }
+    } catch (fallbackError) {
+      debugPrint('Errore anche con fallback email client: $fallbackError');
+      throw Exception('Errore invio email: $e');
+    }
   }
 }
 
@@ -1696,21 +1726,6 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 14,
-                          color: Colors.grey[500],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ID: $authorId',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[500],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
                         if (date.isNotEmpty) ...[
                           Icon(
                             Icons.access_time,
@@ -1727,7 +1742,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             ),
                           ),
                         ],
-                        const SizedBox(width: 8),
+                        const Spacer(),
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 14,
@@ -2096,14 +2111,6 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                                       ),
                                     ),
                                     const Spacer(),
-                                    Text(
-                                      'ID: $authorId',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF95A5A6),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ],
@@ -3388,13 +3395,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     if (urgentPosts.isNotEmpty) {
       debugPrint(
           '🔔 BACKUP WATCHER: TROVATI ${urgentPosts.length} POST URGENTI DA BACKUP! 🔔');
+      
+      // Ordina i post urgenti per data (dal più recente)
+      urgentPosts.sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a['date_gmt'] ?? a['date']);
+          final dateB = DateTime.parse(b['date_gmt'] ?? b['date']);
+          return dateB.compareTo(dateA); // Ordine decrescente (più recente prima)
+        } catch (e) {
+          return 0;
+        }
+      });
 
-      // Mostra popup BACKUP per post urgenti persi dal download principale
-      // Ma mostra MAX 1 popup per ciclo per non bombardare l'utente
+      // Prendi solo l'ultimo (più recente) post urgente
+      final post = urgentPosts.first;
       debugPrint(
-          '🔔 BACKUP: Mostro popup per post urgente perso dal download primario...');
-
-      final post = urgentPosts.first; // Prendi solo il primo
+          '🔔 BACKUP: Mostro popup per l\'ultimo post urgente (più recente) perso dal download primario...');
       final id = post['id'];
 
       // DOPPIO CONTROLLO: Se è già notificato, STOP
@@ -5245,9 +5261,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         if (unnotifiedNewUrgentIds.isNotEmpty) {
           debugPrint(
-              '🚨 Mostro popup per ${unnotifiedNewUrgentIds.length} post urgenti non notificati...');
+              '🚨 Mostro popup per l\'ultimo post urgente non notificato...');
 
-          for (final newUrgentId in unnotifiedNewUrgentIds) {
+          // Prendi solo l'ultimo (più recente) post urgente
+          final latestUrgentId = unnotifiedNewUrgentIds.last;
+          
+          for (final newUrgentId in [latestUrgentId]) {
             // Verifica DOPPIA che non sia già stato notificato
             if (_notifiedUrgentPostIds.contains(newUrgentId)) {
               debugPrint('⚠️ SKIP: Post ID=$newUrgentId già notificato');
@@ -5539,9 +5558,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             subtitle:
                                 AppLocalizations.of(context).linksAndResources,
                             color: const Color(0xFF4CAF50),
-                            onTap: () {
+                            onTap: () async {
                               Navigator.pop(context);
-                              _showUsefulSections(context);
+                              final Uri uri = Uri.parse('https://www.portobellodigallura.it');
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              }
                             },
                           ),
                           const SizedBox(height: 12),
@@ -5554,7 +5579,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             color: AppColors.secondaryBlue,
                             onTap: () {
                               Navigator.pop(context);
-                              _openInAppBrowser(appSettings.urlParcoPortobello);
+                              _showContactsDialog(context);
                             },
                           ),
                           const SizedBox(height: 12),
@@ -5586,19 +5611,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                     builder: (context) =>
                                         const AppInfoScreen()),
                               );
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          _buildModernMenuItem(
-                            context,
-                            icon: Icons.language,
-                            title: AppLocalizations.of(context).language,
-                            subtitle:
-                                AppLocalizations.of(context).chooseLanguage,
-                            color: const Color(0xFF00BCD4),
-                            onTap: () {
-                              Navigator.pop(context);
-                              _showLanguageDialog(context);
                             },
                           ),
                           const SizedBox(height: 12),
@@ -6873,8 +6885,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
-          Text(phone,
-              style: const TextStyle(fontSize: 16, color: AppColors.primary)),
+          _buildPhoneNumber(phone),
           if (website != null) ...[
             const SizedBox(height: 2),
             Text(website,
@@ -6924,11 +6935,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
-                const Text('Cell. +39 327 796 4108',
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold)),
+                _buildPhoneNumber('Cell. +39 327 796 4108'),
                 const Divider(height: 24),
                 _buildMedicalSection(
                     'ASL Gallura – Ambulatorio continuità assistenziale', [
@@ -6952,8 +6959,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 4),
-                const Text('Via Bazzoni – Sircana, 2/2A\nTel. +39 0789 552 200',
+                const Text('Via Bazzoni – Sircana, 2/2A',
                     style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 4),
+                _buildPhoneNumber('Tel. +39 0789 552 200'),
                 const Divider(height: 24),
                 _buildMedicalSection('Farmacie', [
                   'Farmacia Collu - Via Tempio 12, Aglientu\nTel. +39 079 654 445',
@@ -7003,24 +7012,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   children: [
                     TextSpan(text: beforePhone),
                     WidgetSpan(
-                      child: GestureDetector(
-                        onTap: () async {
-                          final phoneNumber =
-                              phoneText.replaceAll(RegExp(r'[^\d+]'), '');
-                          final Uri telUri = Uri.parse('tel:$phoneNumber');
-                          if (await canLaunchUrl(telUri)) {
-                            await launchUrl(telUri);
-                          }
-                        },
-                        child: Text(
-                          phoneText,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
+                      child: _buildPhoneNumber(phoneText),
                     ),
                     TextSpan(text: afterPhone),
                   ],
@@ -7036,6 +7028,45 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           }
         }),
       ],
+    );
+  }
+
+  Widget _buildPhoneNumber(String phoneNumber) {
+    return GestureDetector(
+      onTap: () async {
+        final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+        final Uri telUri = Uri.parse('tel:$cleanNumber');
+        if (await canLaunchUrl(telUri)) {
+          await launchUrl(telUri);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.phone,
+              size: 14,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              phoneNumber,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -7253,6 +7284,105 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         Navigator.pop(context);
         onTap();
       },
+    );
+  }
+
+  void _showContactsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.location_on, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Parco di Portobello'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Parco Residenziale Portobello di Gallura',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const Text('07020 Aglientu (SS)'),
+              const Text('C.F.: 82001540903'),
+              const Text('P. IVA: 00348270901'),
+              const Text('Lunedì-venerdì 8.30-12.00, 12.30-16.30'),
+              
+              const SizedBox(height: 16),
+              const Text(
+                'Amministratore – Avv. Paolo Orecchioni',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              _buildPhoneNumber('Tel. +39 079 656 718'),
+              _buildPhoneNumber('Tel. +39 079 656 766'),
+              _buildPhoneNumber('Cell. +39 345 932 9195'),
+              const Text('Fax +39 079 656 666'),
+              GestureDetector(
+                onTap: () async {
+                  final Uri emailUri = Uri.parse('mailto:amministratore@portobellodigallura.it');
+                  if (await canLaunchUrl(emailUri)) {
+                    await launchUrl(emailUri);
+                  }
+                },
+                child: const Text(
+                  'amministratore@portobellodigallura.it',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              const Text(
+                'Ufficio tecnico – Geom. Michele Cossu',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              _buildPhoneNumber('Tel. +39 079 656 718'),
+              const Text('Fax +39 079 656 666'),
+              GestureDetector(
+                onTap: () async {
+                  final Uri emailUri = Uri.parse('mailto:segreteria@portobellodigallura.it');
+                  if (await canLaunchUrl(emailUri)) {
+                    await launchUrl(emailUri);
+                  }
+                },
+                child: const Text(
+                  'segreteria@portobellodigallura.it',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              const Text(
+                'Portineria est',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              _buildPhoneNumber('Cell. +39 389 784 7867'),
+              
+              const SizedBox(height: 8),
+              const Text(
+                'Portineria ovest',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              _buildPhoneNumber('Cell. +39 389 784 8651'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Chiudi')),
+        ],
+      ),
     );
   }
 
@@ -7896,6 +8026,45 @@ class ContactOptionsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPhoneNumber(String phoneNumber) {
+    return GestureDetector(
+      onTap: () async {
+        final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+        final Uri telUri = Uri.parse('tel:$cleanNumber');
+        if (await canLaunchUrl(telUri)) {
+          await launchUrl(telUri);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.phone,
+              size: 14,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              phoneNumber,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Metodi helper per i popup (come in _MyHomePageState)
   void _showEmergencyDialog(BuildContext context) {
     showDialog(
@@ -7965,21 +8134,7 @@ class ContactOptionsScreen extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () async {
-              // Estrai solo i numeri dal testo (rimuovi "Tel. ", spazi, ecc.)
-              final phoneNumber = phone.replaceAll(RegExp(r'[^\d+]'), '');
-              final Uri telUri = Uri.parse('tel:$phoneNumber');
-              if (await canLaunchUrl(telUri)) {
-                await launchUrl(telUri);
-              }
-            },
-            child: Text(phone,
-                style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.primary,
-                    decoration: TextDecoration.underline)),
-          ),
+          _buildPhoneNumber(phone),
           if (website != null) ...[
             const SizedBox(height: 2),
             Text(website,
@@ -8028,11 +8183,7 @@ class ContactOptionsScreen extends StatelessWidget {
                     'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
-                const Text('Cell. +39 327 796 4108',
-                    style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold)),
+                _buildPhoneNumber('Cell. +39 327 796 4108'),
                 const Divider(height: 24),
                 _buildMedicalSection(
                     'ASL Gallura – Ambulatorio continuità assistenziale', [
@@ -8056,8 +8207,10 @@ class ContactOptionsScreen extends StatelessWidget {
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 4),
-                const Text('Via Bazzoni – Sircana, 2/2A\nTel. +39 0789 552 200',
+                const Text('Via Bazzoni – Sircana, 2/2A',
                     style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 4),
+                _buildPhoneNumber('Tel. +39 0789 552 200'),
                 const Divider(height: 24),
                 _buildMedicalSection('Farmacie', [
                   'Farmacia Collu - Via Tempio 12, Aglientu\nTel. +39 079 654 445',
@@ -8107,24 +8260,7 @@ class ContactOptionsScreen extends StatelessWidget {
                   children: [
                     TextSpan(text: beforePhone),
                     WidgetSpan(
-                      child: GestureDetector(
-                        onTap: () async {
-                          final phoneNumber =
-                              phoneText.replaceAll(RegExp(r'[^\d+]'), '');
-                          final Uri telUri = Uri.parse('tel:$phoneNumber');
-                          if (await canLaunchUrl(telUri)) {
-                            await launchUrl(telUri);
-                          }
-                        },
-                        child: Text(
-                          phoneText,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
+                      child: _buildPhoneNumber(phoneText),
                     ),
                     TextSpan(text: afterPhone),
                   ],
@@ -8253,6 +8389,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
   late final TextEditingController _nameController;
   final _phoneController = TextEditingController();
   final _messageController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -8306,6 +8443,10 @@ class _EmailFormTabState extends State<EmailFormTab> {
       return;
     }
 
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       // Prepara il corpo dell'email
       final emailBody = '''
@@ -8321,34 +8462,39 @@ $messageText
 Inviato dall'app Portobello di Gallura
       ''';
 
-      // Apri l'app email del dispositivo
+      // Invia email via SMTP
       await sendEmail(
         to: AppSettings.emailWebmaster,
         subject: '${widget.subject} - $name',
         body: emailBody,
+        replyTo: email, // Imposta l'email del mittente come reply-to
       );
 
       // Mostra messaggio di successo
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('App email aperta con successo!'),
+            content: Text('Email inviata con successo!'),
             backgroundColor: Colors.green,
           ),
         );
 
         // Pulisci i campi
-        _emailController.clear();
-        _nameController.clear();
         _phoneController.clear();
         _messageController.clear();
+        
+        // Torna alla schermata precedente
+        Navigator.pop(context);
       }
     } catch (e) {
       // Mostra messaggio di errore
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore nell\'apertura dell\'app email: $e'),
+            content: Text('Errore nell\'invio dell\'email: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -8428,8 +8574,17 @@ Inviato dall'app Portobello di Gallura
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.send, color: Colors.white),
-                  label: Text(AppLocalizations.of(context).send),
+                  icon: _isLoading 
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.send, color: Colors.white),
+                  label: Text(_isLoading ? 'Invio in corso...' : AppLocalizations.of(context).send),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFD54F),
                     foregroundColor: Colors.black,
@@ -8443,7 +8598,7 @@ Inviato dall'app Portobello di Gallura
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  onPressed: _submitForm,
+                  onPressed: _isLoading ? null : _submitForm,
                 ),
               ],
             ),
@@ -8501,6 +8656,19 @@ class PostDetailScreen extends StatelessWidget {
         .replaceAll(regex, '')
         .replaceAll('::', '')
         .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
+  }
+
+  String _formatItalianDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      final months = [
+        'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+        'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 
   @override
@@ -8574,14 +8742,6 @@ class PostDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      if (authorId > 0)
-                        Text(
-                          'Autore: $authorId',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -8597,7 +8757,7 @@ class PostDetailScreen extends StatelessWidget {
                   if (date.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Data: ${DateTime.tryParse(date)?.toString().split(' ')[0] ?? date}',
+                      'Data: ${_formatItalianDate(date)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
