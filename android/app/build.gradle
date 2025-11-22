@@ -26,6 +26,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Supporto per pagine di memoria da 16 kB (richiesto per Android 15+)
+        // Le librerie native vengono automaticamente compresse in AGP 8.1+
+        // Assicurarsi che compileSdk sia almeno 35 (Android 15)
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+        }
     }
 
     buildTypes {

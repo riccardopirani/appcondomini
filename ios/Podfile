@@ -74,8 +74,12 @@ post_install do |installer|
       # Disabilita completamente la validazione dei moduli per evitare errori
       config.build_settings['CLANG_DISABLE_MODULE_VALIDATION'] = 'YES'
       
-      # Usa la cache moduli di default di Xcode (non personalizzata)
-      # Xcode gestirà automaticamente la cache nella DerivedData
+      # Usa una cache moduli locale per evitare problemi di permessi
+      # Questo crea una cache separata per ogni build
+      config.build_settings['CLANG_MODULE_CACHE_PATH'] = '$(PROJECT_TEMP_DIR)/ModuleCache'
+      
+      # Disabilita la validazione dei moduli di sistema per evitare errori
+      config.build_settings['CLANG_MODULES_VALIDATE_ONCE_PER_BUILD_SESSION'] = 'NO'
     end
   end
 end
