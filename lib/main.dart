@@ -162,7 +162,7 @@ Future<void> sendEmail({
 
     // Crea il messaggio
     final message = mailer.Message()
-      ..from = mailer.Address(smtpUsername, 'Portobello di Gallura')
+      ..from = const mailer.Address(smtpUsername, 'Portobello di Gallura')
       ..recipients.add(to)
       ..subject = subject ?? 'Messaggio dall\'app Portobello'
       ..text = body ?? '';
@@ -3588,17 +3588,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: Row(
+            title: const Row(
               children: [
-                const Text(
+                Text(
                   '🚨',
                   style: TextStyle(fontSize: 24),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Comunicazione Urgente',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFE74C3C),
                       fontSize: 18,
@@ -3858,23 +3858,167 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString('jwtToken');
 
-    // Usa i dati dell'utente originale per la visualizzazione
     final originalUsername = prefs.getString('originalUsername');
     final originalEmail = prefs.getString('originalEmail');
 
-    if (savedToken != null) {
+    if (savedToken != null && savedToken.isNotEmpty) {
       appSettings.setToken(savedToken);
       isLoggedIn = true;
     }
 
+    Map<String, dynamic>? apiUserData;
+
+    if (savedToken != null && savedToken.isNotEmpty) {
+      try {
+        final response = await http.get(
+          Uri.parse('${appSettings.urlApi}users/me'),
+          headers: {
+            'Cookie': savedToken,
+            'User-Agent': AppSettings.userAgent,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          apiUserData = json.decode(response.body) as Map<String, dynamic>;
+          debugPrint('✅ Dati utente recuperati da /users/me');
+        } else {
+          debugPrint(
+              '⚠️ Impossibile recuperare dati utente (status: ${response.statusCode})');
+        }
+      } catch (e) {
+        debugPrint('❌ Errore recupero dati utente da API: $e');
+      }
+    }
+
+    final displayName = _computeDisplayName(
+      apiDisplayName: _asString(apiUserData?['name']),
+      firstName: _asString(apiUserData?['first_name']),
+      lastName: _asString(apiUserData?['last_name']),
+      username: originalUsername,
+      email: originalEmail,
+    );
+
+    final resolvedEmail = _resolveEmail(
+      apiEmail: _asString(apiUserData?['email']),
+      storedEmail: originalEmail,
+      username: originalUsername,
+    );
+
+    final resolvedId = _resolveUserId(apiUserData?['id']);
+
+    if (!mounted) return;
+
     setState(() {
       userData = {
-        'name': originalUsername ?? 'Utente',
-        'email': originalEmail ?? 'user@example.com',
-        'id': 1,
+        'name': displayName,
+        'email': resolvedEmail,
+        'id': resolvedId,
       };
       isLoadingUserData = false;
     });
+  }
+
+  String _computeDisplayName({
+    String? apiDisplayName,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? email,
+  }) {
+    final candidates = <String?>[
+      _cleanAndCapitalizeName(apiDisplayName),
+      _combineNameParts(firstName, lastName),
+      _formatIdentifierName(username),
+      _formatIdentifierName(email),
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate != null && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return 'Utente';
+  }
+
+  String? _combineNameParts(String? firstName, String? lastName) {
+    final cleanedFirst = _cleanAndCapitalizeName(firstName);
+    final cleanedLast = _cleanAndCapitalizeName(lastName);
+    final parts = <String>[
+      if (cleanedFirst != null && cleanedFirst.isNotEmpty) cleanedFirst,
+      if (cleanedLast != null && cleanedLast.isNotEmpty) cleanedLast,
+    ];
+    if (parts.isEmpty) return null;
+    return parts.join(' ');
+  }
+
+  String? _cleanAndCapitalizeName(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final normalizedWhitespace = trimmed.replaceAll(RegExp(r'\s+'), ' ');
+    final segments = normalizedWhitespace.split(' ');
+    return segments.map(_capitalizeWord).join(' ');
+  }
+
+  String? _formatIdentifierName(String? identifier) {
+    if (identifier == null) return null;
+    final trimmed = identifier.trim();
+    if (trimmed.isEmpty) return null;
+    final base = trimmed.contains('@') ? trimmed.split('@').first : trimmed;
+    final sanitized =
+        base.replaceAll(RegExp(r'[^A-Za-z\u00C0-\u017F\s._-]'), ' ');
+    final segments = sanitized
+        .split(RegExp(r'[._\-\s]+'))
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+    if (segments.isEmpty) {
+      return _capitalizeWord(base);
+    }
+    return segments.map(_capitalizeWord).join(' ');
+  }
+
+  String _capitalizeWord(String value) {
+    if (value.isEmpty) return value;
+    final lower = value.toLowerCase();
+    return '${lower[0].toUpperCase()}${lower.substring(1)}';
+  }
+
+  String _resolveEmail({
+    String? apiEmail,
+    String? storedEmail,
+    String? username,
+  }) {
+    final candidates = <String?>[
+      apiEmail?.trim(),
+      storedEmail?.trim(),
+      username != null && username.contains('@') ? username.trim() : null,
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate != null && candidate.isNotEmpty) {
+        return candidate;
+      }
+    }
+    return 'user@example.com';
+  }
+
+  int _resolveUserId(dynamic value) {
+    if (value is int) return value;
+    if (value is String) {
+      return int.tryParse(value) ?? 1;
+    }
+    return 1;
+  }
+
+  String? _asString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value;
+    if (value is Map && value['rendered'] is String) {
+      return value['rendered'] as String;
+    }
+    return value.toString();
   }
 
   @override
@@ -5723,7 +5867,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                 } else {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
                                           'Non è possibile aprire il sito web. Verifica la connessione internet.',
                                           style: TextStyle(color: Colors.white),
@@ -5740,10 +5884,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                     SnackBar(
                                       content: Text(
                                         'Errore nell\'apertura del sito: ${e.toString()}',
-                                        style: TextStyle(color: Colors.white),
+                                        style: const TextStyle(color: Colors.white),
                                       ),
                                       backgroundColor: Colors.red,
-                                      duration: Duration(seconds: 3),
+                                      duration: const Duration(seconds: 3),
                                     ),
                                   );
                                 }
@@ -5807,7 +5951,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: Color(0xFFE53935),
+                      color: const Color(0xFFE53935),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: ListTile(
@@ -5967,15 +6111,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget _homeContent() {
     // Mostra indicatore di caricamento se i post urgenti sono vuoti e stiamo ancora caricando
     if (urgentPosts.isEmpty && isLoadingPosts) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(
+            CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 16),
+            Text(
               'Caricamento comunicazioni urgenti...',
               style: TextStyle(
                 fontSize: 16,
@@ -7005,11 +7149,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.emergency, color: Colors.red, size: 28),
-              const SizedBox(width: 12),
-              const Text('Numeri di Emergenza',
+              SizedBox(width: 12),
+              Text('Numeri di Emergenza',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
@@ -7087,11 +7231,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.local_hospital, color: Colors.red, size: 28),
-              const SizedBox(width: 12),
-              const Expanded(
+              SizedBox(width: 12),
+              Expanded(
                 child: Text('Servizi Sanitari',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     maxLines: 1,
@@ -7262,7 +7406,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       height: 70,
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [primaryColor, secondaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -8252,11 +8396,11 @@ class ContactOptionsScreen extends StatelessWidget {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.emergency, color: Colors.red, size: 28),
-              const SizedBox(width: 12),
-              const Text('Numeri di Emergenza',
+              SizedBox(width: 12),
+              Text('Numeri di Emergenza',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
@@ -8333,11 +8477,11 @@ class ContactOptionsScreen extends StatelessWidget {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.local_hospital, color: Colors.red, size: 28),
-              const SizedBox(width: 12),
-              const Expanded(
+              SizedBox(width: 12),
+              Expanded(
                 child: Text('Servizi Sanitari',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     maxLines: 1,
@@ -8468,7 +8612,7 @@ class ContactOptionsScreen extends StatelessWidget {
       height: 70,
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [primaryColor, secondaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

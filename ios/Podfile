@@ -25,6 +25,8 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+platform :ios, '13.0'
+
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
@@ -48,6 +50,32 @@ post_install do |installer|
       # Fix per moduli core
       config.build_settings['DEFINES_MODULE'] = 'YES'
       config.build_settings['SWIFT_VERSION'] = '5.0'
+      
+      # Fix per cache SDK e moduli di sistema
+      config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+      config.build_settings['CLANG_MODULES_AUTOLINK'] = 'YES'
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      config.build_settings['CLANG_ENABLE_MODULE_DEBUGGING'] = 'NO'
+      
+      # Disabilita validazione moduli di sistema per evitare errori di cache
+      config.build_settings['CLANG_ANALYZER_NONNULL'] = 'NO'
+      
+      # Fix per problemi di cache moduli Swift/Objective-C
+      config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+      config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
+      config.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = '$(inherited) COCOAPODS'
+      
+      # Disabilita validazione moduli durante la build per evitare errori di cache
+      config.build_settings['CLANG_VALIDATE_MODULES'] = 'NO'
+      
+      # Permetti moduli non modulari per framework di sistema
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # Disabilita completamente la validazione dei moduli per evitare errori
+      config.build_settings['CLANG_DISABLE_MODULE_VALIDATION'] = 'YES'
+      
+      # Usa la cache moduli di default di Xcode (non personalizzata)
+      # Xcode gestirà automaticamente la cache nella DerivedData
     end
   end
 end
