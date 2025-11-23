@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:condominio/config/constants.dart' show AppConstants, jwtToken;
 
+var jwtToken;
 /// Crea l'autenticazione Basic Auth
 String createBasicAuth(String username, String password) {
   final credentials = '$username:$password';
