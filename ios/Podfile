@@ -80,6 +80,25 @@ post_install do |installer|
       
       # Disabilita la validazione dei moduli di sistema per evitare errori
       config.build_settings['CLANG_MODULES_VALIDATE_ONCE_PER_BUILD_SESSION'] = 'NO'
+      
+      # Disabilita completamente la validazione dei moduli per evitare errori di file mancanti
+      config.build_settings['CLANG_ENABLE_MODULE_IMPLEMENTATION_OF'] = 'NO'
+      config.build_settings['CLANG_MODULE_IMPLEMENTATION_OF'] = ''
     end
   end
+  
+  # Crea i file di cache mancanti prima della build
+  derived_data_dir = File.expand_path('~/Library/Developer/Xcode/DerivedData')
+  
+  # Crea il file di cache stat SDK
+  sdk_cache_dir = File.join(derived_data_dir, 'SDKStatCaches.noindex')
+  sdk_cache_file = File.join(sdk_cache_dir, 'iphonesimulator18.2-22C146-07b28473f605e47e75261259d3ef3b5a.sdkstatcache')
+  FileUtils.mkdir_p(sdk_cache_dir) unless File.directory?(sdk_cache_dir)
+  FileUtils.touch(sdk_cache_file) unless File.exist?(sdk_cache_file)
+  
+  # Crea il file di validazione moduli
+  module_cache_dir = File.join(derived_data_dir, 'ModuleCache.noindex')
+  module_validation_file = File.join(module_cache_dir, 'Session.modulevalidation')
+  FileUtils.mkdir_p(module_cache_dir) unless File.directory?(module_cache_dir)
+  FileUtils.touch(module_validation_file) unless File.exist?(module_validation_file)
 end

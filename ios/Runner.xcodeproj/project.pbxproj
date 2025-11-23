@@ -298,7 +298,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+			shellScript = "mkdir -p \"$HOME/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex\"\nmkdir -p \"$HOME/Library/Developer/Xcode/DerivedData/ModuleCache.noindex\"\ntouch \"$HOME/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator18.2-22C146-07b28473f605e47e75261259d3ef3b5a.sdkstatcache\"\ntouch \"$HOME/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation\"\n/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
 		AB885817D78E70CF8F2CD648 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
