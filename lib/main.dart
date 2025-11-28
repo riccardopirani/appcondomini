@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:mailer/mailer.dart' as mailer;
 import 'package:mailer/smtp_server.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -2015,7 +2016,15 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                         borderRadius: BorderRadius.circular(20),
                         onTap: () {
                           if (url.isNotEmpty) {
-                            _openInAppBrowser(url);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CustomWebViewScreen(
+                                  url: url,
+                                  title: title,
+                                ),
+                              ),
+                            );
                           }
                         },
                         child: Container(
@@ -2190,6 +2199,90 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
   }
 }
 
+// Schermata WebView personalizzata con pulsante di back
+class CustomWebViewScreen extends StatefulWidget {
+  final String url;
+  final String title;
+
+  const CustomWebViewScreen({
+    super.key,
+    required this.url,
+    required this.title,
+  });
+
+  @override
+  State<CustomWebViewScreen> createState() => _CustomWebViewScreenState();
+}
+
+class _CustomWebViewScreenState extends State<CustomWebViewScreen> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+  bool _canGoBack = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() {
+              _isLoading = true;
+            });
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              _isLoading = false;
+            });
+            _checkCanGoBack();
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  Future<void> _checkCanGoBack() async {
+    final canGoBack = await _controller.canGoBack();
+    if (mounted) {
+      setState(() {
+        _canGoBack = canGoBack;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_canGoBack) {
+              _controller.goBack();
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        title: Text(widget.title),
+        backgroundColor: const Color(0xFF2C3E50),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class WebcamScreen extends StatelessWidget {
   const WebcamScreen({super.key});
 
@@ -2214,8 +2307,14 @@ class WebcamScreen extends StatelessWidget {
                     colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
                   ),
                   onTap: () {
-                    _openInAppBrowser(
-                      AppSettings.webcamPorto,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomWebViewScreen(
+                          url: AppSettings.webcamPorto,
+                          title: AppLocalizations.of(context).portWebcam,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -2230,8 +2329,14 @@ class WebcamScreen extends StatelessWidget {
                     colors: [Color(0xFF27AE60), Color(0xFF229954)],
                   ),
                   onTap: () {
-                    _openInAppBrowser(
-                      AppSettings.webcamPanoramica,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomWebViewScreen(
+                          url: AppSettings.webcamPanoramica,
+                          title: AppLocalizations.of(context).panoramicWebcam,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -2247,8 +2352,14 @@ class WebcamScreen extends StatelessWidget {
                     colors: [Color(0xFFE67E22), Color(0xFFD35400)],
                   ),
                   onTap: () {
-                    _openInAppBrowser(
-                      AppSettings.stazioneMeteo,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomWebViewScreen(
+                          url: AppSettings.stazioneMeteo,
+                          title: AppLocalizations.of(context).weatherStation,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -7562,14 +7673,30 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               'Identità',
               'Dove siamo e chi siamo',
               Icons.location_on,
-              () => _openInAppBrowser(appSettings.urlDoveSiamo),
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CustomWebViewScreen(
+                    url: appSettings.urlDoveSiamo,
+                    title: 'Dove siamo',
+                  ),
+                ),
+              ),
             ),
             _buildUsefulSectionItem(
               context,
               'Numeri Utili',
               'Contatti e informazioni',
               Icons.phone,
-              () => _openInAppBrowser(appSettings.urlNumeriUtili),
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CustomWebViewScreen(
+                    url: appSettings.urlNumeriUtili,
+                    title: 'Numeri Utili',
+                  ),
+                ),
+              ),
             ),
           ],
         ),
