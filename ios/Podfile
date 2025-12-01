@@ -41,64 +41,24 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     
-    # Fix per Xcode 16.x e iOS 18
     target.build_configurations.each do |config|
+      # Imposta deployment target minimo
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'COCOAPODS=1'
       
-      # Fix per moduli core
-      config.build_settings['DEFINES_MODULE'] = 'YES'
+      # Configurazione Swift
       config.build_settings['SWIFT_VERSION'] = '5.0'
       
-      # Fix per cache SDK e moduli di sistema
-      config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-      config.build_settings['CLANG_MODULES_AUTOLINK'] = 'YES'
-      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      config.build_settings['CLANG_ENABLE_MODULE_DEBUGGING'] = 'NO'
-      
-      # Disabilita validazione moduli di sistema per evitare errori di cache
-      config.build_settings['CLANG_ANALYZER_NONNULL'] = 'NO'
-      
-      # Fix per problemi di cache moduli Swift/Objective-C
-      config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
-      config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O'
-      config.build_settings['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] = '$(inherited) COCOAPODS'
-      
-      # Disabilita validazione moduli durante la build per evitare errori di cache
+      # Fix per Xcode 16.x - disabilita validazione moduli problematica
       config.build_settings['CLANG_VALIDATE_MODULES'] = 'NO'
-      
-      # Permetti moduli non modulari per framework di sistema
+      config.build_settings['CLANG_DISABLE_MODULE_VALIDATION'] = 'YES'
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       
-      # Disabilita completamente la validazione dei moduli per evitare errori
-      config.build_settings['CLANG_DISABLE_MODULE_VALIDATION'] = 'YES'
-      
-      # Usa una cache moduli locale per evitare problemi di permessi
-      # Questo crea una cache separata per ogni build
+      # Fix per problemi di cache moduli
       config.build_settings['CLANG_MODULE_CACHE_PATH'] = '$(PROJECT_TEMP_DIR)/ModuleCache'
       
-      # Disabilita la validazione dei moduli di sistema per evitare errori
-      config.build_settings['CLANG_MODULES_VALIDATE_ONCE_PER_BUILD_SESSION'] = 'NO'
-      
-      # Disabilita completamente la validazione dei moduli per evitare errori di file mancanti
-      config.build_settings['CLANG_ENABLE_MODULE_IMPLEMENTATION_OF'] = 'NO'
-      config.build_settings['CLANG_MODULE_IMPLEMENTATION_OF'] = ''
+      # Configurazione GCC
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'COCOAPODS=1' unless config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].include?('COCOAPODS=1')
     end
   end
-  
-  # Crea i file di cache mancanti prima della build
-  derived_data_dir = File.expand_path('~/Library/Developer/Xcode/DerivedData')
-  
-  # Crea il file di cache stat SDK
-  sdk_cache_dir = File.join(derived_data_dir, 'SDKStatCaches.noindex')
-  sdk_cache_file = File.join(sdk_cache_dir, 'iphonesimulator18.2-22C146-07b28473f605e47e75261259d3ef3b5a.sdkstatcache')
-  FileUtils.mkdir_p(sdk_cache_dir) unless File.directory?(sdk_cache_dir)
-  FileUtils.touch(sdk_cache_file) unless File.exist?(sdk_cache_file)
-  
-  # Crea il file di validazione moduli
-  module_cache_dir = File.join(derived_data_dir, 'ModuleCache.noindex')
-  module_validation_file = File.join(module_cache_dir, 'Session.modulevalidation')
-  FileUtils.mkdir_p(module_cache_dir) unless File.directory?(module_cache_dir)
-  FileUtils.touch(module_validation_file) unless File.exist?(module_validation_file)
 end

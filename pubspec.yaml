@@ -7,14 +7,14 @@ environment:
   sdk: ^3.5.4
 
 dependencies:
-  http: any
-  flutter_mailer: any
+  http: ^1.2.0
+  flutter_mailer: ^2.0.0
   mailer: ^6.1.2
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  intl: any
+  intl: ^0.20.2
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.2
   connectivity_plus: ^6.1.4

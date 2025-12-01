@@ -159,10 +159,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_mailer
-      sha256: "149e51d4e3ba12f8b61e1923ff4304f308acb856b92e9d09326bec6a1ad943d6"
+      sha256: "4fffaa35e911ff5ec2e5a4ebbca62c372e99a154eb3bb2c0bf79f09adf6ecf4c"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.1"
+    version: "2.1.2"
   flutter_test:
     dependency: "direct dev"
     description: flutter
