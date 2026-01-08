@@ -13,7 +13,7 @@ class AppSettings {
   // ==========================================
 
   /// URL base del sito WordPress
-  static const String _urlSitoBase = 'https://www.new.portobellodigallura.it';
+  static const String _urlSitoBase = 'https://www.portobellodigallura.it';
 
   /// Getter per URL base del sito
   String get urlSito => _urlSitoBase;
