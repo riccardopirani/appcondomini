@@ -250,7 +250,7 @@ class ApiService {
   /// Ottiene i post leggibili per l'utente autenticato
   Future<List<Map<String, dynamic>>> fetchPosts({
     int page = 1,
-    int perPage = 20,
+    int perPage = 60,
     String orderBy = 'date',
     String order = 'DESC',
     int? category,

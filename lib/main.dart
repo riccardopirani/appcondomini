@@ -1107,7 +1107,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       debugPrint('📂 ID categoria: $categoryId');
       
       // Carica post della categoria
-      final posts = await apiService.fetchPosts(category: categoryId, perPage: 50);
+      final posts = await apiService.fetchPosts(category: categoryId, perPage: 60);
       
       if (posts.isNotEmpty) {
         debugPrint('✅ Post caricati per categoria "$categoryName": ${posts.length}');
@@ -5384,7 +5384,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       debugPrint('🔌 Tentativa caricamento post via plugin API...');
       
-      final pluginPosts = await apiService.fetchPosts(perPage: 50);
+      // 🔥 Carica TUTTI i post accessibili all'utente
+      final pluginPosts = await apiService.fetchPosts();
       
       if (pluginPosts.isNotEmpty) {
         debugPrint('✅ Plugin API: ${pluginPosts.length} post caricati');

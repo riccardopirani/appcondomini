@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PdG App API (PublishPress-safe + Categories)
  * Description: API per app mobile: login + accesso ai soli post leggibili secondo PublishPress Permissions (permessi su post/categorie). Endpoint categorie "navigabile". Hardening endpoint sensibili.
- * Version: 3.3
+ * Version: 3.4
  * Author: Portobello di Gallura
  */
 
@@ -384,9 +384,17 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     // Questo permette a PublishPress Permissions di applicare i filtri
     pdg_app_set_current_user($user_id);
 
+    // 🔥 Supporto per caricare TUTTI i post: per_page=-1 o all=1
+    $load_all = (int) ($request->get_param('all') ?: 0) === 1;
+    
     $per_page = (int) ($request->get_param('per_page') ?: 20);
-    if ($per_page < 1) $per_page = 20;
-    if ($per_page > 50) $per_page = 50;
+    if ($per_page === -1) {
+        $load_all = true;
+    }
+    if (!$load_all) {
+        if ($per_page < 1) $per_page = 20;
+        if ($per_page > 100) $per_page = 100; // Aumentato limite max per pagina
+    }
 
     $page = (int) ($request->get_param('page') ?: 1);
     if ($page < 1) $page = 1;
@@ -405,14 +413,18 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $args = [
         'post_type'        => 'post',
         'post_status'      => ['publish', 'private'],
-        'posts_per_page'   => $per_page * 6,  // oversampling per compensare filtri
-        'paged'            => $page,
+        'posts_per_page'   => $load_all ? -1 : ($per_page * 6),  // -1 = tutti, altrimenti oversampling
         'orderby'          => $orderby,
         'order'            => $order,
-        'no_found_rows'    => false,
+        'no_found_rows'    => $load_all, // Ottimizzazione se carichiamo tutto
         'suppress_filters' => false, // CRITICO: permette filtri di PublishPress
         'ignore_sticky_posts' => true,
     ];
+    
+    // Paginazione solo se non carichiamo tutto
+    if (!$load_all) {
+        $args['paged'] = $page;
+    }
 
     if ($cat > 0) {
         $args['cat'] = $cat;
@@ -421,7 +433,7 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     if (PDG_APP_DEBUG_PERMISSIONS) {
         $user = wp_get_current_user();
         $roles = implode(',', $user->roles ?: []);
-        error_log("[PDG-APP] Querying posts for user $user_id (roles: $roles), category: $cat");
+        error_log("[PDG-APP] Querying posts for user $user_id (roles: $roles), category: $cat, load_all: " . ($load_all ? 'YES' : 'NO'));
     }
 
     $query = new WP_Query($args);
@@ -435,7 +447,8 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $denied = 0;
 
     foreach (($query->posts ?: []) as $p) {
-        if (count($posts) >= $per_page) break;
+        // Se non carichiamo tutto, rispetta il limite per_page
+        if (!$load_all && count($posts) >= $per_page) break;
 
         // Normalizza WP_Post o ID
         $post_obj = null;
@@ -471,10 +484,12 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
 
     return rest_ensure_response([
         'posts'        => $posts,
-        'current_page' => $page,
+        'current_page' => $load_all ? 1 : $page,
+        'total_posts'  => count($posts),
         'total_checked' => $checked,
         'total_denied' => $denied,
-        'note'         => 'Filtered by PublishPress Permissions',
+        'load_all'     => $load_all,
+        'note'         => $load_all ? 'All readable posts loaded' : 'Filtered by PublishPress Permissions',
     ]);
 }
 
