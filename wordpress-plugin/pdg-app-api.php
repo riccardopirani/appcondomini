@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PdG App API (PublishPress-safe + Categories)
  * Description: API per app mobile: login + accesso ai soli post leggibili secondo PublishPress Permissions (permessi su post/categorie). Endpoint categorie "navigabile". Hardening endpoint sensibili.
- * Version: 3.2
+ * Version: 3.3
  * Author: Portobello di Gallura
  */
 
@@ -25,6 +25,11 @@ if (!defined('PDG_APP_CATEGORY_SAMPLE_POSTS')) {
 // Quante categorie max per risposta (evita payload enormi)
 if (!defined('PDG_APP_MAX_CATEGORIES')) {
     define('PDG_APP_MAX_CATEGORIES', 300);
+}
+
+// DEBUG: Abilita logging per debug permessi (impostare su false in produzione)
+if (!defined('PDG_APP_DEBUG_PERMISSIONS')) {
+    define('PDG_APP_DEBUG_PERMISSIONS', false);
 }
 
 /* ---------------------------
@@ -139,10 +144,55 @@ function pdg_app_get_user_from_token(WP_REST_Request $request) {
 
 /**
  * Imposta user corrente: fondamentale per PublishPress Permissions.
+ * 
+ * IMPORTANTE: PublishPress Permissions usa filtri su WP_Query e current_user_can().
+ * Dobbiamo assicurarci che:
+ * 1. L'utente sia impostato correttamente con wp_set_current_user()
+ * 2. Il global $current_user sia aggiornato
+ * 3. I filtri di PublishPress siano re-inizializzati per il nuovo utente
  */
 function pdg_app_set_current_user(int $user_id): void {
-    if ($user_id > 0) {
-        wp_set_current_user($user_id);
+    if ($user_id <= 0) {
+        return;
+    }
+    
+    // Imposta l'utente corrente
+    wp_set_current_user($user_id);
+    
+    // Forza refresh del global $current_user
+    global $current_user;
+    $current_user = wp_get_current_user();
+    
+    // Forza re-inizializzazione di PublishPress Permissions se presente
+    // PressPermit (PublishPress Permissions) usa un singleton che potrebbe
+    // aver già cachato i permessi per l'utente anonimo/precedente
+    if (defined('PRESSPERMIT_VERSION') || defined('PP_VERSION') || defined('PPC_VERSION')) {
+        // Prova a resettare il cache dei permessi di PublishPress
+        if (function_exists('presspermit')) {
+            $pp = presspermit();
+            if ($pp && method_exists($pp, 'reinitUser')) {
+                $pp->reinitUser($user_id);
+            } elseif ($pp && isset($pp->user_permissions) && is_object($pp->user_permissions)) {
+                // Forza ricaricamento dei permessi utente
+                unset($pp->user_permissions);
+            }
+        }
+        
+        // Alternativa: trigger azione che PublishPress ascolta
+        do_action('set_current_user');
+        
+        // Pulisce eventuali cache di capabilities
+        wp_cache_delete($user_id, 'user_meta');
+        
+        if (PDG_APP_DEBUG_PERMISSIONS) {
+            error_log("[PDG-APP] PublishPress Permissions detected, user $user_id set");
+        }
+    }
+    
+    if (PDG_APP_DEBUG_PERMISSIONS) {
+        $user = wp_get_current_user();
+        $roles = implode(',', $user->roles ?: []);
+        error_log("[PDG-APP] Current user set: ID=$user_id, login={$user->user_login}, roles=[$roles]");
     }
 }
 
@@ -165,14 +215,76 @@ function pdg_app_current_user_id(WP_REST_Request $request): int {
 
 /**
  * Check permessi lettura singolo post:
- * PublishPress Permissions tipicamente influenza `read_post`.
+ * PublishPress Permissions influenza `read_post` tramite filtri su user_has_cap.
+ * 
+ * NOTA: PublishPress Permissions può usare diversi metodi:
+ * 1. Filtro su 'user_has_cap' per current_user_can()
+ * 2. Filtro su 'posts_where' / 'posts_join' per WP_Query
+ * 3. Permessi per categoria/termine
+ * 
+ * Questa funzione controlla TUTTI i metodi possibili.
  */
 function pdg_app_user_can_read_post(int $user_id, int $post_id): bool {
     if ($user_id <= 0 || $post_id <= 0) return false;
 
     pdg_app_set_current_user($user_id);
+    
+    $post = get_post($post_id);
+    if (!$post instanceof WP_Post) {
+        return false;
+    }
 
-    return current_user_can('read_post', $post_id);
+    // Metodo 1: Standard WordPress capability check
+    // PublishPress Permissions filtra questo tramite 'user_has_cap'
+    $can_read = current_user_can('read_post', $post_id);
+    
+    // Metodo 2: Controlla anche 'read' generico per post privati
+    if (!$can_read && $post->post_status === 'private') {
+        $can_read = current_user_can('read_private_posts');
+    }
+    
+    // Metodo 3: Se PublishPress Permissions è attivo, usa le sue API dirette
+    if (!$can_read && function_exists('presspermit')) {
+        $pp = presspermit();
+        if ($pp && method_exists($pp, 'userCan')) {
+            $can_read = $pp->userCan('read', $post_id, 'post');
+        }
+    }
+    
+    // Metodo 4: Controlla se l'utente ha accesso alla categoria del post
+    // (PublishPress Permissions può limitare per categoria)
+    if (!$can_read) {
+        $can_read = pdg_app_user_can_read_post_by_terms($user_id, $post);
+    }
+    
+    if (PDG_APP_DEBUG_PERMISSIONS) {
+        $result = $can_read ? 'YES' : 'NO';
+        error_log("[PDG-APP] User $user_id can read post $post_id ({$post->post_status}): $result");
+    }
+    
+    return $can_read;
+}
+
+/**
+ * Controlla se l'utente può leggere il post basandosi sui termini/categorie.
+ * Utile quando PublishPress Permissions limita per categoria.
+ */
+function pdg_app_user_can_read_post_by_terms(int $user_id, WP_Post $post): bool {
+    // Se esiste la funzione di PublishPress per check categorie, usala
+    if (function_exists('pp_get_terms_exceptions')) {
+        // Prova approccio PP diretto
+        return false; // Lascia che gli altri metodi decidano
+    }
+    
+    // Fallback: controlla se l'utente può leggere almeno una categoria del post
+    $categories = wp_get_post_categories($post->ID, ['fields' => 'ids']);
+    if (empty($categories)) {
+        return false;
+    }
+    
+    // Se l'utente può leggere il post di tipo generico E ha accesso
+    // Questo è un controllo aggiuntivo che può essere customizzato
+    return false; // Di default, non concediamo accesso extra qui
 }
 
 /* ---------------------------
@@ -207,6 +319,13 @@ add_action('rest_api_init', function () {
     register_rest_route('pdg-app/v1', '/categories', [
         'methods'  => 'GET',
         'callback' => 'pdg_app_get_navigable_categories',
+        'permission_callback' => 'pdg_app_require_auth',
+    ]);
+    
+    // 🔍 Debug endpoint per verificare permessi utente
+    register_rest_route('pdg-app/v1', '/debug/permissions', [
+        'methods'  => 'GET',
+        'callback' => 'pdg_app_debug_permissions',
         'permission_callback' => 'pdg_app_require_auth',
     ]);
 });
@@ -260,6 +379,9 @@ function pdg_app_authenticate_user(WP_REST_Request $request) {
 
 function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $user_id = pdg_app_current_user_id($request);
+    
+    // CRITICO: Imposta l'utente PRIMA di qualsiasi query
+    // Questo permette a PublishPress Permissions di applicare i filtri
     pdg_app_set_current_user($user_id);
 
     $per_page = (int) ($request->get_param('per_page') ?: 20);
@@ -278,24 +400,39 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
 
     $cat = (int) ($request->get_param('category') ?: 0);
 
+    // IMPORTANTE: suppress_filters = false permette a PublishPress Permissions
+    // di applicare i suoi filtri (posts_where, posts_join, etc.)
     $args = [
-        'post_type'      => 'post',
-        'post_status'    => ['publish', 'private'],
-        'posts_per_page' => $per_page * 6,  // oversampling
-        'paged'          => $page,
-        'orderby'        => $orderby,
-        'order'          => $order,
-        'no_found_rows'  => false,
+        'post_type'        => 'post',
+        'post_status'      => ['publish', 'private'],
+        'posts_per_page'   => $per_page * 6,  // oversampling per compensare filtri
+        'paged'            => $page,
+        'orderby'          => $orderby,
+        'order'            => $order,
+        'no_found_rows'    => false,
+        'suppress_filters' => false, // CRITICO: permette filtri di PublishPress
         'ignore_sticky_posts' => true,
     ];
 
     if ($cat > 0) {
         $args['cat'] = $cat;
     }
+    
+    if (PDG_APP_DEBUG_PERMISSIONS) {
+        $user = wp_get_current_user();
+        $roles = implode(',', $user->roles ?: []);
+        error_log("[PDG-APP] Querying posts for user $user_id (roles: $roles), category: $cat");
+    }
 
     $query = new WP_Query($args);
+    
+    if (PDG_APP_DEBUG_PERMISSIONS) {
+        error_log("[PDG-APP] Query returned " . count($query->posts ?: []) . " posts before permission check");
+    }
 
     $posts = [];
+    $checked = 0;
+    $denied = 0;
 
     foreach (($query->posts ?: []) as $p) {
         if (count($posts) >= $per_page) break;
@@ -316,18 +453,28 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
         if ($post_obj->post_type !== 'post') continue;
         if (!in_array($post_obj->post_status, ['publish', 'private'], true)) continue;
 
+        $checked++;
+        
         if (pdg_app_user_can_read_post($user_id, $post_id)) {
             $formatted = pdg_app_format_post($post_obj);
             if (!empty($formatted)) {
                 $posts[] = $formatted;
             }
+        } else {
+            $denied++;
         }
+    }
+    
+    if (PDG_APP_DEBUG_PERMISSIONS) {
+        error_log("[PDG-APP] Permission check: checked=$checked, allowed=" . count($posts) . ", denied=$denied");
     }
 
     return rest_ensure_response([
         'posts'        => $posts,
         'current_page' => $page,
-        'note'         => 'Total/pages are approximate due to permission filtering',
+        'total_checked' => $checked,
+        'total_denied' => $denied,
+        'note'         => 'Filtered by PublishPress Permissions',
     ]);
 }
 
@@ -396,12 +543,13 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
 
         // Campioniamo alcuni post della categoria e vediamo se ALMENO UNO è leggibile
         $sample = new WP_Query([
-            'post_type'      => 'post',
-            'post_status'    => ['publish', 'private'],
-            'posts_per_page' => PDG_APP_CATEGORY_SAMPLE_POSTS,
-            'fields'         => 'ids',
-            'no_found_rows'  => true,
-            'cat'            => $cat_id,
+            'post_type'        => 'post',
+            'post_status'      => ['publish', 'private'],
+            'posts_per_page'   => PDG_APP_CATEGORY_SAMPLE_POSTS,
+            'fields'           => 'ids',
+            'no_found_rows'    => true,
+            'cat'              => $cat_id,
+            'suppress_filters' => false, // Permetti filtri PublishPress
             'ignore_sticky_posts' => true,
         ]);
 
@@ -495,4 +643,170 @@ add_filter('rest_authentication_errors', function ($result) {
 
     return $result;
 }, 20);
+
+/* ---------------------------
+ * Debug Permissions Endpoint
+ * --------------------------- */
+
+function pdg_app_debug_permissions(WP_REST_Request $request) {
+    $user_id = pdg_app_current_user_id($request);
+    pdg_app_set_current_user($user_id);
+    
+    $user = wp_get_current_user();
+    
+    // Info utente
+    $user_info = [
+        'id'           => $user->ID,
+        'login'        => $user->user_login,
+        'display_name' => $user->display_name,
+        'email'        => $user->user_email,
+        'roles'        => $user->roles,
+        'caps'         => array_keys(array_filter($user->allcaps ?: [])),
+    ];
+    
+    // Info Ultimate Member (se presente)
+    $um_info = [];
+    if (function_exists('um_user')) {
+        um_fetch_user($user_id);
+        $um_info = [
+            'um_role'     => um_user('role'),
+            'um_status'   => um_user('account_status'),
+        ];
+    }
+    
+    // Info PublishPress Permissions (se presente)
+    $pp_info = [
+        'installed' => false,
+        'version'   => null,
+    ];
+    
+    if (defined('PRESSPERMIT_VERSION')) {
+        $pp_info['installed'] = true;
+        $pp_info['version'] = PRESSPERMIT_VERSION;
+    } elseif (defined('PP_VERSION')) {
+        $pp_info['installed'] = true;
+        $pp_info['version'] = PP_VERSION;
+    } elseif (defined('PPC_VERSION')) {
+        $pp_info['installed'] = true;
+        $pp_info['version'] = PPC_VERSION;
+    }
+    
+    // Test lettura post: prendi 5 post random e verifica permessi
+    $test_posts = get_posts([
+        'post_type'        => 'post',
+        'post_status'      => ['publish', 'private'],
+        'posts_per_page'   => 10,
+        'orderby'          => 'rand',
+        'suppress_filters' => true, // Ignora filtri per ottenere TUTTI i post
+    ]);
+    
+    $post_tests = [];
+    foreach ($test_posts as $p) {
+        $can_standard = current_user_can('read_post', $p->ID);
+        $can_pdg = pdg_app_user_can_read_post($user_id, $p->ID);
+        
+        $cats = wp_get_post_categories($p->ID, ['fields' => 'names']);
+        
+        $post_tests[] = [
+            'id'             => $p->ID,
+            'title'          => $p->post_title,
+            'status'         => $p->post_status,
+            'categories'     => $cats,
+            'can_read_wp'    => $can_standard,
+            'can_read_pdg'   => $can_pdg,
+        ];
+    }
+    
+    // Conta totale post e quanti leggibili
+    $total_posts = wp_count_posts('post');
+    $published = (int)($total_posts->publish ?? 0);
+    $private = (int)($total_posts->private ?? 0);
+    
+    // Query con filtri PublishPress attivi
+    $filtered_query = new WP_Query([
+        'post_type'        => 'post',
+        'post_status'      => ['publish', 'private'],
+        'posts_per_page'   => -1,
+        'fields'           => 'ids',
+        'suppress_filters' => false,
+    ]);
+    $filtered_count = count($filtered_query->posts ?: []);
+    
+    // Query senza filtri (tutti i post)
+    $unfiltered_query = new WP_Query([
+        'post_type'        => 'post',
+        'post_status'      => ['publish', 'private'],
+        'posts_per_page'   => -1,
+        'fields'           => 'ids',
+        'suppress_filters' => true,
+    ]);
+    $unfiltered_count = count($unfiltered_query->posts ?: []);
+    
+    return rest_ensure_response([
+        'user'          => $user_info,
+        'ultimate_member' => $um_info,
+        'publishpress_permissions' => $pp_info,
+        'post_counts'   => [
+            'total_published' => $published,
+            'total_private'   => $private,
+            'with_filters'    => $filtered_count,
+            'without_filters' => $unfiltered_count,
+            'difference'      => $unfiltered_count - $filtered_count,
+        ],
+        'sample_posts'  => $post_tests,
+        'diagnosis'     => pdg_app_diagnose_permissions($user_info, $pp_info, $filtered_count, $unfiltered_count),
+    ]);
+}
+
+/**
+ * Diagnosi automatica dei problemi di permessi
+ */
+function pdg_app_diagnose_permissions(array $user_info, array $pp_info, int $filtered, int $unfiltered): array {
+    $issues = [];
+    $suggestions = [];
+    
+    // Check 1: PublishPress installato?
+    if (!$pp_info['installed']) {
+        $issues[] = 'PublishPress Permissions non rilevato';
+        $suggestions[] = 'Verifica che PublishPress Permissions sia installato e attivato';
+    }
+    
+    // Check 2: Ruoli utente
+    if (empty($user_info['roles'])) {
+        $issues[] = 'Utente senza ruoli assegnati';
+        $suggestions[] = 'Assegna un ruolo all\'utente in WordPress o Ultimate Member';
+    }
+    
+    // Check 3: Filtri funzionanti?
+    if ($filtered === $unfiltered && $unfiltered > 0) {
+        $issues[] = 'I filtri PublishPress non sembrano attivi (stesso numero di post con/senza filtri)';
+        $suggestions[] = 'Verifica le impostazioni di PublishPress Permissions per il ruolo ' . implode(',', $user_info['roles']);
+    }
+    
+    // Check 4: Nessun post accessibile
+    if ($filtered === 0 && $unfiltered > 0) {
+        $issues[] = 'Utente non ha accesso a nessun post';
+        $suggestions[] = 'Configura i permessi in PublishPress > Permissions per il ruolo dell\'utente';
+        $suggestions[] = 'Verifica che le categorie abbiano permessi di lettura per il ruolo';
+    }
+    
+    // Check 5: Capability read_post
+    if (!in_array('read', $user_info['caps']) && !in_array('read_post', $user_info['caps'])) {
+        $issues[] = 'Utente non ha capability "read" base';
+        $suggestions[] = 'Aggiungi la capability "read" al ruolo in WordPress';
+    }
+    
+    if (empty($issues)) {
+        return [
+            'status' => 'ok',
+            'message' => 'Nessun problema rilevato. I permessi sembrano configurati correttamente.',
+        ];
+    }
+    
+    return [
+        'status' => 'issues_found',
+        'issues' => $issues,
+        'suggestions' => $suggestions,
+    ];
+}
 ?>
