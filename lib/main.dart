@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:condominio/app_theme.dart';
 import 'package:condominio/l10n/app_localizations.dart';
 import 'package:condominio/language_provider.dart';
+import 'package:condominio/services/api_service.dart';
+import 'package:condominio/services/debug_api_service.dart';
 import 'package:condominio/setttings.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -1077,6 +1079,80 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       currentCategory = category;
       filteredPosts = categoryMap[category] ?? [];
     });
+    
+    // 🔥 CARICA POST DELLA CATEGORIA DAL PLUGIN API se autenticato
+    if (apiService.isAuthenticated) {
+      _loadPostsByCategory(category);
+    }
+  }
+
+  /// 🔥 CARICA POST DI UNA CATEGORIA DAL PLUGIN API
+  Future<void> _loadPostsByCategory(String categoryName) async {
+    try {
+      debugPrint('📂 Caricamento post per categoria: $categoryName');
+      
+      // Trova l'ID della categoria dal nome
+      final categories = await apiService.fetchCategories();
+      final category = categories.firstWhere(
+        (c) => c['name'] == categoryName && c['readable'] == true,
+        orElse: () => {},
+      );
+      
+      if (category.isEmpty) {
+        debugPrint('⚠️ Categoria "$categoryName" non trovata o non leggibile');
+        return;
+      }
+      
+      final categoryId = category['id'] as int;
+      debugPrint('📂 ID categoria: $categoryId');
+      
+      // Carica post della categoria
+      final posts = await apiService.fetchPosts(category: categoryId, perPage: 50);
+      
+      if (posts.isNotEmpty) {
+        debugPrint('✅ Post caricati per categoria "$categoryName": ${posts.length}');
+        
+        // 🔥 AGGIUNGI CATEGORIA AI POST (se non presente)
+        final postsWithCategory = posts.map((post) {
+          final postCopy = Map<String, dynamic>.from(post);
+          
+          // Se il post non ha categorie embedded, aggiungile
+          if (postCopy['_embedded'] == null || postCopy['_embedded']?['wp:term'] == null) {
+            postCopy['_embedded'] = {
+              'wp:term': [
+                [
+                  {
+                    'id': categoryId,
+                    'name': categoryName,
+                    'slug': category['slug'],
+                  }
+                ]
+              ]
+            };
+          }
+          
+          return postCopy;
+        }).toList();
+        
+        // Aggiorna la mappa delle categorie
+        setState(() {
+          categoryMap[categoryName] = postsWithCategory;
+          filteredPosts = postsWithCategory;
+        });
+        
+        // Log dei post
+        for (int i = 0; i < (posts.length > 3 ? 3 : posts.length); i++) {
+          debugPrint('   ${i + 1}. "${posts[i]['title']['rendered']}"');
+        }
+        if (posts.length > 3) {
+          debugPrint('   ... e altri ${posts.length - 3} post');
+        }
+      } else {
+        debugPrint('📭 Nessun post trovato per categoria "$categoryName"');
+      }
+    } catch (e) {
+      debugPrint('❌ Errore caricamento post categoria: $e');
+    }
   }
 
   void _goBackToCategories() {
@@ -2825,6 +2901,16 @@ class _LoginScreenState extends State<LoginScreen> {
           // Login riuscito - salva i cookie
           appSettings.setToken(cookies);
 
+          // 🔐 Tenta login con il plugin API
+          debugPrint('🔐 Tentativa login con plugin API...');
+          final apiLoginSuccess = await apiService.login(username, password);
+          
+          if (apiLoginSuccess) {
+            debugPrint('✅ Login plugin API riuscito!');
+          } else {
+            debugPrint('⚠️ Login plugin API fallito, continuo con cookie WordPress');
+          }
+
           // Salva le credenziali e i cookie
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('jwtToken', appSettings.jwtToken!);
@@ -4323,27 +4409,30 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     debugPrint('🔐 isLoggedIn: $isLoggedIn, username: $username');
 
-    // Se l'utente è loggato, assicurati che abbia un token valido
+    // Se l'utente è loggato, tenta di ottenere il token del plugin API
     if (isLoggedIn && username != null && password != null) {
-      await reloadTokenFromStorage();
-
-      debugPrint(
-          'Token dopo ricarica: ${appSettings.jwtToken != null ? "Presente" : "Mancante"}');
-      if (appSettings.jwtToken != null) {
-        debugPrint(
-            'Token contiene wordpress_logged_in: ${appSettings.jwtToken!.contains('wordpress_logged_in')}');
-        debugPrint('Token length: ${appSettings.jwtToken!.length}');
-      }
-
-      // Se il token è mancante o non valido, rigeneralo
-      if (appSettings.jwtToken == null ||
-          !appSettings.jwtToken!.contains('wordpress_logged_in')) {
-        debugPrint(
-            '⚠️ Token mancante o non valido, rigenerazione automatica...');
-        await regenerateToken();
-        await reloadTokenFromStorage();
-        debugPrint(
-            '✅ Token dopo rigenerazione: ${appSettings.jwtToken != null ? "Presente" : "Mancante"}');
+      // Prova prima a caricare il token dal servizio API
+      await apiService.loadToken();
+      
+      if (apiService.isAuthenticated) {
+        debugPrint('✅ Token API plugin valido e non scaduto');
+      } else {
+        // Se il token non è valido o scaduto, prova il login
+        debugPrint('⚠️ Token API plugin mancante o scaduto, tentativo login...');
+        final loginSuccess = await apiService.login(username, password);
+        
+        if (loginSuccess) {
+          debugPrint('✅ Login API plugin riuscito!');
+        } else {
+          debugPrint('❌ Login API plugin fallito, provo metodo legacy...');
+          // Fallback al metodo legacy per compatibilità
+          await reloadTokenFromStorage();
+          if (appSettings.jwtToken == null ||
+              !appSettings.jwtToken!.contains('wordpress_logged_in')) {
+            await regenerateToken();
+            await reloadTokenFromStorage();
+          }
+        }
       }
     } else {
       debugPrint('❌ Utente non loggato o credenziali mancanti');
@@ -4403,12 +4492,25 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final username = prefs.getString('username');
     final password = prefs.getString('password');
 
-    if (savedToken != null && username != null && password != null) {
-      if (!savedToken.contains('wordpress_logged_in')) {
-        debugPrint('Sessione scaduta durante la pausa, riautenticazione...');
+    if (username != null && password != null) {
+      // 🔌 Verifica token del plugin API
+      await apiService.loadToken();
+      if (!apiService.isAuthenticated) {
+        debugPrint('⚠️ Token API plugin scaduto, tentativo rigenerazione...');
+        final loginSuccess = await apiService.login(username, password);
+        if (loginSuccess) {
+          debugPrint('✅ Token API plugin rigenerato');
+        } else {
+          debugPrint('⚠️ Rigenerazione token API plugin fallita');
+        }
+      }
+
+      // 🍪 Verifica token WordPress legacy
+      if (savedToken != null && !savedToken.contains('wordpress_logged_in')) {
+        debugPrint('Sessione WordPress scaduta durante la pausa, riautenticazione...');
         await _autoReLoginFromHome(username, password);
-      } else {
-        debugPrint('Sessione ancora valida');
+      } else if (savedToken != null) {
+        debugPrint('Sessione WordPress ancora valida');
       }
     }
   }
@@ -4559,6 +4661,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _initializeWithTimeout(() => fetchWpMenu(), 'fetchWpMenu', 30)
           .catchError((e) {
         debugPrint('Errore caricamento menu: $e');
+      });
+
+      // 🔥 CARICA CATEGORIE DAL PLUGIN API
+      _initializeWithTimeout(() => _fetchCategoriesFromPlugin(), '_fetchCategoriesFromPlugin', 15)
+          .catchError((e) {
+        debugPrint('Errore caricamento categorie: $e');
       });
 
       if (mounted) {
@@ -4858,6 +4966,45 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// 🔥 CARICA CATEGORIE DAL PLUGIN API (v3.2+)
+  Future<void> _fetchCategoriesFromPlugin() async {
+    try {
+      if (!apiService.isAuthenticated) {
+        debugPrint('⚠️ Categorie: Token non autenticato, salto caricamento');
+        return;
+      }
+
+      debugPrint('📂 Caricamento categorie dal plugin API...');
+      
+      final categories = await apiService.fetchCategories();
+      
+      if (categories.isNotEmpty) {
+        // Filtra solo categorie leggibili
+        final readableCategories = categories
+            .where((c) => c['readable'] == true)
+            .toList();
+        
+        debugPrint('✅ Categorie caricate: ${categories.length} totali, ${readableCategories.length} leggibili');
+        
+        // Salva nella cache per uso futuro
+        if (mounted) {
+          setState(() {
+            // Puoi usare readableCategories nella UI se necessario
+          });
+        }
+        
+        // Log delle categorie leggibili
+        for (var cat in readableCategories) {
+          debugPrint('  📁 ${cat['name']} (ID: ${cat['id']})');
+        }
+      } else {
+        debugPrint('📭 Nessuna categoria ricevuta dal plugin');
+      }
+    } catch (e) {
+      debugPrint('❌ Errore caricamento categorie: $e');
+    }
+  }
+
   /// Carica post dalla cache locale
   Future<List<dynamic>> _loadPostsFromCache() async {
     try {
@@ -5038,6 +5185,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+
   Future<void> fetchPosts() async {
     try {
       debugPrint('=== INIZIO DOWNLOAD POST CON CACHE ===');
@@ -5090,15 +5238,27 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return;
       }
 
-      // Usa sempre l'autenticazione se disponibile
-      if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
-        debugPrint('Caricamento post con autenticazione...');
-        await _tryFetchUserSpecificPosts();
-        tempPosts.addAll(posts);
-      } else {
-        debugPrint('Caricamento post senza autenticazione...');
-        await _tryFetchPostsWithoutAuth();
-        tempPosts.addAll(posts);
+      // 🔌 PRIMO TENTATIVO: Usa il plugin API se autenticato
+      if (apiService.isAuthenticated) {
+        debugPrint('🔌 Provo prima con il plugin API...');
+        final pluginApiSuccess = await _tryFetchPostsViaPluginApi();
+        if (pluginApiSuccess) {
+          tempPosts.addAll(posts);
+          debugPrint('✅ Caricamento riuscito via plugin API');
+        }
+      }
+
+      // 🔄 FALLBACK: Se il plugin API non ha funzionato, usa i metodi legacy
+      if (tempPosts.isEmpty) {
+        if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
+          debugPrint('Caricamento post con autenticazione legacy...');
+          await _tryFetchUserSpecificPosts();
+          tempPosts.addAll(posts);
+        } else {
+          debugPrint('Caricamento post senza autenticazione...');
+          await _tryFetchPostsWithoutAuth();
+          tempPosts.addAll(posts);
+        }
       }
 
       // Se non ha funzionato, prova endpoint alternativi
@@ -5214,6 +5374,32 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Tenta di caricare i post usando il plugin API
+  Future<bool> _tryFetchPostsViaPluginApi() async {
+    try {
+      if (!apiService.isAuthenticated) {
+        debugPrint('⚠️ API plugin: Token non autenticato');
+        return false;
+      }
+
+      debugPrint('🔌 Tentativa caricamento post via plugin API...');
+      
+      final pluginPosts = await apiService.fetchPosts(perPage: 50);
+      
+      if (pluginPosts.isNotEmpty) {
+        debugPrint('✅ Plugin API: ${pluginPosts.length} post caricati');
+     await _processPosts(pluginPosts);
+        return true;
+      } else {
+        debugPrint('📭 Plugin API: Nessun post ricevuto');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Plugin API: Errore durante caricamento - $e');
+      return false;
+    }
+  }
+
   Future<void> _tryFetchPostsWithoutAuth() async {
     try {
       debugPrint('Tentativo 1: Caricamento post senza autenticazione');
@@ -5306,7 +5492,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             debugPrint('Post ricevuti con Basic Auth: ${data.length}');
 
             if (data.isNotEmpty) {
-              _processPosts(data);
+              await _processPosts(data);
               debugPrint('SUCCESS: Post caricati con Basic Auth!');
               return;
             }
@@ -5364,7 +5550,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             debugPrint('Post categoria ricevuti: ${data.length}');
 
             if (data.isNotEmpty) {
-              _processPosts(data);
+              await _processPosts(data);
               return;
             }
           }
@@ -5401,7 +5587,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           final data = json.decode(response.body);
           if (data is List && data.isNotEmpty) {
             debugPrint('Post trovati via admin-ajax: ${data.length}');
-            _processPosts(data);
+            await _processPosts(data);
           }
         } catch (e) {
           debugPrint('Errore parsing admin-ajax response: $e');
@@ -5448,7 +5634,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           debugPrint('Post ricevuti (user specific): ${data.length}');
 
           if (data.isNotEmpty) {
-            _processPosts(data);
+            await _processPosts(data);
             return;
           }
         } else if (response.statusCode == 401) {
@@ -5581,7 +5767,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             debugPrint('Post ricevuti da $endpoint: ${data.length}');
 
             if (data.isNotEmpty) {
-              _processPosts(data);
+              await _processPosts(data);
               return;
             }
           }
@@ -5594,13 +5780,93 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  void _processPosts(List<dynamic> data) {
+  /// 🔥 ARRICCHISCI I POST CON CATEGORIE DAL PLUGIN API
+  Future<List<dynamic>> _enrichPostsWithCategories(List<dynamic> postsToEnrich) async {
+    try {
+      debugPrint('🏷️ Arricchimento post con categorie dal plugin API...');
+      
+      // Carica le categorie dal plugin
+      final categories = await apiService.fetchCategories();
+      debugPrint('🏷️ Categorie caricate: ${categories.length}');
+      for (final cat in categories) {
+        debugPrint('   - ${cat['name']} (ID: ${cat['id']})');
+      }
+      
+      // Mappa categoria ID -> info categoria
+      final categoryMap = Map<int, Map<String, dynamic>>.fromIterable(categories,
+        key: (cat) => cat['id'] as int,
+        value: (cat) => cat as Map<String, dynamic>
+      );
+      
+      // Arricchisci ogni post
+      final enrichedPosts = postsToEnrich.map((post) {
+        final postCopy = Map<String, dynamic>.from(post);
+        
+        debugPrint('🔍 Post: "${postCopy['title']['rendered']}"');
+        debugPrint('   - Ha _embedded? ${postCopy['_embedded'] != null}');
+        debugPrint('   - Ha wp:term? ${postCopy['_embedded']?['wp:term'] != null}');
+        debugPrint('   - Ha categories field? ${postCopy['categories'] != null}');
+        
+        // Se il post non ha categorie embedded
+        if (postCopy['_embedded'] == null || postCopy['_embedded']?['wp:term'] == null) {
+          // Estrai gli ID categoria dal post se disponibili
+          final postCategories = postCopy['categories'] as List<dynamic>?;
+          
+          debugPrint('   - Category IDs: $postCategories');
+          
+          if (postCategories != null && postCategories.isNotEmpty) {
+            // Mappale le categorie
+            final categoriesList = postCategories
+              .whereType<int>()
+              .map((catId) {
+                final cat = categoryMap[catId];
+                debugPrint('   - Mapping ID $catId -> ${cat?['name'] ?? 'NOT FOUND'}');
+                return cat ?? {
+                  'id': catId,
+                  'name': 'Categoria $catId',
+                  'slug': 'categoria-$catId'
+                };
+              })
+              .toList();
+            
+            debugPrint('   - Categorie mappate: ${categoriesList.length}');
+            
+            if (categoriesList.isNotEmpty) {
+              postCopy['_embedded'] = {
+                'wp:term': [categoriesList]
+              };
+              debugPrint('  ✅ Post arricchito con ${categoriesList.length} categorie: ${categoriesList.map((c) => c['name']).join(", ")}');
+            }
+          }
+        } else {
+          debugPrint('  ℹ️ Post ha già categorie embedded');
+        }
+        
+        return postCopy;
+      }).toList();
+      
+      debugPrint('🏷️ Arricchimento completato: ${enrichedPosts.length} post');
+      return enrichedPosts;
+    } catch (e, st) {
+      debugPrint('❌ Errore arricchimento categorie: $e');
+      debugPrint('Stack trace: $st');
+      return postsToEnrich; // Ritorna i post originali se c'è errore
+    }
+  }
+
+  Future<void> _processPosts(List<dynamic> data) async {
     debugPrint('=== PROCESSAMENTO POST ===');
     debugPrint('Post ricevuti da processare: ${data.length}');
 
     if (data.isEmpty) {
       debugPrint('Nessun post da processare');
       return;
+    }
+
+    // 🔥 ARRICCHISCI CON CATEGORIE SE AUTENTICATO
+    List<dynamic> processedData = data;
+    if (apiService.isAuthenticated) {
+      processedData = await _enrichPostsWithCategories(data);
     }
 
     // 🔥 STEP 1: Salva i post urgenti correnti per confronto
@@ -5611,8 +5877,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     // Log di tutti i post ricevuti CON INFO URGENZA
     int urgentiCount = 0;
     int normaliCount = 0;
-    for (int i = 0; i < data.length; i++) {
-      final post = data[i];
+    for (int i = 0; i < processedData.length; i++) {
+      final post = processedData[i];
       final isUrg = _isUrgent(post);
       if (isUrg)
         urgentiCount++;
@@ -5623,10 +5889,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           'Post $i: "${post['title']['rendered']}" - Status: ${post['status']} - ${isUrg ? "⚠️ URGENTE" : "📰 normale"}');
     }
     debugPrint(
-        '⚠️⚠️ DALL\'API: $urgentiCount urgenti + $normaliCount normali = ${data.length} TOTALI');
+        '⚠️⚠️ DALL\'API: $urgentiCount urgenti + $normaliCount normali = ${processedData.length} TOTALI');
 
     // Con autenticazione, accetta tutti i post (pubblici e privati)
-    final filtered = data.where((post) {
+    final filtered = processedData.where((post) {
       final title = post['title']['rendered']?.toLowerCase() ?? '';
       final content = post['content']['rendered'] ?? '';
       final excerpt = post['excerpt']['rendered'] ?? '';
