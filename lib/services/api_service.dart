@@ -363,6 +363,70 @@ class ApiService {
       return [];
     }
   }
+
+  /// 🔥 Ottiene le informazioni dell'utente e i suoi ruoli
+  Future<Map<String, dynamic>?> fetchUserPermissions() async {
+    try {
+      final response = await get('/debug/permissions');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('✅ Info utente caricate');
+        
+        // Salva i ruoli nelle SharedPreferences per uso offline
+        final roles = (data['user']?['roles'] as List?)?.cast<String>() ?? [];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('user_roles', roles);
+        debugPrint('👤 Ruoli utente: $roles');
+        
+        return data;
+      }
+
+      debugPrint('❌ Errore nel caricamento info utente: ${response.statusCode}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Errore durante la richiesta info utente: $e');
+      return null;
+    }
+  }
+
+  /// 🔥 Ottiene i ruoli dell'utente (da cache o API)
+  Future<List<String>> getUserRoles() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedRoles = prefs.getStringList('user_roles');
+      
+      if (cachedRoles != null && cachedRoles.isNotEmpty) {
+        debugPrint('👤 Ruoli utente (cache): $cachedRoles');
+        return cachedRoles;
+      }
+      
+      // Se non in cache, carica dall'API
+      if (isAuthenticated) {
+        final permissions = await fetchUserPermissions();
+        if (permissions != null) {
+          final roles = (permissions['user']?['roles'] as List?)?.cast<String>() ?? [];
+          return roles;
+        }
+      }
+      
+      return [];
+    } catch (e) {
+      debugPrint('❌ Errore recupero ruoli utente: $e');
+      return [];
+    }
+  }
+
+  /// 🔥 Verifica se l'utente ha un ruolo specifico
+  Future<bool> hasRole(String role) async {
+    final roles = await getUserRoles();
+    return roles.contains(role);
+  }
+
+  /// 🔥 Verifica se l'utente è un proprietario (um_proprietari)
+  Future<bool> isProprietario() async {
+    return await hasRole('um_proprietari');
+  }
 }
 
 /// Istanza globale del servizio API

@@ -958,6 +958,13 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   String currentCategory = '';
   Map<String, List<dynamic>> categoryMap = {};
   String currentLanguage = 'it';
+  
+  // 🔥 Ruoli utente per filtrare categorie
+  List<String> _userRoles = [];
+  bool _rolesLoaded = false;
+  
+  // 🔥 Categorie dall'API (per mostrare tutte le categorie disponibili)
+  List<Map<String, dynamic>> _apiCategories = [];
 
   @override
   void initState() {
@@ -971,6 +978,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       currentCategory = 'Tutti i post';
     }
 
+    // 🔥 Carica i ruoli utente
+    _loadUserRoles();
+
     if (currentLanguage != 'it') {
       _translatePostsOnInit();
     } else {
@@ -979,6 +989,90 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     }
 
     languageProvider.addListener(_onLanguageChanged);
+  }
+
+  /// 🔥 Carica i ruoli dell'utente per filtrare le categorie
+  Future<void> _loadUserRoles() async {
+    try {
+      debugPrint('👤 Inizio caricamento ruoli utente...');
+      
+      // Prima prova dalla cache
+      List<String> roles = await apiService.getUserRoles();
+      
+      // Se la cache è vuota e siamo autenticati, forza il caricamento dall'API
+      if (roles.isEmpty && apiService.isAuthenticated) {
+        debugPrint('👤 Cache vuota, carico ruoli dall\'API...');
+        final permissions = await apiService.fetchUserPermissions();
+        if (permissions != null) {
+          roles = (permissions['user']?['roles'] as List?)?.cast<String>() ?? [];
+        }
+      }
+      
+      // 🔥 PRIMA imposta i ruoli
+      if (mounted) {
+        setState(() {
+          _userRoles = roles;
+          _rolesLoaded = true;
+        });
+        debugPrint('✅ Ruoli utente caricati: $_userRoles');
+      }
+      
+      // 🔥 POI carica le categorie dall'API
+      if (apiService.isAuthenticated) {
+        final categories = await apiService.fetchCategories();
+        if (categories.isNotEmpty && mounted) {
+          debugPrint('📁 Categorie API caricate: ${categories.length}');
+          for (final cat in categories) {
+            debugPrint('   - ${cat['name']} (readable: ${cat['readable']})');
+          }
+          
+          setState(() {
+            _apiCategories = categories;
+          });
+          
+          // 🔥 INFINE ricostruisci la mappa categorie
+          _buildCategoryMap();
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Errore caricamento ruoli: $e');
+      if (mounted) {
+        setState(() {
+          _rolesLoaded = true;
+        });
+      }
+    }
+  }
+
+  /// 🔥 Verifica se l'utente può vedere una categoria
+  bool _canViewCategory(String categoryName) {
+    debugPrint('🔍 Controllo categoria "$categoryName" - Ruoli utente: $_userRoles');
+    
+    // Categorie riservate ai proprietari (um_proprietari)
+    // Queste categorie sono visibili SOLO ai proprietari
+    const categorieRiservateProprietari = [
+      'documenti',
+      'documenti condominio', 
+      'documentazione ridosso',
+    ];
+    
+    final categoryLower = categoryName.toLowerCase().trim();
+    
+    // Verifica se questa categoria è riservata ai proprietari
+    final isRiservata = categorieRiservateProprietari.any((c) => 
+        categoryLower == c || 
+        categoryLower.contains(c) ||
+        c.contains(categoryLower));
+    
+    if (isRiservata) {
+      // L'utente deve avere il ruolo um_proprietari per vedere questa categoria
+      final canView = _userRoles.contains('um_proprietari');
+      debugPrint('📁 Categoria "$categoryName" riservata - Può vedere: $canView');
+      return canView;
+    }
+    
+    // Tutte le altre categorie sono visibili a tutti
+    return true;
   }
 
   Future<void> _translatePostsOnInit() async {
@@ -1049,7 +1143,17 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   void _buildCategoryMap() {
-    categoryMap.clear();
+    // 🔥 NON fare clear() per preservare le categorie dall'API
+    // Invece, ricostruisci mantenendo le categorie vuote dall'API
+    final apiCategoryNames = _apiCategories.map((c) => c['name'] as String? ?? '').toSet();
+    
+    // Pulisci solo le categorie che NON vengono dall'API
+    categoryMap.removeWhere((key, value) => !apiCategoryNames.contains(key));
+    
+    // Svuota i post delle categorie esistenti (verranno riaggiunti)
+    for (final key in categoryMap.keys) {
+      categoryMap[key] = [];
+    }
 
     // Recupera la localizzazione in modo sicuro
     String withoutCategoryText = 'Senza categoria';
@@ -1061,6 +1165,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           '⚠️ Errore caricamento localizzazioni in _buildCategoryMap: $e');
     }
 
+    // Aggiungi i post alle rispettive categorie
     for (final post in translatedPosts) {
       final categories = post['_embedded']?['wp:term']?[0];
       final names = (categories != null && categories.isNotEmpty)
@@ -1071,6 +1176,17 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
         categoryMap.putIfAbsent(name, () => []).add(post);
       }
     }
+    
+    // 🔥 Aggiungi categorie dall'API che non sono ancora nella mappa
+    for (final cat in _apiCategories) {
+      final catName = cat['name'] as String? ?? '';
+      if (catName.isNotEmpty && !categoryMap.containsKey(catName)) {
+        categoryMap[catName] = [];
+        debugPrint('📁 Categoria API aggiunta: $catName');
+      }
+    }
+    
+    debugPrint('📁 CategoryMap finale: ${categoryMap.keys.toList()}');
   }
 
   void _showCategoryPosts(String category) {
@@ -1285,7 +1401,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   Widget _buildCategoriesView() {
-    final categories = categoryMap.keys.toList()..sort();
+    // 🔥 Filtra categorie in base ai ruoli utente
+    final allCategories = categoryMap.keys.toList()..sort();
+    final categories = allCategories.where((cat) => _canViewCategory(cat)).toList();
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -1545,6 +1663,76 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                     foregroundColor: AppColors.primary,
                   ),
                 ),
+            ],
+          ),
+        ),
+
+        // 🔥 Banner informativo
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFB71C1C).withOpacity(0.1),
+                const Color(0xFF1A1A1A).withOpacity(0.05),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFFB71C1C).withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB71C1C).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFFB71C1C),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: RichText(
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: 'Tramite app ',
+                        style: TextStyle(
+                          color: Color(0xFF1A1A1A),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'sono disponibili solo ',
+                        style: TextStyle(
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'gli ultimi 50 articoli',
+                        style: TextStyle(
+                          color: Color(0xFFB71C1C),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
