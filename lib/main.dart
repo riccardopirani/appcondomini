@@ -1050,7 +1050,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     
     // Categorie riservate ai proprietari (um_proprietari)
     // Queste categorie sono visibili SOLO ai proprietari
+    // TUTTO in minuscolo per confronto case-insensitive
     const categorieRiservateProprietari = [
+      'avvisi',
       'documenti',
       'documenti condominio', 
       'documentazione ridosso',
@@ -1059,12 +1061,14 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     final categoryLower = categoryName.toLowerCase().trim();
     
     // Verifica se questa categoria è riservata ai proprietari
+    // Confronto esatto o parziale (case-insensitive)
     final isRiservata = categorieRiservateProprietari.any((c) => 
         categoryLower == c || 
         categoryLower.contains(c) ||
         c.contains(categoryLower));
-    
+    print('isRiserverd: '+isRiservata.toString()+' cateogru: categoryLower');
     if (isRiservata) {
+       print('isRiserverd: '+isRiservata.toString()+' cateogru: categoryLower');
       // L'utente deve avere il ruolo um_proprietari per vedere questa categoria
       final canView = _userRoles.contains('um_proprietari');
       debugPrint('📁 Categoria "$categoryName" riservata - Può vedere: $canView');
@@ -1401,9 +1405,13 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   Widget _buildCategoriesView() {
-    // 🔥 Filtra categorie in base ai ruoli utente
+    // 🔥 Filtra categorie in base ai ruoli utente E che abbiano almeno 1 post
     final allCategories = categoryMap.keys.toList()..sort();
-    final categories = allCategories.where((cat) => _canViewCategory(cat)).toList();
+    final categories = allCategories.where((cat) {
+      final hasPost = (categoryMap[cat]?.length ?? 0) > 0;
+      final canView = _canViewCategory(cat);
+      return hasPost && canView;
+    }).toList();
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
