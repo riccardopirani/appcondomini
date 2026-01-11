@@ -4612,18 +4612,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _testWordPressAPI() async {
+  /// Testa la disponibilità dell'API WordPress.
+  /// Restituisce true se il server risponde, false altrimenti.
+  /// In caso di fallimento, marca il server come non disponibile.
+  Future<bool> _testWordPressAPI() async {
     try {
       debugPrint('Test API WordPress 6.8.2...');
 
-      // Test endpoint base
-      final response = await http.get(
-        Uri.parse('${appSettings.urlApi}'),
-        headers: {
-          'User-Agent': 'Flutter App/1.0',
-          'Accept': 'application/json',
-        },
-      );
+      // Test endpoint base con timeout
+      final response = await http
+          .get(
+            Uri.parse('${appSettings.urlApi}'),
+            headers: {
+              'User-Agent': 'Flutter App/1.0',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
 
       debugPrint('WordPress API Status: ${response.statusCode}');
 
@@ -4632,13 +4637,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint('WordPress API disponibile: ${data['name']}');
         debugPrint('WordPress versione: ${data['version']}');
 
+        // Server disponibile, marca come tale
+        appSettings.markServerAvailable();
+
         // Test se ci sono post disponibili
         await _testPostsAvailability();
+        return true;
       } else {
         debugPrint('WordPress API non accessibile: ${response.statusCode}');
+        appSettings.markServerUnavailable();
+        return false;
       }
     } catch (e) {
       debugPrint('Errore test WordPress API: $e');
+      // Server non risponde, marca come non disponibile
+      appSettings.markServerUnavailable();
+      return false;
     }
   }
 
@@ -5049,6 +5063,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint('📭 Nessuna cache trovata, scarico dal server...');
       }
 
+      // 🚫 CONTROLLA SE IL SERVER È DISPONIBILE PRIMA DI FARE CHIAMATE REST
+      if (!appSettings.isServerAvailable) {
+        debugPrint(
+            '🚫 Server non disponibile, skip chiamate REST. Uso solo cache.');
+        if (cachedPosts.isEmpty) {
+          setState(() {
+            isLoadingPosts = false;
+          });
+        }
+        return;
+      }
+
       // 🌐 STEP 2: Prova a scaricare nuovi post dal server (in background)
       debugPrint(
           'JWT Token disponibile: ${appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty}');
@@ -5058,7 +5084,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final tempPosts = <dynamic>[];
 
       // Prima verifica che l'API REST sia accessibile
-      await _testWordPressAPI();
+      final serverOk = await _testWordPressAPI();
+      if (!serverOk) {
+        debugPrint('🚫 Server non risponde, uso solo cache');
+        return;
+      }
 
       // Usa sempre l'autenticazione se disponibile
       if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {

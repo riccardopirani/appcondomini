@@ -3,10 +3,66 @@
 /// Tutte le configurazioni dell'app sono centralizzate qui per facilitare
 /// la manutenzione e le modifiche.
 
+import 'package:flutter/foundation.dart';
+
 class AppSettings {
   // Singleton pattern
   AppSettings._();
   static final AppSettings instance = AppSettings._();
+
+  // ==========================================
+  // CONTROLLO DISPONIBILITÀ SERVER
+  // ==========================================
+
+  /// Indica se il server è attualmente disponibile
+  bool _serverAvailable = true;
+
+  /// Timestamp dell'ultimo fallimento del server
+  DateTime? _lastServerFailure;
+
+  /// Durata in secondi prima di riprovare dopo un fallimento
+  static const int serverRetryDelaySeconds = 30;
+
+  /// Getter per verificare se il server è disponibile
+  bool get isServerAvailable {
+    if (_serverAvailable) return true;
+
+    // Se il server era non disponibile, controlla se è passato abbastanza tempo
+    if (_lastServerFailure != null) {
+      final elapsed = DateTime.now().difference(_lastServerFailure!).inSeconds;
+      if (elapsed >= serverRetryDelaySeconds) {
+        // Tempo scaduto, permetti un nuovo tentativo
+        _serverAvailable = true;
+        debugPrint(
+            '🔄 Server retry: passati $elapsed secondi, permetto nuovo tentativo');
+        return true;
+      }
+      debugPrint(
+          '⏳ Server non disponibile: aspetta ancora ${serverRetryDelaySeconds - elapsed} secondi');
+      return false;
+    }
+    return false;
+  }
+
+  /// Segna il server come non disponibile
+  void markServerUnavailable() {
+    _serverAvailable = false;
+    _lastServerFailure = DateTime.now();
+    debugPrint('❌ Server marcato come non disponibile');
+  }
+
+  /// Segna il server come disponibile
+  void markServerAvailable() {
+    _serverAvailable = true;
+    _lastServerFailure = null;
+    debugPrint('✅ Server marcato come disponibile');
+  }
+
+  /// Resetta lo stato del server
+  void resetServerStatus() {
+    _serverAvailable = true;
+    _lastServerFailure = null;
+  }
 
   // ==========================================
   // CONFIGURAZIONI SITO WEB
