@@ -80,7 +80,7 @@ class AppSettings {
   /// URL della pagina "Numeri utili"
   String get urlNumeriUtili => '$_urlSitoBase/numeri-util/';
 
-  /// URL della pagina "Parco di Portobello" (Contatti)
+  /// URL della pagina contatti
   String get urlParcoPortobello => _urlSitoBase;
 
   /// URL della home page del sito

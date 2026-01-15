@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:condominio/app_theme.dart';
 import 'package:condominio/l10n/app_localizations.dart';
 import 'package:condominio/language_provider.dart';
@@ -165,9 +166,9 @@ Future<void> sendEmail({
 
     // Crea il messaggio
     final message = mailer.Message()
-      ..from = const mailer.Address(smtpUsername, 'Portobello di Gallura')
+      ..from = const mailer.Address(smtpUsername, 'App Condominio')
       ..recipients.add(to)
-      ..subject = subject ?? 'Messaggio dall\'app Portobello'
+      ..subject = subject ?? 'Messaggio dall\'app Condominio'
       ..text = body ?? '';
 
     // Aggiungi reply-to se fornito
@@ -703,7 +704,15 @@ Future<bool> _updateNotificationPermissionStatus(
   bool androidGranted = _androidNotificationsGranted;
   bool iosGranted = _iosNotificationsGranted;
 
-  if (Platform.isAndroid) {
+  // 🔥 Su Web, le notifiche locali non sono supportate - ritorna true per evitare blocchi
+  if (kIsWeb) {
+    _notificationsPermissionGranted = true;
+    _androidNotificationsGranted = true;
+    _iosNotificationsGranted = true;
+    return true;
+  }
+
+  if (!kIsWeb && Platform.isAndroid) {
     final androidImplementation =
         flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
@@ -729,7 +738,7 @@ Future<bool> _updateNotificationPermissionStatus(
     androidGranted = true;
   }
 
-  if (Platform.isIOS) {
+  if (!kIsWeb && Platform.isIOS) {
     final iosImplementation =
         flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin>();
@@ -763,6 +772,14 @@ Future<bool> _updateNotificationPermissionStatus(
 
 // Funzione per inizializzare le notifiche locali
 Future<void> initializeNotifications() async {
+  // 🔥 Su Web, le notifiche locali non sono supportate
+  if (kIsWeb) {
+    debugPrint('🌐 Web: Notifiche locali non supportate, skip inizializzazione');
+    _notificationsPermissionGranted = true;
+    _hasRequestedNotificationPermissions = true;
+    return;
+  }
+
   // Configurazione Android
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -854,6 +871,12 @@ Future<void> showLocalNotification({
   required String body,
   String? payload,
 }) async {
+  // 🔥 Su Web, le notifiche locali non sono supportate
+  if (kIsWeb) {
+    debugPrint('🌐 Web: Notifica "$title" non mostrata (non supportato)');
+    return;
+  }
+
   // Configurazione Android
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'urgent_channel', // ID canale
@@ -3395,8 +3418,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               TextButton(
                                 onPressed: () {
-                                  launchUrl(Uri.parse(
-                                      '${appSettings.urlLogin}?action=register'));
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CustomWebViewScreen(
+                                        url: '${appSettings.urlLogin}?action=register',
+                                        title: 'Registrazione',
+                                      ),
+                                    ),
+                                  );
                                 },
                                 child: const Text(
                                   'Registrati',
@@ -3408,8 +3438,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               TextButton(
                                 onPressed: () {
-                                  launchUrl(Uri.parse(
-                                      '${appSettings.urlLogin}?action=lostpassword'));
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CustomWebViewScreen(
+                                        url: '${appSettings.urlLogin}?action=lostpassword',
+                                        title: 'Recupero Password',
+                                      ),
+                                    ),
+                                  );
                                 },
                                 child: const Text(
                                   'Password\ndimenticata?',
@@ -6412,7 +6449,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   child: Column(
                     children: [
                       Text(
-                        AppLocalizations.of(context).portoBello,
+                        'App Condominio',
                         style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -7852,7 +7889,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Guardia medica Portobello',
+                const Text('Guardia medica',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
@@ -8241,7 +8278,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           children: [
             Icon(Icons.location_on, color: AppColors.primary),
             SizedBox(width: 8),
-            Text('Parco di Portobello'),
+            Text('Contatti'),
           ],
         ),
         content: SingleChildScrollView(
@@ -8250,7 +8287,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Parco Residenziale Portobello di Gallura',
+                'Parco Residenziale',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const Text('07020 Aglientu (SS)'),
@@ -8594,7 +8631,7 @@ class AppInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Benvenuto nell\'applicazione ufficiale del Portobello di Gallura. '
+                      'Benvenuto nell\'applicazione ufficiale del condominio. '
                       'Questa app ti permette di rimanere sempre aggiornato sulle novità '
                       'del condominio e di accedere rapidamente ai servizi disponibili.',
                       style: TextStyle(
@@ -9114,7 +9151,7 @@ class ContactOptionsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Guardia medica Portobello',
+                const Text('Guardia medica',
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
@@ -9402,7 +9439,7 @@ Messaggio:
 $messageText
 
 ---
-Inviato dall'app Portobello di Gallura
+Inviato dall'app Condominio
       ''';
 
       // Invia email via SMTP
@@ -9636,6 +9673,7 @@ class PostDetailScreen extends StatelessWidget {
     final authorId = post['author'] ?? 0;
     final status = post['status'] ?? '';
     final date = post['date'] ?? '';
+    final url = post['link'] ?? '';
     final categories = post['_embedded']?['wp:term']?[0];
     final categoryNames = (categories != null && categories.isNotEmpty)
         ? categories.map<String>((c) => (c['name'] ?? '') as String).join(', ')
@@ -9652,6 +9690,37 @@ class PostDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Messaggio informativo sui contenuti multimediali
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.red[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red[300]!, width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.red[700],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'I contenuti multimediali sono visibili aprendo il link web',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Titolo
             Text(
               title,
@@ -9758,6 +9827,69 @@ class PostDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            // Bottone per aprire il link web
+            if (url.isNotEmpty)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final uri = Uri.parse(url);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Impossibile aprire il link. Verifica la connessione internet.',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Errore nell\'apertura del link: ${e.toString()}',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_browser, color: Colors.white),
+                  label: const Text(
+                    'Apri link web',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondaryBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 4,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
