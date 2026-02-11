@@ -14,7 +14,7 @@ class AppLocalizations {
 
   static final Map<String, Map<String, String>> _localizedValues = {
     'it': {
-      'app_title': 'Condominio App',
+      'app_title': 'App Condominio',
       'porto_bello': 'App Condominio',
       'porto_di_gallura': 'Porto di Gallura',
 
@@ -109,7 +109,7 @@ class AppLocalizations {
       'message_required': 'Messaggio *',
     },
     'en': {
-      'app_title': 'Condo App',
+      'app_title': 'App Condominio',
       'porto_bello': 'App Condominio',
       'porto_di_gallura': 'Port of Gallura',
 
@@ -204,7 +204,7 @@ class AppLocalizations {
       'message_required': 'Message *',
     },
     'fr': {
-      'app_title': 'App Condominium',
+      'app_title': 'App Condominio',
       'porto_bello': 'App Condominio',
       'porto_di_gallura': 'Port de Gallura',
 

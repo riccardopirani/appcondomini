@@ -1,7 +1,7 @@
 name: condominio
 description: "App Condominio"
 publish_to: 'none'
-version: 1.0.3+7
+version: 1.1.1+9
 
 environment:
   sdk: ^3.5.4

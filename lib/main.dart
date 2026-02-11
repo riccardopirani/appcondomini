@@ -2801,7 +2801,7 @@ class _MyAppState extends State<MyApp> {
       key: ValueKey(languageProvider
           .locale.languageCode), // Forza rebuild quando cambia lingua
       navigatorKey: navigatorKey,
-      title: 'Condominio App',
+      title: 'App Condominio',
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       locale: languageProvider.locale,
@@ -2827,11 +2827,15 @@ class MyHomePage extends StatefulWidget {
       {super.key,
       required this.title,
       required this.userEmail,
-      required this.userName});
+      required this.userName,
+      this.isGuest = false,
+      this.isDemoMode = false});
 
   final String title;
   final String userEmail;
   final String userName;
+  final bool isGuest;
+  final bool isDemoMode;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -3055,6 +3059,45 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+
+  Future<void> _continueAsGuest() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isGuest', true);
+    await prefs.setBool('demoMode', false);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MyHomePage(
+          key: homePageKey,
+          title: '',
+          userEmail: '',
+          userName: '',
+          isGuest: true,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _enableDemoModeForReview() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isGuest', true);
+    await prefs.setBool('demoMode', true);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MyHomePage(
+          key: homePageKey,
+          title: '',
+          userEmail: '',
+          userName: '',
+          isGuest: true,
+          isDemoMode: true,
+        ),
+      ),
+    );
+  }
 
   Future<void> handleLogin(String username, String password) async {
     if (_isLoading) return;
@@ -3458,6 +3501,25 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: _isLoading ? null : _continueAsGuest,
+                                icon: const Icon(Icons.person_outline),
+                                label: const Text('Continua come ospite'),
+                              ),
+                              TextButton(
+                                onPressed:
+                                    _isLoading ? null : _enableDemoModeForReview,
+                                child: const Text(
+                                  'Modalità demo',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -3542,6 +3604,7 @@ class _SplashScreenState extends State<SplashScreen>
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString('jwtToken');
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final isDemoMode = prefs.getBool('demoMode') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
 
@@ -3551,6 +3614,27 @@ class _SplashScreenState extends State<SplashScreen>
     debugPrint('- isLoggedIn: $isLoggedIn');
     debugPrint('- Username: ${username != null ? "Presente" : "Assente"}');
     debugPrint('- Password: ${password != null ? "Presente" : "Assente"}');
+
+    // Se è in demo mode, entra direttamente in home (senza login)
+    if (isDemoMode) {
+      debugPrint('🧪 Demo mode attivo: apro Home senza login');
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MyHomePage(
+              key: homePageKey,
+              title: '',
+              userEmail: '',
+              userName: '',
+              isGuest: true,
+              isDemoMode: true,
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     // Se l'utente ha fatto login almeno una volta, mantienilo loggato
     if (isLoggedIn && username != null && password != null) {
@@ -3580,12 +3664,19 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } else {
-      debugPrint('❌ Nessun login precedente, mostra onboarding');
-      // Mostra l'onboarding che porta al login
+      debugPrint('👤 Nessun login precedente: apro Home in modalità Ospite');
       if (context.mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          MaterialPageRoute(
+            builder: (context) => MyHomePage(
+              key: homePageKey,
+              title: '',
+              userEmail: '',
+              userName: '',
+              isGuest: true,
+            ),
+          ),
         );
       }
     }
@@ -3748,6 +3839,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late List<dynamic> translatedPosts = []; // Post tradotti
   String currentLanguage = 'it';
   bool isLoggedIn = false;
+  bool _isGuestMode = false;
+  bool _isDemoMode = false;
   int _selectedIndex = 0;
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
@@ -4291,6 +4384,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final originalUsername = prefs.getString('originalUsername');
     final originalEmail = prefs.getString('originalEmail');
 
+    final bool guest = widget.isGuest || (prefs.getBool('isGuest') ?? false);
+    final bool demo = widget.isDemoMode || (prefs.getBool('demoMode') ?? false);
+    if (guest || demo) {
+      if (!mounted) return;
+      setState(() {
+        isLoggedIn = false;
+        userData = {
+          'name': demo ? 'Demo' : 'Ospite',
+          'email': '',
+          'id': 0,
+        };
+        isLoadingUserData = false;
+      });
+      return;
+    }
+
     if (savedToken != null && savedToken.isNotEmpty) {
       appSettings.setToken(savedToken);
       isLoggedIn = true;
@@ -4636,14 +4745,24 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     debugPrint('=== INIZIALIZZAZIONE CON RICARICA TOKEN ===');
 
     final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final storedIsLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    _isGuestMode = widget.isGuest || (prefs.getBool('isGuest') ?? false);
+    _isDemoMode = widget.isDemoMode || (prefs.getBool('demoMode') ?? false);
     final username = prefs.getString('username');
     final password = prefs.getString('password');
 
-    debugPrint('🔐 isLoggedIn: $isLoggedIn, username: $username');
+    debugPrint(
+        '🔐 isLoggedIn: $storedIsLoggedIn, guest=$_isGuestMode, demo=$_isDemoMode, username: $username');
+
+    // Demo/Guest: non serve token login per vedere funzioni non account-based
+    if (_isGuestMode || _isDemoMode) {
+      isLoggedIn = false;
+      await _initializeData();
+      return;
+    }
 
     // Se l'utente è loggato, tenta di ottenere il token del plugin API
-    if (isLoggedIn && username != null && password != null) {
+    if (storedIsLoggedIn && username != null && password != null) {
       // Prova prima a caricare il token dal servizio API
       await apiService.loadToken();
       
@@ -5423,6 +5542,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     try {
       debugPrint('=== INIZIO DOWNLOAD POST CON CACHE ===');
 
+      // 🧪 DEMO MODE: carica contenuti fittizi (utile per App Review)
+      if (_isDemoMode || widget.isDemoMode) {
+        final demoPosts = _buildDemoPosts();
+        setState(() {
+          posts = demoPosts;
+          urgentPosts = _extractUrgentPosts(demoPosts);
+          translatedPosts = demoPosts;
+          isLoadingPosts = false;
+        });
+        return;
+      }
+
       // 🎯 STEP 1: Carica dalla cache locale (immediato)
       final cachedPosts = await _loadPostsFromCache();
       if (cachedPosts.isNotEmpty) {
@@ -5605,6 +5736,66 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     } finally {
       _schedulePendingNotificationNavigation();
     }
+  }
+
+  List<dynamic> _buildDemoPosts() {
+    final now = DateTime.now();
+    return [
+      {
+        'id': 900001,
+        'date': now.toIso8601String(),
+        'status': 'publish',
+        'link': 'https://example.com/post/demo-1',
+        'title': {'rendered': 'Benvenuto (Demo)'},
+        'excerpt': {'rendered': 'Esempio di news per la revisione App Store.'},
+        'content': {
+          'rendered':
+              '<p>Questa è una comunicazione di esempio. Per vedere media, usa “Apri link web”.</p>'
+        },
+        '_embedded': {
+          'wp:term': [
+            [
+              {'name': 'News'}
+            ]
+          ]
+        }
+      },
+      {
+        'id': 900002,
+        'date': now.subtract(const Duration(days: 1)).toIso8601String(),
+        'status': 'private',
+        'link': 'https://example.com/post/demo-2',
+        'title': {'rendered': 'Comunicazione privata (Demo)'},
+        'excerpt': {'rendered': 'Esempio di contenuto account-based.'},
+        'content': {
+          'rendered':
+              '<p>Questo contenuto simula una sezione riservata. In demo mode è visibile per la review.</p>'
+        },
+        '_embedded': {
+          'wp:term': [
+            [
+              {'name': 'Articoli'}
+            ]
+          ]
+        }
+      },
+      {
+        'id': 900003,
+        'date': now.subtract(const Duration(hours: 6)).toIso8601String(),
+        'status': 'publish',
+        'link': 'https://example.com/post/demo-3',
+        'title': {'rendered': 'Comunicazione urgente (Demo)'},
+        'excerpt': {'rendered': 'Esempio di post urgente.'},
+        'content': {'rendered': '<p>Questa è una comunicazione urgente di esempio.</p>'},
+        '_embedded': {
+          'wp:term': [
+            [
+              {'name': 'Urgente'}
+            ]
+          ]
+        }
+      },
+    ];
   }
 
   /// Tenta di caricare i post usando il plugin API
@@ -6586,20 +6777,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   ),
                 ),
 
-                // Logout
+                // Logout / Login
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE53935),
+                      color: isLoggedIn ? const Color(0xFFE53935) : Colors.green,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: ListTile(
-                      leading: const Icon(Icons.logout,
+                      leading: Icon(isLoggedIn ? Icons.logout : Icons.login,
                           color: Colors.white, size: 24),
                       title: Text(
-                        AppLocalizations.of(context).logout,
+                        isLoggedIn
+                            ? AppLocalizations.of(context).logout
+                            : 'Accedi',
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -6607,6 +6800,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       ),
                       onTap: () async {
                         Navigator.of(context).pop();
+
+                        if (!isLoggedIn) {
+                          if (context.mounted) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (context) => const LoginScreen()),
+                            );
+                          }
+                          return;
+                        }
 
                         // Mostra dialogo di conferma
                         final conferma = await showDialog<bool>(
@@ -8805,13 +9008,14 @@ class _NoAccessMessageState extends State<NoAccessMessage>
               ),
             ],
           ),
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lock_outline, color: Color(0xFF1ABC9C), size: 40),
-              SizedBox(height: 12),
-              Text(
-                'Non hai accesso a questi post',
+              const Icon(Icons.lock_outline,
+                  color: Color(0xFF1ABC9C), size: 40),
+              const SizedBox(height: 12),
+              const Text(
+                'Contenuti non disponibili',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -8819,14 +9023,56 @@ class _NoAccessMessageState extends State<NoAccessMessage>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                'Contatta l’amministratore per ottenere i permessi necessari.',
+              const SizedBox(height: 8),
+              const Text(
+                'Puoi accedere come utente, oppure attivare la modalità demo per la revisione.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.black54,
                 ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (context) => const LoginScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.login),
+                    label: const Text('Accedi'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('isGuest', true);
+                      await prefs.setBool('demoMode', true);
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) => MyHomePage(
+                            key: homePageKey,
+                            title: '',
+                            userEmail: '',
+                            userName: '',
+                            isGuest: true,
+                            isDemoMode: true,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Modalità demo'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondaryBlue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
