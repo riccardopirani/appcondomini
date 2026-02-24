@@ -166,9 +166,9 @@ Future<void> sendEmail({
 
     // Crea il messaggio
     final message = mailer.Message()
-      ..from = const mailer.Address(smtpUsername, 'App Condominio')
+      ..from = const mailer.Address(smtpUsername, 'Porti Italiani')
       ..recipients.add(to)
-      ..subject = subject ?? 'Messaggio dall\'app Condominio'
+      ..subject = subject ?? 'Messaggio dall\'app Porti Italiani'
       ..text = body ?? '';
 
     // Aggiungi reply-to se fornito
@@ -2801,7 +2801,7 @@ class _MyAppState extends State<MyApp> {
       key: ValueKey(languageProvider
           .locale.languageCode), // Forza rebuild quando cambia lingua
       navigatorKey: navigatorKey,
-      title: 'App Condominio',
+      title: 'Porti Italiani',
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       locale: languageProvider.locale,
@@ -6640,7 +6640,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   child: Column(
                     children: [
                       Text(
-                        'App Condominio',
+                        'Porti Italiani',
                         style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -8825,7 +8825,7 @@ class AppInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'App Condominio',
+                      'Porti Italiani',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -8834,9 +8834,9 @@ class AppInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Benvenuto nell\'applicazione ufficiale del condominio. '
-                      'Questa app ti permette di rimanere sempre aggiornato sulle novità '
-                      'del condominio e di accedere rapidamente ai servizi disponibili.',
+                      'Benvenuto in Porti Italiani. '
+                      'Questa app ti permette di rimanere aggiornato su notizie, servizi e risorse utili, '
+                      'oltre a consultare webcam e dati meteo disponibili.',
                       style: TextStyle(
                         fontSize: 16,
                         color: Color(0xFF37474F),
@@ -8856,7 +8856,7 @@ class AppInfoScreen extends StatelessWidget {
                     _buildFeatureItem('🏠 Home',
                         'Visualizza le ultime comunicazioni e novità'),
                     _buildFeatureItem('📞 Servizi',
-                        'Contatta facilmente i servizi del porto'),
+                        'Contatta facilmente i servizi e i referenti disponibili'),
                     _buildFeatureItem(
                         '📰 Articoli', 'Naviga tra le categorie di articoli'),
                     _buildFeatureItem(
@@ -9685,7 +9685,7 @@ Messaggio:
 $messageText
 
 ---
-Inviato dall'app Condominio
+Inviato dall'app Porti Italiani
       ''';
 
       // Invia email via SMTP

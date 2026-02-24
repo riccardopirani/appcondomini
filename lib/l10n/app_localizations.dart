@@ -14,8 +14,8 @@ class AppLocalizations {
 
   static final Map<String, Map<String, String>> _localizedValues = {
     'it': {
-      'app_title': 'App Condominio',
-      'porto_bello': 'App Condominio',
+      'app_title': 'Porti Italiani',
+      'porto_bello': 'Porti Italiani',
       'porto_di_gallura': 'Porto di Gallura',
 
       // Menu laterale
@@ -109,8 +109,8 @@ class AppLocalizations {
       'message_required': 'Messaggio *',
     },
     'en': {
-      'app_title': 'App Condominio',
-      'porto_bello': 'App Condominio',
+      'app_title': 'Porti Italiani',
+      'porto_bello': 'Porti Italiani',
       'porto_di_gallura': 'Port of Gallura',
 
       // Side menu
@@ -204,8 +204,8 @@ class AppLocalizations {
       'message_required': 'Message *',
     },
     'fr': {
-      'app_title': 'App Condominio',
-      'porto_bello': 'App Condominio',
+      'app_title': 'Porti Italiani',
+      'porto_bello': 'Porti Italiani',
       'porto_di_gallura': 'Port de Gallura',
 
       // Menu latéral
@@ -300,8 +300,8 @@ class AppLocalizations {
       'message_required': 'Message *',
     },
     'zh': {
-      'app_title': '公寓应用',
-      'porto_bello': 'App Condominio',
+      'app_title': 'Porti Italiani',
+      'porto_bello': 'Porti Italiani',
       'porto_di_gallura': '加卢拉港',
 
       // 侧边菜单
