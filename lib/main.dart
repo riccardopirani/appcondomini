@@ -3110,110 +3110,105 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('=== INIZIO LOGIN ===');
       debugPrint('Username: $username');
 
-      // Step 1: Ottieni il nonce necessario per il login
-      final nonceResponse = await http.get(
-        Uri.parse('${appSettings.urlLogin}'),
-        headers: {
-          'User-Agent': AppSettings.userAgent,
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      );
+      bool loginSucceeded = false;
 
-      debugPrint('Nonce response status: ${nonceResponse.statusCode}');
-
-      // Estrai il nonce dalla risposta HTML
-      String nonce = '';
-      final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
-          .firstMatch(nonceResponse.body);
-      if (nonceMatch != null) {
-        nonce = nonceMatch.group(1)!;
-        debugPrint('Nonce estratto: $nonce');
+      // ── STEP 1: Prova login via API plugin (più affidabile su iPad) ──
+      debugPrint('🔌 Tentativo login via API plugin...');
+      try {
+        final apiOk = await apiService.login(username, password);
+        if (apiOk) {
+          debugPrint('✅ Login API plugin riuscito!');
+          loginSucceeded = true;
+        } else {
+          debugPrint('⚠️ API plugin: credenziali rifiutate');
+        }
+      } catch (e) {
+        debugPrint('⚠️ API plugin non raggiungibile: $e');
       }
 
-      // Step 2: Effettua login con il nonce
-      final loginResponse = await http.post(
-        Uri.parse('${appSettings.urlLogin}'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': AppSettings.userAgent,
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '${appSettings.urlLogin}',
-        },
-        body: nonce.isNotEmpty
-            ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
-            : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
-      );
+      // ── STEP 2: Fallback a login WordPress cookie ──
+      if (!loginSucceeded) {
+        debugPrint('🍪 Fallback: tentativo login WordPress cookie...');
+        try {
+          final nonceResponse = await http.get(
+            Uri.parse('${appSettings.urlLogin}'),
+            headers: {
+              'User-Agent': AppSettings.userAgent,
+              'Accept':
+                  'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+          );
 
-      debugPrint('Login response status: ${loginResponse.statusCode}');
-      debugPrint('Login response headers: ${loginResponse.headers}');
+          String nonce = '';
+          final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
+              .firstMatch(nonceResponse.body);
+          if (nonceMatch != null) {
+            nonce = nonceMatch.group(1)!;
+          }
 
-      // Step 3: Verifica se il login è riuscito controllando i cookie
-      if (loginResponse.headers['set-cookie'] != null) {
-        final cookies = loginResponse.headers['set-cookie']!;
-        debugPrint('Login cookies ricevuti: $cookies');
+          final loginResponse = await http.post(
+            Uri.parse('${appSettings.urlLogin}'),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': AppSettings.userAgent,
+              'Accept':
+                  'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Referer': '${appSettings.urlLogin}',
+            },
+            body: nonce.isNotEmpty
+                ? 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
+                : 'log=$username&pwd=$password&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
+          );
 
-        // Step 4: Verifica il login controllando se siamo reindirizzati
-        // Se il login è riuscito, WordPress reindirizza a wp-admin
-        if (loginResponse.statusCode == 302 ||
-            loginResponse.headers['location']?.contains('wp-admin') == true ||
-            loginResponse.body.contains('wp-admin') ||
-            cookies.contains('wordpress_logged_in')) {
-          // Login riuscito - salva i cookie
-          appSettings.setToken(cookies);
+          debugPrint('WP login status: ${loginResponse.statusCode}');
 
-          // 🔐 Tenta login con il plugin API
-          debugPrint('🔐 Tentativa login con plugin API...');
-          final apiLoginSuccess = await apiService.login(username, password);
-          
-          if (apiLoginSuccess) {
-            debugPrint('✅ Login plugin API riuscito!');
+          final cookies = loginResponse.headers['set-cookie'] ?? '';
+          if (loginResponse.statusCode == 302 ||
+              loginResponse.headers['location']?.contains('wp-admin') == true ||
+              loginResponse.body.contains('wp-admin') ||
+              cookies.contains('wordpress_logged_in')) {
+            appSettings.setToken(cookies);
+            loginSucceeded = true;
+            debugPrint('✅ Login WordPress cookie riuscito');
           } else {
-            debugPrint('⚠️ Login plugin API fallito, continuo con cookie WordPress');
+            debugPrint('❌ WordPress cookie login fallito');
           }
+        } catch (e) {
+          debugPrint('❌ WordPress cookie login errore: $e');
+        }
+      }
 
-          // Salva le credenziali e i cookie
-          final prefs = await SharedPreferences.getInstance();
+      // ── STEP 3: Salva credenziali e naviga, oppure mostra errore ──
+      if (loginSucceeded) {
+        final prefs = await SharedPreferences.getInstance();
+        if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
           await prefs.setString('jwtToken', appSettings.jwtToken!);
-          await prefs.setString('username', username);
-          await prefs.setString('password', password);
-          await prefs.setBool('isLoggedIn', true);
+        }
+        await prefs.setString('username', username);
+        await prefs.setString('password', password);
+        await prefs.setBool('isLoggedIn', true);
+        await prefs.setBool('isGuest', false);
+        await prefs.setBool('demoMode', false);
+        await prefs.setString('originalUsername', username);
+        await prefs.setString('originalEmail', username);
 
-          // Salva i dati dell'utente originale per la visualizzazione nell'app
-          await prefs.setString('originalUsername', username);
-          await prefs.setString('originalEmail', username);
+        debugPrint('✅ Login completato, navigo alla home');
 
-          debugPrint('Login successful, cookies saved');
-          debugPrint('Dati utente originale salvati: $username');
-
-          if (context.mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MyHomePage(
-                  key: homePageKey,
-                  title: '',
-                  userEmail: '',
-                  userName: '',
-                ),
+        if (context.mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MyHomePage(
+                key: homePageKey,
+                title: '',
+                userEmail: '',
+                userName: '',
               ),
-            );
-          }
-        } else {
-          debugPrint('Login failed - no valid session');
-          debugPrint('Response body: ${loginResponse.body}');
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Login fallito. Verifica le credenziali.'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+            ),
+          );
         }
       } else {
-        debugPrint('No cookies received, login failed');
+        debugPrint('❌ Tutti i metodi di login falliti');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -9783,13 +9778,6 @@ Inviato dall'app Porti Italiani
                   label: AppLocalizations.of(context).emailRequired,
                   icon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 15),
-                _buildTextField(
-                  controller: _phoneController,
-                  label: AppLocalizations.of(context).phoneOptional,
-                  icon: Icons.phone,
-                  keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 15),
                 _buildTextField(
