@@ -21,6 +21,8 @@ class AppLocalizations {
       // Menu laterale
       'useful_sections': 'Sito online',
       'links_and_resources': 'Link e risorse',
+      'documents': 'Documenti',
+      'open_documents_section': 'Apri sezione documenti',
       'contacts': 'Contatti',
       'contact_the_port': 'Contatta il porto',
       'account': 'Account',
@@ -80,7 +82,7 @@ class AppLocalizations {
       'port_webcam': 'Webcam Porto',
       'direct_port_view': 'Vista diretta del porto',
       'monitor_port_activity': 'Monitora l\'attività del porto in tempo reale',
-      'panoramic_webcam': 'Webcam Panoramica',
+      'panoramic_webcam': 'Panoramica Porto',
       'panoramic_360_view': 'Vista a 360° del territorio',
       'enjoy_panoramic_view': 'Goditi la vista panoramica del paesaggio',
       'weather_station': 'Stazione Meteo',
@@ -116,6 +118,8 @@ class AppLocalizations {
       // Side menu
       'useful_sections': 'Online Site',
       'links_and_resources': 'Links and resources',
+      'documents': 'Documents',
+      'open_documents_section': 'Open documents section',
       'contacts': 'Contacts',
       'contact_the_port': 'Contact the port',
       'account': 'Account',
@@ -211,6 +215,8 @@ class AppLocalizations {
       // Menu latéral
       'useful_sections': 'Site en ligne',
       'links_and_resources': 'Liens et ressources',
+      'documents': 'Documents',
+      'open_documents_section': 'Ouvrir la section documents',
       'contacts': 'Contacts',
       'contact_the_port': 'Contactez le port',
       'account': 'Compte',
@@ -307,6 +313,8 @@ class AppLocalizations {
       // 侧边菜单
       'useful_sections': '在线网站',
       'links_and_resources': '链接和资源',
+      'documents': '文件',
+      'open_documents_section': '打开文档页面',
       'contacts': '联系方式',
       'contact_the_port': '联系港口',
       'account': '账户',
@@ -405,6 +413,8 @@ class AppLocalizations {
   String get portoDiGallura => translate('porto_di_gallura');
   String get usefulSections => translate('useful_sections');
   String get linksAndResources => translate('links_and_resources');
+  String get documents => translate('documents');
+  String get openDocumentsSection => translate('open_documents_section');
   String get contacts => translate('contacts');
   String get contactThePort => translate('contact_the_port');
   String get account => translate('account');

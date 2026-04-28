@@ -7,7 +7,6 @@ import 'package:condominio/app_theme.dart';
 import 'package:condominio/l10n/app_localizations.dart';
 import 'package:condominio/language_provider.dart';
 import 'package:condominio/services/api_service.dart';
-import 'package:condominio/services/debug_api_service.dart';
 import 'package:condominio/setttings.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:mailer/mailer.dart' as mailer;
 import 'package:mailer/smtp_server.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
 // Cache per le traduzioni
 final Map<String, Map<String, String>> _translationCache = {};
@@ -141,7 +141,7 @@ Future<Map<String, dynamic>> translatePost(
   }
 }
 
-Future<void> sendEmail({
+Future<void> _sendRawEmail({
   required String to,
   String? subject,
   String? body,
@@ -210,6 +210,45 @@ Future<void> sendEmail({
       throw Exception('Errore invio email: $e');
     }
   }
+}
+
+Future<void> sendAppEmail({
+  required String to,
+  required String service,
+  required String senderName,
+  required String senderEmail,
+  required String message,
+  Map<String, String>? details,
+  String? subject,
+  String? replyTo,
+}) async {
+  final buffer = StringBuffer()
+    ..writeln('Servizio: $service')
+    ..writeln('Nome: $senderName')
+    ..writeln('Email: ${senderEmail.isNotEmpty ? senderEmail : 'Non fornita'}');
+
+  if (details != null && details.isNotEmpty) {
+    for (final entry in details.entries) {
+      buffer.writeln('${entry.key}: ${entry.value}');
+    }
+  }
+
+  buffer
+    ..writeln()
+    ..writeln('Messaggio:')
+    ..writeln(message)
+    ..writeln()
+    ..writeln('---')
+    ..writeln('Inviato dall\'app Porti Italiani');
+
+  final computedSubject = subject ?? '$service - $senderName';
+
+  await _sendRawEmail(
+    to: to,
+    subject: computedSubject,
+    body: buffer.toString(),
+    replyTo: (replyTo != null && replyTo.isNotEmpty) ? replyTo : senderEmail,
+  );
 }
 
 // Funzione per creare l'autenticazione Basic Auth
@@ -2517,20 +2556,34 @@ class _CustomWebViewScreenState extends State<CustomWebViewScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
+
+    late final PlatformWebViewControllerCreationParams params;
+    if (!kIsWeb && Platform.isIOS) {
+      params = WebKitWebViewControllerCreationParams(
+        allowsInlineMediaPlayback: true,
+        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
+      );
+    } else {
+      params = const PlatformWebViewControllerCreationParams();
+    }
+
+    _controller = WebViewController.fromPlatformCreationParams(params)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
+            if (mounted) setState(() => _isLoading = true);
           },
           onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
+            if (mounted) setState(() => _isLoading = false);
             _checkCanGoBack();
+          },
+          onWebResourceError: (error) {
+            debugPrint('WebView error: ${error.description}');
+            if (mounted) setState(() => _isLoading = false);
+          },
+          onNavigationRequest: (request) {
+            return NavigationDecision.navigate;
           },
         ),
       )
@@ -2581,6 +2634,37 @@ class _CustomWebViewScreenState extends State<CustomWebViewScreen> {
 class WebcamScreen extends StatelessWidget {
   const WebcamScreen({super.key});
 
+  Future<void> _openWebcam(
+      BuildContext context, String url, String title) async {
+    final uri = Uri.parse(url);
+
+    // iOS: apri esternamente per evitare limitazioni WebView su stream/iframe.
+    if (!kIsWeb && Platform.isIOS) {
+      final launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossibile aprire la webcam.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomWebViewScreen(
+          url: url,
+          title: title,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2601,17 +2685,11 @@ class WebcamScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     colors: [Color(0xFF3498DB), Color(0xFF2980B9)],
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CustomWebViewScreen(
-                          url: AppSettings.webcamPorto,
-                          title: AppLocalizations.of(context).portWebcam,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openWebcam(
+                    context,
+                    AppSettings.webcamPanoramica,
+                    AppLocalizations.of(context).portWebcam,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 _buildWebcamCard(
@@ -2623,17 +2701,11 @@ class WebcamScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     colors: [Color(0xFF27AE60), Color(0xFF229954)],
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CustomWebViewScreen(
-                          url: AppSettings.webcamPanoramica,
-                          title: AppLocalizations.of(context).panoramicWebcam,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openWebcam(
+                    context,
+                    AppSettings.webcamPorto,
+                    AppLocalizations.of(context).panoramicWebcam,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 _buildWebcamCard(
@@ -2646,17 +2718,11 @@ class WebcamScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     colors: [Color(0xFFE67E22), Color(0xFFD35400)],
                   ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CustomWebViewScreen(
-                          url: AppSettings.stazioneMeteo,
-                          title: AppLocalizations.of(context).weatherStation,
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _openWebcam(
+                    context,
+                    AppSettings.stazioneMeteo,
+                    AppLocalizations.of(context).weatherStation,
+                  ),
                 ),
               ],
             ),
@@ -4758,26 +4824,37 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     // Se l'utente è loggato, tenta di ottenere il token del plugin API
     if (storedIsLoggedIn && username != null && password != null) {
+      isLoggedIn = true;
+
       // Prova prima a caricare il token dal servizio API
       await apiService.loadToken();
       
       if (apiService.isAuthenticated) {
         debugPrint('✅ Token API plugin valido e non scaduto');
       } else {
-        // Se il token non è valido o scaduto, prova il login
         debugPrint('⚠️ Token API plugin mancante o scaduto, tentativo login...');
-        final loginSuccess = await apiService.login(username, password);
-        
-        if (loginSuccess) {
-          debugPrint('✅ Login API plugin riuscito!');
-        } else {
-          debugPrint('❌ Login API plugin fallito, provo metodo legacy...');
-          // Fallback al metodo legacy per compatibilità
-          await reloadTokenFromStorage();
-          if (appSettings.jwtToken == null ||
-              !appSettings.jwtToken!.contains('wordpress_logged_in')) {
-            await regenerateToken();
+        try {
+          final loginSuccess = await apiService.login(username, password);
+          if (loginSuccess) {
+            debugPrint('✅ Login API plugin riuscito!');
+          } else {
+            debugPrint('⚠️ Login API plugin fallito, provo metodo legacy...');
+          }
+        } catch (e) {
+          debugPrint('⚠️ API plugin non raggiungibile: $e');
+        }
+
+        // Fallback al metodo legacy per compatibilità
+        if (!apiService.isAuthenticated) {
+          try {
             await reloadTokenFromStorage();
+            if (appSettings.jwtToken == null ||
+                !appSettings.jwtToken!.contains('wordpress_logged_in')) {
+              await regenerateToken();
+              await reloadTokenFromStorage();
+            }
+          } catch (e) {
+            debugPrint('⚠️ Anche il legacy fallback ha fallito: $e');
           }
         }
       }
@@ -5639,6 +5716,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             tempPosts.addAll(posts);
           }
         }
+      }
+
+      // Ultimo fallback: scarica post pubblici senza auth
+      if (tempPosts.isEmpty && cachedPosts.isEmpty) {
+        debugPrint('🔄 Ultimo fallback: post pubblici senza auth...');
+        await _tryFetchPostsWithoutAuth();
+        tempPosts.addAll(posts);
       }
 
       // 🔄 STEP 3: Aggiorna cache solo se ci sono nuovi post
@@ -6724,6 +6808,55 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           const SizedBox(height: 12),
                           _buildModernMenuItem(
                             context,
+                            icon: Icons.folder_open,
+                            title: AppLocalizations.of(context).documents,
+                            subtitle:
+                                AppLocalizations.of(context).openDocumentsSection,
+                            color: const Color(0xFF607D8B),
+                            onTap: () async {
+                              Navigator.pop(context);
+                              final Uri uri = Uri.parse(appSettings.urlDocumenti);
+                              try {
+                                final bool canLaunch = await canLaunchUrl(uri);
+                                if (canLaunch) {
+                                  await launchUrl(
+                                    uri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                } else {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Non è possibile aprire la sezione documenti. Verifica la connessione internet.',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        backgroundColor: Colors.red,
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Errore nell\'apertura dei documenti: ${e.toString()}',
+                                        style:
+                                            const TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Colors.red,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildModernMenuItem(
+                            context,
                             icon: Icons.contact_mail,
                             title: AppLocalizations.of(context).contacts,
                             subtitle:
@@ -7012,7 +7145,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       child: Column(
                         children: [
                           _buildButton(
-                              context, "Emergenze", 'assets/emergenza.png'),
+                              context, "Numeri di Emergenza", 'assets/emergenza.png'),
                           _buildButton(context, "Assistenza medica",
                               'assets/ritiro_rifiuti.png'),
                           _buildButton(
@@ -7389,7 +7522,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               : ListView(
                   children: [
                     const SizedBox(height: 8),
-                    _buildButton(context, "Emergenze", 'assets/emergenza.png'),
+                    _buildButton(context, "Numeri di Emergenza", 'assets/emergenza.png'),
                     _buildButton(context, "Assistenza medica",
                         'assets/ritiro_rifiuti.png'),
                     _buildButton(
@@ -8270,11 +8403,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
         onPressed: () {
           // Gestisci casi speciali per Emergenze e Assistenza medica
-          if (label == "Emergenze") {
+          if (label == "Numeri di Emergenza") {
             _showEmergencyDialog(context);
           } else if (label == "Assistenza medica" ||
               label == "Servizi sanitari") {
             _showMedicalServicesDialog(context);
+          } else if (label == "Ritiro rifiuti" || label == "Ritiro Rifiuti") {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => WastePickupScreen(
+                  userName: userData?['name'] ?? 'Utente',
+                  userEmail: userData?['email'] ?? '',
+                ),
+              ),
+            );
           } else {
             // Per gli altri servizi, apri il form email
             Navigator.push(
@@ -9535,11 +9678,21 @@ class ContactOptionsScreen extends StatelessWidget {
         ),
         onPressed: () {
           // Gestisci casi speciali per Emergenze e Assistenza medica
-          if (label == "Emergenze") {
+          if (label == "Numeri di Emergenza") {
             _showEmergencyDialog(context);
           } else if (label == "Assistenza medica" ||
               label == "Servizi sanitari") {
             _showMedicalServicesDialog(context);
+          } else if (label == "Ritiro rifiuti" || label == "Ritiro Rifiuti") {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => WastePickupScreen(
+                  userName: userName,
+                  userEmail: userEmail,
+                ),
+              ),
+            );
           } else {
             // Per gli altri servizi, apri il form email
             Navigator.push(
@@ -9603,6 +9756,207 @@ class EmailFormTab extends StatefulWidget {
 
   @override
   State<EmailFormTab> createState() => _EmailFormTabState();
+}
+
+class WastePickupScreen extends StatefulWidget {
+  final String userName;
+  final String userEmail;
+
+  const WastePickupScreen({
+    super.key,
+    required this.userName,
+    required this.userEmail,
+  });
+
+  @override
+  State<WastePickupScreen> createState() => _WastePickupScreenState();
+}
+
+class _WastePickupScreenState extends State<WastePickupScreen> {
+  final TextEditingController _requestController = TextEditingController();
+  bool _isLoading = false;
+  String _selectedSlot = '09:00 - 16:00 (feriali)';
+
+  static const List<String> _timeSlots = [
+    '09:00 - 16:00 (feriali)',
+    '09:00 - 12:00 (festivi)',
+  ];
+
+  @override
+  void dispose() {
+    _requestController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitWasteRequest() async {
+    final requestText = _requestController.text.trim();
+    if (requestText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Inserisci la richiesta di ritiro.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1) Invio principale verso endpoint (automazione lato server)
+      final response = await http.post(
+        Uri.parse(appSettings.urlRitiroRifiutiEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': AppSettings.userAgent,
+        },
+        body: jsonEncode({
+          'service': 'ritiro_rifiuti',
+          'name': widget.userName,
+          'email': widget.userEmail,
+          'time_slot': _selectedSlot,
+          'request': requestText,
+          'source': 'app_porti_italiani',
+          'created_at': DateTime.now().toIso8601String(),
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      // 2) Fallback email se endpoint non risponde bene
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        await sendAppEmail(
+          to: AppSettings.emailWebmaster,
+          service: 'Ritiro rifiuti',
+          senderName: widget.userName,
+          senderEmail: widget.userEmail,
+          message: requestText,
+          details: {
+            'Fascia oraria': _selectedSlot,
+          },
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Richiesta inviata. La comunicazione ai condomini sarà pianificata automaticamente.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _requestController.clear();
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Errore invio richiesta: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ritiro rifiuti'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Seleziona la fascia oraria',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: const Text(
+                'Fasce disponibili:\n'
+                '- 09:00 - 16:00 (feriali)\n'
+                '- 09:00 - 12:00 (festivi)',
+                style: TextStyle(fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedSlot,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                prefixIcon: const Icon(Icons.schedule),
+              ),
+              items: _timeSlots
+                  .map((slot) => DropdownMenuItem(value: slot, child: Text(slot)))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => _selectedSlot = value);
+              },
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Richiesta ritiro',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _requestController,
+              maxLines: 6,
+              decoration: InputDecoration(
+                hintText:
+                    'Scrivi qui i dettagli del ritiro rifiuti da pianificare...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _submitWasteRequest,
+                icon: _isLoading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send),
+                label: Text(_isLoading
+                    ? 'Invio in corso...'
+                    : 'Invia comunicazione ritiro'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _EmailFormTabState extends State<EmailFormTab> {
@@ -9669,26 +10023,17 @@ class _EmailFormTabState extends State<EmailFormTab> {
     });
 
     try {
-      // Prepara il corpo dell'email
-      final emailBody = '''
-Nome: $name
-Email: $email
-Telefono: ${phone.isNotEmpty ? phone : 'Non fornito'}
-Oggetto: ${widget.subject}
-
-Messaggio:
-$messageText
-
----
-Inviato dall'app Porti Italiani
-      ''';
-
-      // Invia email via SMTP
-      await sendEmail(
+      // Invia email tramite funzione centralizzata
+      await sendAppEmail(
         to: AppSettings.emailWebmaster,
-        subject: '${widget.subject} - $name',
-        body: emailBody,
-        replyTo: email, // Imposta l'email del mittente come reply-to
+        service: widget.subject,
+        senderName: name,
+        senderEmail: email,
+        message: messageText,
+        details: {
+          'Telefono': phone.isNotEmpty ? phone : 'Non fornito',
+          'Oggetto': widget.subject,
+        },
       );
 
       // Mostra messaggio di successo

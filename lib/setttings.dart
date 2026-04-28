@@ -80,6 +80,9 @@ class AppSettings {
   /// URL della pagina "Numeri utili"
   String get urlNumeriUtili => '$_urlSitoBase/numeri-util/';
 
+  /// URL della sezione documenti
+  String get urlDocumenti => '$_urlSitoBase/documenti/';
+
   /// URL della pagina contatti
   String get urlParcoPortobello => _urlSitoBase;
 
@@ -114,6 +117,10 @@ class AppSettings {
 
   /// Endpoint per admin AJAX
   String get urlAdminAjax => '$_urlSitoBase/wp-admin/admin-ajax.php';
+
+  /// Endpoint per richieste ritiro rifiuti (da automatizzare lato server)
+  String get urlRitiroRifiutiEndpoint =>
+      '$_urlSitoBase/wp-json/pdg-app/v1/waste-pickup-request';
 
   // ==========================================
   // CREDENZIALI E AUTENTICAZIONE
