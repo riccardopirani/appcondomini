@@ -723,7 +723,7 @@ Future<void> _openInAppBrowser(String url) async {
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final LanguageProvider languageProvider = LanguageProvider();
-final GlobalKey<_MyHomePageState> homePageKey = GlobalKey<_MyHomePageState>();
+_MyHomePageState? activeHomePageState;
 
 // Variabile per gestire la navigazione dalle notifiche
 int? _pendingNotificationPostId;
@@ -860,7 +860,7 @@ Future<void> initializeNotifications() async {
         final postId = int.tryParse(response.payload!);
         if (postId != null) {
           _pendingNotificationPostId = postId;
-          final homeState = homePageKey.currentState;
+          final homeState = activeHomePageState;
           if (homeState != null) {
             unawaited(homeState.openPostFromNotification(postId));
           } else {
@@ -3135,7 +3135,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => MyHomePage(
-          key: homePageKey,
           title: '',
           userEmail: '',
           userName: '',
@@ -3154,7 +3153,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => MyHomePage(
-          key: homePageKey,
           title: '',
           userEmail: '',
           userName: '',
@@ -3265,7 +3263,6 @@ class _LoginScreenState extends State<LoginScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => MyHomePage(
-                key: homePageKey,
                 title: '',
                 userEmail: '',
                 userName: '',
@@ -3563,14 +3560,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          Column(
                             children: [
                               OutlinedButton.icon(
                                 onPressed: _isLoading ? null : _continueAsGuest,
                                 icon: const Icon(Icons.person_outline),
                                 label: const Text('Continua come ospite'),
                               ),
+                              const SizedBox(height: 6),
                               TextButton(
                                 onPressed:
                                     _isLoading ? null : _enableDemoModeForReview,
@@ -3684,7 +3681,6 @@ class _SplashScreenState extends State<SplashScreen>
           context,
           MaterialPageRoute(
             builder: (context) => MyHomePage(
-              key: homePageKey,
               title: '',
               userEmail: '',
               userName: '',
@@ -3716,7 +3712,6 @@ class _SplashScreenState extends State<SplashScreen>
           context,
           MaterialPageRoute(
             builder: (context) => MyHomePage(
-              key: homePageKey,
               title: '',
               userEmail: '',
               userName: '',
@@ -3731,7 +3726,6 @@ class _SplashScreenState extends State<SplashScreen>
           context,
           MaterialPageRoute(
             builder: (context) => MyHomePage(
-              key: homePageKey,
               title: '',
               userEmail: '',
               userName: '',
@@ -3842,7 +3836,6 @@ class _SplashScreenState extends State<SplashScreen>
               context,
               MaterialPageRoute(
                 builder: (context) => MyHomePage(
-                  key: homePageKey,
                   title: '',
                   userEmail: '',
                   userName: '',
@@ -4624,6 +4617,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    activeHomePageState = this;
     WidgetsBinding.instance.addObserver(this);
     currentLanguage = languageProvider.locale.languageCode;
     languageProvider.addListener(_onLanguageChanged);
@@ -4793,6 +4787,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    if (identical(activeHomePageState, this)) {
+      activeHomePageState = null;
+    }
     languageProvider.removeListener(_onLanguageChanged);
     WidgetsBinding.instance.removeObserver(this);
     _notificationTimer?.cancel();
@@ -9193,7 +9190,6 @@ class _NoAccessMessageState extends State<NoAccessMessage>
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
                           builder: (context) => MyHomePage(
-                            key: homePageKey,
                             title: '',
                             userEmail: '',
                             userName: '',
