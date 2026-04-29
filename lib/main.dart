@@ -142,10 +142,11 @@ Future<Map<String, dynamic>> translatePost(
 }
 
 class EmailService {
-  static const String _smtpServer = 'pro.eu.turbo-smtp.com';
-  static const int _smtpPort = 25;
-  static const String _smtpUsername = 'webmaster@portobellodigallura.it';
-  static const String _smtpPassword = 'FwPDvGt9';
+  static const String _smtpServer = 'pro.turbo-smtp.com';
+  static const int _smtpPort = 465;
+  static const String _smtpUsername = '20ec50606baae0792cfb';
+  static const String _smtpPassword = 'zaV9ZWPfDHCkMypY8X5I';
+  static const String _smtpFromAddress = 'no-reply@portobellodigallura.it';
 
   static Future<void> _sendRawEmail({
     required String to,
@@ -159,12 +160,13 @@ class EmailService {
         port: _smtpPort,
         username: _smtpUsername,
         password: _smtpPassword,
+        ssl: true,
         ignoreBadCertificate: true,
         allowInsecure: true,
       );
 
       final message = mailer.Message()
-        ..from = const mailer.Address(_smtpUsername, 'pdg')
+        ..from = const mailer.Address(_smtpFromAddress, 'pdg')
         ..recipients.add(to)
         ..subject = subject ?? 'Messaggio dall\'app pdg'
         ..text = body ?? '';
