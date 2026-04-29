@@ -141,114 +141,112 @@ Future<Map<String, dynamic>> translatePost(
   }
 }
 
-Future<void> _sendRawEmail({
-  required String to,
-  String? subject,
-  String? body,
-  String? replyTo,
-}) async {
-  // SMTP Configuration
-  const smtpServer = 'pro.eu.turbo-smtp.com';
-  const smtpPort = 25;
-  const smtpUsername = 'webmaster@portobellodigallura.it';
-  const smtpPassword = 'FwPDvGt9';
+class EmailService {
+  static const String _smtpServer = 'pro.eu.turbo-smtp.com';
+  static const int _smtpPort = 25;
+  static const String _smtpUsername = 'webmaster@portobellodigallura.it';
+  static const String _smtpPassword = 'FwPDvGt9';
 
-  try {
-    // Configurazione del server SMTP
-    final smtpServerConfig = SmtpServer(
-      smtpServer,
-      port: smtpPort,
-      username: smtpUsername,
-      password: smtpPassword,
-      ignoreBadCertificate: true,
-      allowInsecure: true,
-    );
-
-    // Crea il messaggio
-    final message = mailer.Message()
-      ..from = const mailer.Address(smtpUsername, 'Porti Italiani')
-      ..recipients.add(to)
-      ..subject = subject ?? 'Messaggio dall\'app Porti Italiani'
-      ..text = body ?? '';
-
-    // Aggiungi reply-to se fornito
-    if (replyTo != null && replyTo.isNotEmpty) {
-      message.headers['Reply-To'] = replyTo;
-    }
-
-    // Invia l'email
-    final sendReport = await mailer.send(message, smtpServerConfig);
-    debugPrint('Email inviata con successo via SMTP: ${sendReport.toString()}');
-  } catch (e) {
-    debugPrint('Errore invio email via SMTP: $e');
-    // Fallback: prova ad aprire il client email locale
-    final uri = Uri(
-      scheme: 'mailto',
-      path: to,
-      queryParameters: {
-        if (subject != null) 'subject': subject,
-        if (body != null) 'body': body,
-      },
-    );
-
+  static Future<void> _sendRawEmail({
+    required String to,
+    String? subject,
+    String? body,
+    String? replyTo,
+  }) async {
     try {
-      final canLaunch = await canLaunchUrl(uri).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => false,
+      final smtpServerConfig = SmtpServer(
+        _smtpServer,
+        port: _smtpPort,
+        username: _smtpUsername,
+        password: _smtpPassword,
+        ignoreBadCertificate: true,
+        allowInsecure: true,
       );
 
-      if (canLaunch) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-      } else {
-        throw Exception('Impossibile inviare email');
+      final message = mailer.Message()
+        ..from = const mailer.Address(_smtpUsername, 'pdg')
+        ..recipients.add(to)
+        ..subject = subject ?? 'Messaggio dall\'app pdg'
+        ..text = body ?? '';
+
+      if (replyTo != null && replyTo.isNotEmpty) {
+        message.headers['Reply-To'] = replyTo;
       }
-    } catch (fallbackError) {
-      debugPrint('Errore anche con fallback email client: $fallbackError');
-      throw Exception('Errore invio email: $e');
+
+      final sendReport = await mailer.send(message, smtpServerConfig);
+      debugPrint('Email inviata con successo via SMTP: ${sendReport.toString()}');
+    } catch (e) {
+      debugPrint('Errore invio email via SMTP: $e');
+      final uri = Uri(
+        scheme: 'mailto',
+        path: to,
+        queryParameters: {
+          if (subject != null) 'subject': subject,
+          if (body != null) 'body': body,
+        },
+      );
+
+      try {
+        final canLaunch = await canLaunchUrl(uri).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => false,
+        );
+
+        if (canLaunch) {
+          await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+        } else {
+          throw Exception('Impossibile inviare email');
+        }
+      } catch (fallbackError) {
+        debugPrint('Errore anche con fallback email client: $fallbackError');
+        throw Exception('Errore invio email: $e');
+      }
     }
   }
-}
 
-Future<void> sendAppEmail({
-  required String to,
-  required String service,
-  required String senderName,
-  required String senderEmail,
-  required String message,
-  Map<String, String>? details,
-  String? subject,
-  String? replyTo,
-}) async {
-  final buffer = StringBuffer()
-    ..writeln('Servizio: $service')
-    ..writeln('Nome: $senderName')
-    ..writeln('Email: ${senderEmail.isNotEmpty ? senderEmail : 'Non fornita'}');
+  static Future<void> sendAppEmail({
+    required String to,
+    required String service,
+    required String senderName,
+    required String senderEmail,
+    required String message,
+    Map<String, String>? details,
+    String? subject,
+    String? replyTo,
+  }) async {
+    final buffer = StringBuffer()
+      ..writeln('Servizio: $service')
+      ..writeln(
+          'Nome: $senderName')
+      ..writeln(
+          'Email: ${senderEmail.isNotEmpty ? senderEmail : 'Non fornita'}');
 
-  if (details != null && details.isNotEmpty) {
-    for (final entry in details.entries) {
-      buffer.writeln('${entry.key}: ${entry.value}');
+    if (details != null && details.isNotEmpty) {
+      for (final entry in details.entries) {
+        buffer.writeln('${entry.key}: ${entry.value}');
+      }
     }
+
+    buffer
+      ..writeln()
+      ..writeln('Messaggio:')
+      ..writeln(message)
+      ..writeln()
+      ..writeln('---')
+      ..writeln('Inviato dall\'app pdg');
+
+    final computedSubject = subject ?? '$service - $senderName';
+
+    await _sendRawEmail(
+      to: to,
+      subject: computedSubject,
+      body: buffer.toString(),
+      replyTo: (replyTo != null && replyTo.isNotEmpty) ? replyTo : senderEmail,
+    );
   }
-
-  buffer
-    ..writeln()
-    ..writeln('Messaggio:')
-    ..writeln(message)
-    ..writeln()
-    ..writeln('---')
-    ..writeln('Inviato dall\'app Porti Italiani');
-
-  final computedSubject = subject ?? '$service - $senderName';
-
-  await _sendRawEmail(
-    to: to,
-    subject: computedSubject,
-    body: buffer.toString(),
-    replyTo: (replyTo != null && replyTo.isNotEmpty) ? replyTo : senderEmail,
-  );
 }
 
 // Funzione per creare l'autenticazione Basic Auth
@@ -2867,7 +2865,7 @@ class _MyAppState extends State<MyApp> {
       key: ValueKey(languageProvider
           .locale.languageCode), // Forza rebuild quando cambia lingua
       navigatorKey: navigatorKey,
-      title: 'Porti Italiani',
+      title: 'pdg',
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       locale: languageProvider.locale,
@@ -6716,7 +6714,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   child: Column(
                     children: [
                       Text(
-                        'Porti Italiani',
+                        'pdg',
                         style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -7142,6 +7140,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       child: Column(
                         children: [
                           _buildButton(
+                              context, "Comunicazioni", 'assets/logo.png'),
+                          _buildButton(
                               context, "Numeri di Emergenza", 'assets/emergenza.png'),
                           _buildButton(context, "Assistenza medica",
                               'assets/ritiro_rifiuti.png'),
@@ -7519,6 +7519,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               : ListView(
                   children: [
                     const SizedBox(height: 8),
+                    _buildButton(context, "Comunicazioni", 'assets/logo.png'),
                     _buildButton(context, "Numeri di Emergenza", 'assets/emergenza.png'),
                     _buildButton(context, "Assistenza medica",
                         'assets/ritiro_rifiuti.png'),
@@ -8400,7 +8401,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
         onPressed: () {
           // Gestisci casi speciali per Emergenze e Assistenza medica
-          if (label == "Numeri di Emergenza") {
+          if (label == "Comunicazioni") {
+            setState(() => _selectedIndex = 1);
+          } else if (label == "Numeri di Emergenza") {
             _showEmergencyDialog(context);
           } else if (label == "Assistenza medica" ||
               label == "Servizi sanitari") {
@@ -8432,16 +8435,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              imagePath,
-              width: 32,
-              height: 32,
-              color: Colors.white,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.image_not_supported,
-                    color: Colors.white, size: 28);
-              },
-            ),
+            if (label == "Comunicazioni")
+              const Icon(
+                Icons.campaign_rounded,
+                color: Colors.white,
+                size: 30,
+              )
+            else
+              Image.asset(
+                imagePath,
+                width: 32,
+                height: 32,
+                color: Colors.white,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(Icons.image_not_supported,
+                      color: Colors.white, size: 28);
+                },
+              ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -8960,7 +8970,7 @@ class AppInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Porti Italiani',
+                      'pdg',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -8969,7 +8979,7 @@ class AppInfoScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Benvenuto in Porti Italiani. '
+                      'Benvenuto in pdg. '
                       'Questa app ti permette di rimanere aggiornato su notizie, servizi e risorse utili, '
                       'oltre a consultare webcam e dati meteo disponibili.',
                       style: TextStyle(
@@ -9353,13 +9363,13 @@ class ContactOptionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE0F7FA),
+      backgroundColor: AppColors.primary,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFFE0F7FA),
-              Color(0xFFF0F8FF),
+              AppColors.primary,
+              AppColors.secondaryBlue,
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -9640,9 +9650,9 @@ class ContactOptionsScreen extends StatelessWidget {
   }
 
   Widget _buildButton(BuildContext context, String label, String imagePath) {
-    // Tutti i servizi usano il colore blu principale
-    const Color primaryColor = AppColors.primary;
-    const Color secondaryColor = AppColors.secondaryBlue;
+    // Pulsanti servizi con azzurro chiaro
+    const Color primaryColor = Color(0xFF7CCBFF);
+    const Color secondaryColor = Color(0xFFA8DEFF);
 
     return Container(
       width: double.infinity,
@@ -9820,7 +9830,7 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
 
       // 2) Fallback email se endpoint non risponde bene
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        await sendAppEmail(
+        await EmailService.sendAppEmail(
           to: AppSettings.emailWebmaster,
           service: 'Ritiro rifiuti',
           senderName: widget.userName,
@@ -10020,7 +10030,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
 
     try {
       // Invia email tramite funzione centralizzata
-      await sendAppEmail(
+      await EmailService.sendAppEmail(
         to: AppSettings.emailWebmaster,
         service: widget.subject,
         senderName: name,
