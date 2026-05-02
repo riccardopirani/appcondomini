@@ -15,8 +15,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:mailer/mailer.dart' as mailer;
-import 'package:mailer/smtp_server.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
@@ -142,11 +140,8 @@ Future<Map<String, dynamic>> translatePost(
 }
 
 class EmailService {
-  static const String _smtpServer = 'pro.turbo-smtp.com';
-  static const int _smtpPort = 465;
-  static const String _smtpUsername = '20ec50606baae0792cfb';
-  static const String _smtpPassword = 'zaV9ZWPfDHCkMypY8X5I';
-  static const String _smtpFromAddress = 'no-reply@portobellodigallura.it';
+  /// Backend Render: invio SMTP lato server.
+  static const String _sendEmailBaseUrl = 'https://appcondomini.onrender.com';
 
   static Future<void> _sendRawEmail({
     required String to,
@@ -154,49 +149,72 @@ class EmailService {
     String? body,
     String? replyTo,
   }) async {
+    final subj = subject ?? 'Messaggio dall\'app pdg';
+    final textBody = body ?? '';
+
     try {
-      final smtpServerConfig = SmtpServer(
-        _smtpServer,
-        port: _smtpPort,
-        username: _smtpUsername,
-        password: _smtpPassword,
-        ssl: true,
-        ignoreBadCertificate: true,
-        allowInsecure: true,
-      );
+      final uri = Uri.parse('$_sendEmailBaseUrl/send-email');
+      final payload = <String, dynamic>{
+        'to': to,
+        'subject': subj,
+        'text': textBody,
+        'fromName': 'pdg',
+        if (replyTo != null && replyTo.isNotEmpty) 'replyTo': replyTo,
+      };
 
-      final message = mailer.Message()
-        ..from = const mailer.Address(_smtpFromAddress, 'pdg')
-        ..recipients.add(to)
-        ..subject = subject ?? 'Messaggio dall\'app pdg'
-        ..text = body ?? '';
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json; charset=UTF-8',
+              'Accept': 'application/json',
+              'User-Agent': AppSettings.userAgent,
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      if (replyTo != null && replyTo.isNotEmpty) {
-        message.headers['Reply-To'] = replyTo;
+      Map<String, dynamic>? data;
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          data = decoded;
+        }
+      } catch (_) {}
+
+      if (response.statusCode >= 200 &&
+          response.statusCode < 300 &&
+          data != null &&
+          data['ok'] == true) {
+        debugPrint(
+            'Email inviata via backend: messageId=${data['messageId']}');
+        return;
       }
 
-      final sendReport = await mailer.send(message, smtpServerConfig);
-      debugPrint('Email inviata con successo via SMTP: ${sendReport.toString()}');
+      debugPrint(
+          'Errore invio email backend: ${response.statusCode} ${response.body}');
+      throw Exception(
+          'Backend email: ${data?['error'] ?? response.statusCode}');
     } catch (e) {
-      debugPrint('Errore invio email via SMTP: $e');
-      final uri = Uri(
+      debugPrint('Errore invio email via backend: $e');
+      final mailUri = Uri(
         scheme: 'mailto',
         path: to,
         queryParameters: {
-          if (subject != null) 'subject': subject,
-          if (body != null) 'body': body,
+          'subject': subj,
+          'body': textBody,
         },
       );
 
       try {
-        final canLaunch = await canLaunchUrl(uri).timeout(
+        final canLaunch = await canLaunchUrl(mailUri).timeout(
           const Duration(seconds: 5),
           onTimeout: () => false,
         );
 
         if (canLaunch) {
           await launchUrl(
-            uri,
+            mailUri,
             mode: LaunchMode.externalApplication,
           );
         } else {
@@ -9968,6 +9986,11 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
 }
 
 class _EmailFormTabState extends State<EmailFormTab> {
+  /// PDF modulo richiesta ormeggio (dominio ufficiale del porto).
+  static final Uri _mooringFormPdfUri = Uri.parse(
+    'https://www.portobellodigallura.it/wp-content/uploads/2026/05/PDG_Richiesta_ormeggio_compilabile.pdf',
+  );
+
   late final TextEditingController _emailController;
   late final TextEditingController _nameController;
   final _phoneController = TextEditingController();
@@ -10076,6 +10099,39 @@ class _EmailFormTabState extends State<EmailFormTab> {
     }
   }
 
+  Future<void> _openMooringFormPdf() async {
+    try {
+      if (await canLaunchUrl(_mooringFormPdfUri)) {
+        await launchUrl(
+          _mooringFormPdfUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Impossibile aprire il modulo. Verifica la connessione.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Errore apertura modulo: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -10119,6 +10175,38 @@ class _EmailFormTabState extends State<EmailFormTab> {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (widget.subject == 'Ormeggio') ...[
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: _openMooringFormPdf,
+                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+                    label: const Text(
+                      'Download modulo',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0288D1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Si apre il PDF sul browser del dispositivo (Safari o Chrome).',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 const SizedBox(height: 20),
                 _buildTextField(
                   controller: _nameController,
