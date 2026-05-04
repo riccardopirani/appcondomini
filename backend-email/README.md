@@ -4,19 +4,15 @@ Micro-backend Node.js per inviare email dalla app tramite SMTP.
 
 ## Setup
 
-1. Copia il file di esempio:
+La configurazione SMTP e la porta sono definite in `server.js` (costanti in cima al file).
 
-```bash
-cp .env.example .env
-```
-
-2. Installa dipendenze (se non già fatto):
+1. Installa dipendenze:
 
 ```bash
 npm install
 ```
 
-3. Avvia:
+2. Avvia:
 
 ```bash
 npm run dev

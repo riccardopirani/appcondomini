@@ -1,21 +1,29 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-require('dotenv').config();
+
+/** Configurazione SMTP e server (ex .env.example) */
+const PORT = 8080;
+const SMTP_HOST = 'pro.turbo-smtp.com';
+/** 587 = submission senza TLS implicito (SMTPS); la sessione passa a TLS via STARTTLS. */
+const SMTP_PORT = 587;
+const SMTP_SECURE = false;
+const SMTP_USER = '20ec50606baae0792cfb';
+const SMTP_PASSWORD = 'zaV9ZWPfDHCkMypY8X5I';
+const SMTP_FROM = 'no-reply@portobellodigallura.it';
 
 const app = express();
-const port = Number(process.env.PORT || 8080);
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 const smtpConfig = {
-  host: process.env.SMTP_HOST || 'pro.turbo-smtp.com',
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: (process.env.SMTP_SECURE || 'true') === 'true',
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_SECURE,
   auth: {
-    user: process.env.SMTP_USER || '20ec50606baae0792cfb',
-    pass: process.env.SMTP_PASSWORD || 'zaV9ZWPfDHCkMypY8X5I',
+    user: SMTP_USER,
+    pass: SMTP_PASSWORD,
   },
 };
 
@@ -42,8 +50,7 @@ app.post('/send-email', async (req, res) => {
     });
   }
 
-  const fromAddress =
-    process.env.SMTP_FROM || 'no-reply@portobellodigallura.it';
+  const fromAddress = SMTP_FROM;
 
   try {
     const info = await transporter.sendMail({
@@ -69,7 +76,7 @@ app.post('/send-email', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(PORT, () => {
   // eslint-disable-next-line no-console
-  console.log(`PDG email backend listening on http://localhost:${port}`);
+  console.log(`PDG email backend listening on http://localhost:${PORT}`);
 });

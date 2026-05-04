@@ -140,7 +140,7 @@ Future<Map<String, dynamic>> translatePost(
 }
 
 class EmailService {
-  /// Backend Render: invio SMTP lato server.
+  /// Invio SMTP tramite backend Render (`_sendEmailBaseUrl`); nessun fallback mailto.
   static const String _sendEmailBaseUrl = 'https://appcondomini.onrender.com';
 
   static Future<void> _sendRawEmail({
@@ -193,37 +193,14 @@ class EmailService {
 
       debugPrint(
           'Errore invio email backend: ${response.statusCode} ${response.body}');
-      throw Exception(
+      final err = Exception(
           'Backend email: ${data?['error'] ?? response.statusCode}');
-    } catch (e) {
-      debugPrint('Errore invio email via backend: $e');
-      final mailUri = Uri(
-        scheme: 'mailto',
-        path: to,
-        queryParameters: {
-          'subject': subj,
-          'body': textBody,
-        },
-      );
-
-      try {
-        final canLaunch = await canLaunchUrl(mailUri).timeout(
-          const Duration(seconds: 5),
-          onTimeout: () => false,
-        );
-
-        if (canLaunch) {
-          await launchUrl(
-            mailUri,
-            mode: LaunchMode.externalApplication,
-          );
-        } else {
-          throw Exception('Impossibile inviare email');
-        }
-      } catch (fallbackError) {
-        debugPrint('Errore anche con fallback email client: $fallbackError');
-        throw Exception('Errore invio email: $e');
-      }
+      debugPrint('[EmailService] $err');
+      throw err;
+    } catch (e, stackTrace) {
+      debugPrint('[EmailService._sendRawEmail] ERRORE: $e');
+      debugPrint('[EmailService._sendRawEmail] Stack:\n$stackTrace');
+      rethrow;
     }
   }
 
@@ -9872,7 +9849,9 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
       );
       _requestController.clear();
       Navigator.of(context).pop();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[WastePickupScreen._submitWasteRequest] ERRORE: $e');
+      debugPrint('[WastePickupScreen] Stack:\n$stackTrace');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -10083,8 +10062,9 @@ class _EmailFormTabState extends State<EmailFormTab> {
         // Torna alla schermata precedente
         Navigator.pop(context);
       }
-    } catch (e) {
-      // Mostra messaggio di errore
+    } catch (e, stackTrace) {
+      debugPrint('[EmailFormTab._submitForm] ERRORE invio email: $e');
+      debugPrint('[EmailFormTab._submitForm] Stack:\n$stackTrace');
       if (mounted) {
         setState(() {
           _isLoading = false;
