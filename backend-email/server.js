@@ -10,7 +10,7 @@ const SMTP_PORT = 587;
 const SMTP_SECURE = false;
 const SMTP_USER = '20ec50606baae0792cfb';
 const SMTP_PASSWORD = 'zaV9ZWPfDHCkMypY8X5I';
-const SMTP_FROM = 'no-reply@portobellodigallura.it';
+const SMTP_FROM = 'no-reply@portobellodigallura.email';
 
 const app = express();
 
