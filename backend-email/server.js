@@ -4,7 +4,7 @@ const nodemailer = require('nodemailer');
 
 /** Configurazione SMTP e server (ex .env.example) */
 const PORT = 8080;
-const SMTP_HOST = 'pro.turbo-smtp.com';
+const SMTP_HOST =  'smtp.turbo-smtp.com';
 /** 587 = submission senza TLS implicito (SMTPS); la sessione passa a TLS via STARTTLS. */
 const SMTP_PORT = 587;
 const SMTP_SECURE = false;
@@ -25,6 +25,19 @@ const smtpConfig = {
     user: SMTP_USER,
     pass: SMTP_PASSWORD,
   },
+  requireTLS: true,
+
+  tls: {
+
+    rejectUnauthorized: false,
+
+  },
+
+  connectionTimeout: 10000,
+
+  greetingTimeout: 10000,
+
+  socketTimeout: 20000,
 };
 
 const transporter = nodemailer.createTransport(smtpConfig);
