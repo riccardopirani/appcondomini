@@ -3152,7 +3152,7 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => MyHomePage(
+        builder: (context) => const MyHomePage(
           title: '',
           userEmail: '',
           userName: '',
@@ -3170,7 +3170,7 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => MyHomePage(
+        builder: (context) => const MyHomePage(
           title: '',
           userEmail: '',
           userName: '',
@@ -3280,7 +3280,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => MyHomePage(
+              builder: (context) => const MyHomePage(
                 title: '',
                 userEmail: '',
                 userName: '',
@@ -3698,7 +3698,7 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => MyHomePage(
+            builder: (context) => const MyHomePage(
               title: '',
               userEmail: '',
               userName: '',
@@ -3729,7 +3729,7 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => MyHomePage(
+            builder: (context) => const MyHomePage(
               title: '',
               userEmail: '',
               userName: '',
@@ -3743,7 +3743,7 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => MyHomePage(
+            builder: (context) => const MyHomePage(
               title: '',
               userEmail: '',
               userName: '',
@@ -3853,7 +3853,7 @@ class _SplashScreenState extends State<SplashScreen>
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => MyHomePage(
+                builder: (context) => const MyHomePage(
                   title: '',
                   userEmail: '',
                   userName: '',
@@ -6733,9 +6733,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      Text(
+                      const Text(
                         'pdg',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Colors.white),
@@ -9219,7 +9219,7 @@ class _NoAccessMessageState extends State<NoAccessMessage>
                       if (!context.mounted) return;
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (context) => MyHomePage(
+                          builder: (context) => const MyHomePage(
                             title: '',
                             userEmail: '',
                             userName: '',
