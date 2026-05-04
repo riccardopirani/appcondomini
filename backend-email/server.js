@@ -8,8 +8,8 @@ const SMTP_HOST =  'smtp.turbo-smtp.com';
 /** 587 = submission senza TLS implicito (SMTPS); la sessione passa a TLS via STARTTLS. */
 const SMTP_PORT = 587;
 const SMTP_SECURE = false;
-const SMTP_USER = '20ec50606baae0792cfb';
-const SMTP_PASSWORD = 'zaV9ZWPfDHCkMypY8X5I';
+const SMTP_USER = 'f12b7bc7f22c095953eb';
+const SMTP_PASSWORD = '4jcwkx5dQl6JzLMib8rB';
 const SMTP_FROM = 'no-reply@portobellodigallura.email';
 
 const app = express();
@@ -26,6 +26,8 @@ const smtpConfig = {
     pass: SMTP_PASSWORD,
   },
   requireTLS: true,
+  debug:true,
+  logger: true,
 
   tls: {
 
