@@ -24,10 +24,7 @@ const smtpConfig = {
     user: SMTP_USER,
     pass: SMTP_PASSWORD,
   },
-  connectionTimeout: 10000,
   debugger: true,
-  greetingTimeout: 10000,
-  socketTimeout: 20000,
 };
 
 const transporter = nodemailer.createTransport(smtpConfig);
