@@ -5,8 +5,8 @@ const nodemailer = require('nodemailer');
 /** Configurazione SMTP e server (ex .env.example) */
 const PORT = Number(process.env.PORT) || 8080;
 const SMTP_HOST = 'pro.eu.turbo-smtp.com';
-/** Porta 25: SMTP in chiaro, senza TLS/SSL né upgrade STARTTLS */
-const SMTP_PORT = 25;
+/** Porta 465: SMTP con SSL/TLS implicito */
+const SMTP_PORT = 465;
 const SMTP_USER = 'f12b7bc7f22c095953eb';
 const SMTP_PASSWORD = '4jcwkx5dQl6JzLMib8rB';
 const SMTP_FROM = 'no-reply@portobellodigallura.email';
@@ -19,13 +19,11 @@ app.use(express.json({ limit: '1mb' }));
 const smtpConfig = {
   host: SMTP_HOST,
   port: SMTP_PORT,
-  secure: false,
+  secure: true,
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASSWORD,
   },
-  /** Non negozia STARTTLS: traffico SMTP solo plaintext */
-  ignoreTLS: true,
   connectionTimeout: 10000,
   debugger: true,
   greetingTimeout: 10000,
