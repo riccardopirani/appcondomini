@@ -27,6 +27,7 @@ const smtpConfig = {
   /** Non negozia STARTTLS: traffico SMTP solo plaintext */
   ignoreTLS: true,
   connectionTimeout: 10000,
+  debugger: true,
   greetingTimeout: 10000,
   socketTimeout: 20000,
 };
