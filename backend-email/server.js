@@ -5,8 +5,6 @@ const nodemailer = require('nodemailer');
 /** Configurazione SMTP e server (ex .env.example) */
 const PORT = Number(process.env.PORT) || 8080;
 const SMTP_HOST = 'pro.eu.turbo-smtp.com';
-/** Porta 465: SMTP con SSL/TLS implicito */
-const SMTP_PORT = 465;
 const SMTP_USER = 'eb76d2df1111fe69401d';
 const SMTP_PASSWORD = 'hCaVAzwHPRJXlkMcU2fd';
 const SMTP_FROM = 'no-reply@portobellodigallura.email';
@@ -21,22 +19,29 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-const smtpConfig = {
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: true,
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASSWORD,
-  },
-  logger: true,
-  debug: true,
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 30000,
-};
+const smtpRoutes = [
+  { label: 'ssl-465', port: 465, secure: true },
+  { label: 'starttls-587', port: 587, secure: false, requireTLS: true },
+  { label: 'plain-2525', port: 2525, secure: false },
+];
 
-const transporter = nodemailer.createTransport(smtpConfig);
+function createTransport(route) {
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: route.port,
+    secure: route.secure,
+    requireTLS: route.requireTLS || false,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASSWORD,
+    },
+    logger: true,
+    debug: true,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+  });
+}
 
 app.use((req, _res, next) => {
   console.log(
@@ -80,19 +85,52 @@ app.post('/send-email', async (req, res) => {
   }
 
   const fromAddress = SMTP_FROM;
+  const mailOptions = {
+    from: `"${fromName || 'pdg'}" <${fromAddress}>`,
+    to,
+    subject,
+    text: text || undefined,
+    html: html || undefined,
+    replyTo: replyTo || undefined,
+  };
 
   try {
-    const info = await transporter.sendMail({
-      from: `"${fromName || 'pdg'}" <${fromAddress}>`,
-      to,
-      subject,
-      text: text || undefined,
-      html: html || undefined,
-      replyTo: replyTo || undefined,
-    });
+    let info;
+    let selectedRoute;
+    let lastError;
+
+    for (const route of smtpRoutes) {
+      const transporter = createTransport(route);
+      const routeStartMs = Date.now();
+      console.log(
+        `[${nowIso()}] [${requestId}] trying route=${route.label} host=${SMTP_HOST} port=${route.port} secure=${route.secure} requireTLS=${Boolean(route.requireTLS)}`,
+      );
+
+      try {
+        info = await transporter.sendMail(mailOptions);
+        selectedRoute = route;
+        console.log(
+          `[${nowIso()}] [${requestId}] route success=${route.label} elapsedMs=${Date.now() - routeStartMs}`,
+        );
+        break;
+      } catch (routeError) {
+        lastError = routeError;
+        console.warn(`[${nowIso()}] [${requestId}] route failed=${route.label}`, {
+          message: routeError?.message,
+          code: routeError?.code,
+          command: routeError?.command,
+          responseCode: routeError?.responseCode,
+          elapsedMs: Date.now() - routeStartMs,
+        });
+      }
+    }
+
+    if (!info || !selectedRoute) {
+      throw lastError || new Error('SMTP send failed on all routes');
+    }
 
     console.log(
-      `[${nowIso()}] [${requestId}] success messageId=${info.messageId} accepted=${JSON.stringify(
+      `[${nowIso()}] [${requestId}] success route=${selectedRoute.label} messageId=${info.messageId} accepted=${JSON.stringify(
         info.accepted,
       )} rejected=${JSON.stringify(info.rejected)} elapsedMs=${Date.now() - startMs}`,
     );
@@ -113,8 +151,7 @@ app.post('/send-email', async (req, res) => {
       stack: error?.stack,
       elapsedMs: Date.now() - startMs,
       smtpHost: SMTP_HOST,
-      smtpPort: SMTP_PORT,
-      smtpSecure: true,
+      attemptedRoutes: smtpRoutes.map((route) => route.label),
     });
     res.status(500).json({
       ok: false,
@@ -126,6 +163,8 @@ app.post('/send-email', async (req, res) => {
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(
-    `[${nowIso()}] PDG email backend listening on http://localhost:${PORT} | smtpHost=${SMTP_HOST} smtpPort=${SMTP_PORT} secure=true user=${SMTP_USER}`,
+    `[${nowIso()}] PDG email backend listening on http://localhost:${PORT} | smtpHost=${SMTP_HOST} routes=${smtpRoutes
+      .map((route) => `${route.label}:${route.port}`)
+      .join(',')} user=${SMTP_USER}`,
   );
 });
