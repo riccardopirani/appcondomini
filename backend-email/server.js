@@ -32,10 +32,10 @@ app.get('/health', (_, res) => {
 app.post('/send-email', async (req, res) => {
   const requestId = `mail-${Date.now()}-${++requestCounter}`;
   const startMs = Date.now();
-  const { to, subject, text, html, replyTo, fromName } = req.body || {};
+  const { to, subject, text, html, replyTo } = req.body || {};
 
   console.log(
-    `[${nowIso()}] [${requestId}] payload to=${to || 'missing'} subject="${subject || 'missing'}" text=${Boolean(text)} html=${Boolean(html)} replyTo=${Boolean(replyTo)} fromName="${fromName || 'pdg'}"`,
+    `[${nowIso()}] [${requestId}] payload to=${to || 'missing'} subject="${subject || 'missing'}" text=${Boolean(text)} html=${Boolean(html)} replyTo=${Boolean(replyTo)} from=${SMTP_FROM}`,
   );
 
   if (!to || !subject || (!text && !html)) {
@@ -46,14 +46,15 @@ app.post('/send-email', async (req, res) => {
     });
   }
 
+  /** Mittente: stesso indirizzo come nome visualizzato e come email (es. no-reply@… <no-reply@…>) */
   const payload = {
     from: SMTP_FROM,
+    from_name: SMTP_FROM,
     to,
     subject,
     ...(text && { content: text }),
     ...(html && { html_content: html }),
     ...(replyTo && { reply_to: replyTo }),
-    ...(fromName && { from_name: fromName }),
   };
 
   try {

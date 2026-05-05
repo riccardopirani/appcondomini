@@ -158,7 +158,6 @@ class EmailService {
         'to': to,
         'subject': subj,
         'text': textBody,
-        'fromName': 'pdg',
         if (replyTo != null && replyTo.isNotEmpty) 'replyTo': replyTo,
       };
 
