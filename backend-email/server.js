@@ -3,7 +3,7 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 
 /** Configurazione SMTP e server (ex .env.example) */
-const PORT = 8080;
+const PORT = Number(process.env.PORT) || 8080;
 const SMTP_HOST = 'pro.eu.turbo-smtp.com';
 /** Porta 25: SMTP in chiaro, senza TLS/SSL né upgrade STARTTLS */
 const SMTP_PORT = 25;
