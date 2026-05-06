@@ -1,0 +1,6 @@
+# Copia in key.properties (solo in locale) oppure usa i segreti in GitHub Actions.
+# storeFile è relativo alla cartella android/app/
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=CHANGE_ME
+storeFile=release-keystore.jks

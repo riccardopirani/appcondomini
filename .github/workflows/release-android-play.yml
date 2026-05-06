@@ -1,0 +1,116 @@
+# Rilascio automatico Android → Google Play Console
+#
+# Segreti da configurare nel repo GitHub → Settings → Secrets and variables → Actions:
+#
+#   ANDROID_KEYSTORE_BASE64
+#     Keystore in Base64 (una sola riga). Da macOS, con la tua chiave in keys/chiave:
+#       base64 -i keys/chiave | tr -d '\n' | pbcopy
+#     Incolla il valore nel segreto (o usa: base64 -i keys/chiave | tr -d '\n' > /tmp/b64.txt)
+#
+#   ANDROID_STORE_PASSWORD   — password del keystore
+#   ANDROID_KEY_PASSWORD     — password della chiave (spesso uguale alla store)
+#   ANDROID_KEY_ALIAS        — alias della chiave di firma
+#
+#   PLAY_SERVICE_ACCOUNT_JSON — JSON del service account Google Cloud collegato a Play Console
+#     (API access → Service accounts → crea chiave JSON; in Play Console: Utenti → Invita utente
+#      con ruolo “Release” / permessi per caricare bundle)
+#
+# Avvio:
+#   - Manuale: Actions → “Release Android to Play Console” → Run workflow (scegli la track).
+#   - Tag: push di un tag semver es. v1.1.3 → build + upload sulla track PLAY_TRACK_ON_TAG.
+
+name: Release Android to Play Console
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Track Play Console
+        type: choice
+        required: true
+        default: internal
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+  push:
+    tags:
+      - 'v*'
+
+env:
+  # Track usata quando il workflow parte da push tag (modifica se vuoi produzione automatica su tag)
+  PLAY_TRACK_ON_TAG: internal
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Play track
+        id: track
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.track }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ env.PLAY_TRACK_ON_TAG }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Missing secret ANDROID_KEYSTORE_BASE64"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release-keystore.jks
+
+      - name: Write android/key.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "Missing ANDROID_STORE_PASSWORD, ANDROID_KEY_PASSWORD or ANDROID_KEY_ALIAS"
+            exit 1
+          fi
+          cat > android/key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=release-keystore.jks
+          EOF
+
+      - name: Build App Bundle (release)
+        run: flutter build appbundle --release
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1.1.4
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.viewsoftware.condominio
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: ${{ steps.track.outputs.value }}
+          status: completed
