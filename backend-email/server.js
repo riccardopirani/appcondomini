@@ -6,7 +6,11 @@ const PORT = Number(process.env.PORT) || 8080;
 const TURBO_API_URL = 'https://api.turbo-smtp.com/api/v2/mail/send';
 const CONSUMER_KEY = 'eb76d2df1111fe69401d';
 const CONSUMER_SECRET = 'hCaVAzwHPRJXlkMcU2fd';
-const SMTP_FROM = 'no-reply@portobellodigallura.email';
+const SMTP_FROM =
+  process.env.SMTP_FROM || 'no-reply@portobellodigallura.email';
+/** Nome visualizzato del mittente (TurboSMTP: from_name). */
+const SMTP_FROM_NAME =
+  process.env.SMTP_FROM_NAME || 'NO-REPLY | Portobellodigallura.it';
 
 const app = express();
 let requestCounter = 0;
@@ -35,7 +39,7 @@ app.post('/send-email', async (req, res) => {
   const { to, subject, text, html, replyTo } = req.body || {};
 
   console.log(
-    `[${nowIso()}] [${requestId}] payload to=${to || 'missing'} subject="${subject || 'missing'}" text=${Boolean(text)} html=${Boolean(html)} replyTo=${Boolean(replyTo)} from=${SMTP_FROM}`,
+    `[${nowIso()}] [${requestId}] payload to=${to || 'missing'} subject="${subject || 'missing'}" text=${Boolean(text)} html=${Boolean(html)} replyTo=${Boolean(replyTo)} from="${SMTP_FROM_NAME}" <${SMTP_FROM}>`,
   );
 
   if (!to || !subject || (!text && !html)) {
@@ -46,10 +50,10 @@ app.post('/send-email', async (req, res) => {
     });
   }
 
-  /** Mittente: stesso indirizzo come nome visualizzato e come email (es. no-reply@… <no-reply@…>) */
+  /** Mittente: nome visualizzato + indirizzo (TurboSMTP: from + from_name). */
   const payload = {
     from: SMTP_FROM,
-    from_name: SMTP_FROM,
+    from_name: SMTP_FROM_NAME,
     to,
     subject,
     ...(text && { content: text }),
@@ -105,6 +109,6 @@ app.post('/send-email', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(
-    `[${nowIso()}] PDG email backend listening on http://localhost:${PORT} | via TurboSMTP HTTP API | from=${SMTP_FROM}`,
+    `[${nowIso()}] PDG email backend listening on http://localhost:${PORT} | via TurboSMTP HTTP API | from="${SMTP_FROM_NAME}" <${SMTP_FROM}>`,
   );
 });

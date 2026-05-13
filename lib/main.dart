@@ -1014,9 +1014,6 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   String currentCategory = '';
   Map<String, List<dynamic>> categoryMap = {};
   String currentLanguage = 'it';
-
-  /// Tab **Articoli** (non News): card con sfondo azzurro → testi chiari.
-  bool get _lightTextInArticleCards => !widget.showDirectList;
   
   // 🔥 Ruoli utente per filtrare categorie
   List<String> _userRoles = [];
@@ -1508,16 +1505,12 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: _lightTextInArticleCards
-                              ? Colors.white.withOpacity(0.2)
-                              : AppColors.secondaryBlue.withOpacity(0.1),
+                          color: AppColors.secondaryBlue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.folder_outlined,
-                          color: _lightTextInArticleCards
-                              ? Colors.white
-                              : AppColors.secondaryBlue,
+                          color: AppColors.secondaryBlue,
                           size: 24,
                         ),
                       ),
@@ -1528,12 +1521,10 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           children: [
                             Text(
                               category,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: _lightTextInArticleCards
-                                    ? Colors.white
-                                    : const Color(0xFF2C3E50),
+                                color: Colors.black,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1551,11 +1542,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                                 }
                                 return Text(
                                   '$postCount $articlesText',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 14,
-                                    color: _lightTextInArticleCards
-                                        ? Colors.white70
-                                        : Colors.grey[600],
+                                    color: Colors.black87,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 );
@@ -1564,11 +1553,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           ],
                         ),
                       ),
-                      Icon(
+                      const Icon(
                         Icons.arrow_forward_ios,
-                        color: _lightTextInArticleCards
-                            ? Colors.white54
-                            : Colors.grey[400],
+                        color: Colors.black54,
                         size: 16,
                       ),
                     ],
@@ -1901,7 +1888,6 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       final url = post['link'] ?? '';
       final date = post['date'] ?? '';
       final bool isUrgente = _isPostUrgent(post);
-      final bool light = _lightTextInArticleCards;
 
       // Estrai categoria
       final categories = post['_embedded']?['wp:term']?[0];
@@ -1982,22 +1968,18 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: light
-                                ? Colors.white.withOpacity(0.18)
-                                : (status == 'private'
-                                    ? const Color(0xFFFF9800).withOpacity(0.1)
-                                    : AppColors.secondaryBlue.withOpacity(0.1)),
+                            color: status == 'private'
+                                ? const Color(0xFFFF9800).withOpacity(0.1)
+                                : AppColors.secondaryBlue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             status == 'private'
                                 ? Icons.lock_rounded
                                 : Icons.article_rounded,
-                            color: light
-                                ? Colors.white
-                                : (status == 'private'
-                                    ? const Color(0xFFFF9800)
-                                    : AppColors.secondaryBlue),
+                            color: status == 'private'
+                                ? const Color(0xFFFF9800)
+                                : AppColors.secondaryBlue,
                             size: 20,
                           ),
                         ),
@@ -2008,11 +1990,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: light
-                                  ? Colors.white
-                                  : (status == 'private'
-                                      ? const Color(0xFFE65100)
-                                      : const Color(0xFF2C3E50)),
+                              color: status == 'private'
+                                  ? const Color(0xFFE65100)
+                                  : Colors.black,
                               height: 1.3,
                             ),
                             maxLines: 2,
@@ -2023,15 +2003,11 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: light
-                                ? Colors.black.withOpacity(0.2)
-                                : (isUrgente
-                                    ? const Color(0xFFE53935).withOpacity(0.1)
-                                    : (status == 'private'
-                                        ? const Color(0xFFFF9800)
-                                            .withOpacity(0.1)
-                                        : const Color(0xFF4CAF50)
-                                            .withOpacity(0.1))),
+                            color: isUrgente
+                                ? const Color(0xFFE53935).withOpacity(0.1)
+                                : (status == 'private'
+                                    ? const Color(0xFFFF9800).withOpacity(0.1)
+                                    : const Color(0xFF4CAF50).withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -2043,13 +2019,11 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: light
-                                  ? Colors.white
-                                  : (isUrgente
-                                      ? const Color(0xFFE53935)
-                                      : (status == 'private'
-                                          ? const Color(0xFFFF9800)
-                                          : const Color(0xFF4CAF50))),
+                              color: isUrgente
+                                  ? const Color(0xFFE53935)
+                                  : (status == 'private'
+                                      ? const Color(0xFFFF9800)
+                                      : const Color(0xFF4CAF50)),
                             ),
                           ),
                         ),
@@ -2070,19 +2044,16 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: light
-                                    ? Colors.white.withOpacity(0.22)
-                                    : const Color(0xFFE3F2FD).withOpacity(0.8),
+                                color:
+                                    const Color(0xFFE3F2FD).withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 category,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: light
-                                      ? Colors.white
-                                      : const Color(0xFF1976D2),
+                                  color: Colors.black87,
                                 ),
                               ),
                             );
@@ -2098,11 +2069,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         _removeHtmlTags(excerpt),
                         style: TextStyle(
                           fontSize: 14,
-                          color: light
-                              ? Colors.white.withOpacity(0.92)
-                              : (status == 'private'
-                                  ? const Color(0xFFBF360C).withOpacity(0.8)
-                                  : const Color(0xFF7F8C8D)),
+                          color: status == 'private'
+                              ? const Color(0xFFBF360C).withOpacity(0.8)
+                              : Colors.black87,
                           height: 1.4,
                         ),
                         maxLines: 3,
@@ -2118,14 +2087,14 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: light ? Colors.white54 : Colors.grey[500],
+                            color: Colors.grey[800],
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _formatDate(date),
                             style: TextStyle(
                               fontSize: 11,
-                              color: light ? Colors.white70 : Colors.grey[500],
+                              color: Colors.grey[800],
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -2134,7 +2103,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 14,
-                          color: light ? Colors.white38 : Colors.grey[400],
+                          color: Colors.black54,
                         ),
                       ],
                     ),
@@ -4178,6 +4147,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         barrierDismissible: true,
         builder: (BuildContext dialogContext) {
           return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -4202,23 +4173,32 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             ),
             content: SizedBox(
               width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2C3E50),
+              child: Container(
+                width: double.maxFinite,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  if (currentPost != null) ...[
-                    const SizedBox(height: 16),
-                    _buildUrgentContentWidget(currentPost),
+                    if (currentPost != null) ...[
+                      const SizedBox(height: 16),
+                      _buildUrgentContentWidget(currentPost),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             actions: [
@@ -4290,65 +4270,57 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         content.toLowerCase().contains('embed');
 
     if (hasVideo) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE74C3C).withOpacity(0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.play_circle_outline,
-                    color: Color(0xFFE74C3C), size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Contenuto Video Rilevato',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFE74C3C),
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Questo post contiene contenuti video. Tocca "Visualizza Completo" per vedere i video nel browser.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey[700],
-              ),
-            ),
-            if (excerpt.isNotEmpty && excerpt != content) ...[
-              const SizedBox(height: 12),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.play_circle_outline,
+                  color: Color(0xFFE74C3C), size: 20),
+              SizedBox(width: 8),
               Text(
-                _removeHtmlTags(excerpt),
-                style: const TextStyle(
+                'Contenuto Video Rilevato',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
                   fontSize: 14,
-                  color: Color(0xFF2C3E50),
                 ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Questo post contiene contenuti video. Tocca "Visualizza Completo" per vedere i video nel browser.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.black87,
+            ),
+          ),
+          if (excerpt.isNotEmpty && excerpt != content) ...[
+            const SizedBox(height: 12),
+            Text(
+              _removeHtmlTags(excerpt),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
-        ),
+        ],
       );
     } else {
       // Nessun video, mostra il contenuto normale
       final displayText = excerpt.isNotEmpty ? excerpt : content;
-      return Container(
+      return ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 200),
         child: SingleChildScrollView(
           child: Text(
             _removeHtmlTags(displayText),
             style: const TextStyle(
               fontSize: 14,
-              color: Color(0xFF2C3E50),
+              color: Colors.black87,
             ),
           ),
         ),
@@ -9919,7 +9891,16 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
                       color: AppColors.textGray,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Specificare l\'orario di ritiro',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: _requestController,
                     maxLines: 6,
@@ -10356,8 +10337,6 @@ class PostDetailScreen extends StatelessWidget {
         post['title']?['rendered'] ?? 'Titolo non disponibile');
     final content = _removeHtmlTags(
         post['content']?['rendered'] ?? 'Contenuto non disponibile');
-    final excerpt = _removeHtmlTags(post['excerpt']?['rendered'] ?? '');
-    final authorId = post['author'] ?? 0;
     final status = post['status'] ?? '';
     final date = post['date'] ?? '';
     final url = post['link'] ?? '';
@@ -10369,7 +10348,16 @@ class PostDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
-        title: const Text('Dettaglio Post'),
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -10409,19 +10397,6 @@ class PostDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
-            // Titolo
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                height: 1.3,
-              ),
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 16),
 
             // Informazioni del post
             Container(
