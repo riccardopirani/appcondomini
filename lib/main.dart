@@ -1014,6 +1014,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   String currentCategory = '';
   Map<String, List<dynamic>> categoryMap = {};
   String currentLanguage = 'it';
+
+  /// Tab **Articoli** (non News): card con sfondo azzurro → testi chiari.
+  bool get _lightTextInArticleCards => !widget.showDirectList;
   
   // 🔥 Ruoli utente per filtrare categorie
   List<String> _userRoles = [];
@@ -1455,7 +1458,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     final availableCategories = _getAvailableCategories();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.loggedInBackground,
       body: showCategories ? _buildCategoriesView() : _buildArticlesView(),
     );
   }
@@ -1496,11 +1499,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Colors.white, Color(0xFFFAFAFA)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  gradient: AppColors.serviceButtonGradient,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -1509,12 +1508,16 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.secondaryBlue.withOpacity(0.1),
+                          color: _lightTextInArticleCards
+                              ? Colors.white.withOpacity(0.2)
+                              : AppColors.secondaryBlue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.folder_outlined,
-                          color: AppColors.secondaryBlue,
+                          color: _lightTextInArticleCards
+                              ? Colors.white
+                              : AppColors.secondaryBlue,
                           size: 24,
                         ),
                       ),
@@ -1525,10 +1528,12 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           children: [
                             Text(
                               category,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF2C3E50),
+                                color: _lightTextInArticleCards
+                                    ? Colors.white
+                                    : const Color(0xFF2C3E50),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1548,7 +1553,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                                   '$postCount $articlesText',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey[600],
+                                    color: _lightTextInArticleCards
+                                        ? Colors.white70
+                                        : Colors.grey[600],
                                     fontWeight: FontWeight.w500,
                                   ),
                                 );
@@ -1559,7 +1566,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       ),
                       Icon(
                         Icons.arrow_forward_ios,
-                        color: Colors.grey[400],
+                        color: _lightTextInArticleCards
+                            ? Colors.white54
+                            : Colors.grey[400],
                         size: 16,
                       ),
                     ],
@@ -1776,14 +1785,14 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       TextSpan(
                         text: 'Tramite app ',
                         style: TextStyle(
-                          color: Color(0xFF1A1A1A),
+                          color: Colors.white,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       TextSpan(
                         text: 'sono disponibili solo ',
                         style: TextStyle(
-                          color: Color(0xFF1A1A1A),
+                          color: Colors.white,
                         ),
                       ),
                       TextSpan(
@@ -1892,6 +1901,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       final url = post['link'] ?? '';
       final date = post['date'] ?? '';
       final bool isUrgente = _isPostUrgent(post);
+      final bool light = _lightTextInArticleCards;
 
       // Estrai categoria
       final categories = post['_embedded']?['wp:term']?[0];
@@ -1948,11 +1958,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           )
-                        : const LinearGradient(
-                            colors: [Colors.white, Color(0xFFFAFAFA)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )),
+                        : AppColors.serviceButtonGradient),
                 border: isUrgente
                     ? Border.all(
                         color: const Color(0xFFE53935),
@@ -1976,18 +1982,22 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: status == 'private'
-                                ? const Color(0xFFFF9800).withOpacity(0.1)
-                                : AppColors.secondaryBlue.withOpacity(0.1),
+                            color: light
+                                ? Colors.white.withOpacity(0.18)
+                                : (status == 'private'
+                                    ? const Color(0xFFFF9800).withOpacity(0.1)
+                                    : AppColors.secondaryBlue.withOpacity(0.1)),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             status == 'private'
                                 ? Icons.lock_rounded
                                 : Icons.article_rounded,
-                            color: status == 'private'
-                                ? const Color(0xFFFF9800)
-                                : AppColors.secondaryBlue,
+                            color: light
+                                ? Colors.white
+                                : (status == 'private'
+                                    ? const Color(0xFFFF9800)
+                                    : AppColors.secondaryBlue),
                             size: 20,
                           ),
                         ),
@@ -1998,9 +2008,11 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: status == 'private'
-                                  ? const Color(0xFFE65100)
-                                  : const Color(0xFF2C3E50),
+                              color: light
+                                  ? Colors.white
+                                  : (status == 'private'
+                                      ? const Color(0xFFE65100)
+                                      : const Color(0xFF2C3E50)),
                               height: 1.3,
                             ),
                             maxLines: 2,
@@ -2011,11 +2023,15 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isUrgente
-                                ? const Color(0xFFE53935).withOpacity(0.1)
-                                : (status == 'private'
-                                    ? const Color(0xFFFF9800).withOpacity(0.1)
-                                    : const Color(0xFF4CAF50).withOpacity(0.1)),
+                            color: light
+                                ? Colors.black.withOpacity(0.2)
+                                : (isUrgente
+                                    ? const Color(0xFFE53935).withOpacity(0.1)
+                                    : (status == 'private'
+                                        ? const Color(0xFFFF9800)
+                                            .withOpacity(0.1)
+                                        : const Color(0xFF4CAF50)
+                                            .withOpacity(0.1))),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -2027,11 +2043,13 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isUrgente
-                                  ? const Color(0xFFE53935)
-                                  : (status == 'private'
-                                      ? const Color(0xFFFF9800)
-                                      : const Color(0xFF4CAF50)),
+                              color: light
+                                  ? Colors.white
+                                  : (isUrgente
+                                      ? const Color(0xFFE53935)
+                                      : (status == 'private'
+                                          ? const Color(0xFFFF9800)
+                                          : const Color(0xFF4CAF50))),
                             ),
                           ),
                         ),
@@ -2052,15 +2070,19 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE3F2FD).withOpacity(0.8),
+                                color: light
+                                    ? Colors.white.withOpacity(0.22)
+                                    : const Color(0xFFE3F2FD).withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 category,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF1976D2),
+                                  color: light
+                                      ? Colors.white
+                                      : const Color(0xFF1976D2),
                                 ),
                               ),
                             );
@@ -2076,9 +2098,11 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         _removeHtmlTags(excerpt),
                         style: TextStyle(
                           fontSize: 14,
-                          color: status == 'private'
-                              ? const Color(0xFFBF360C).withOpacity(0.8)
-                              : const Color(0xFF7F8C8D),
+                          color: light
+                              ? Colors.white.withOpacity(0.92)
+                              : (status == 'private'
+                                  ? const Color(0xFFBF360C).withOpacity(0.8)
+                                  : const Color(0xFF7F8C8D)),
                           height: 1.4,
                         ),
                         maxLines: 3,
@@ -2094,14 +2118,14 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: Colors.grey[500],
+                            color: light ? Colors.white54 : Colors.grey[500],
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _formatDate(date),
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey[500],
+                              color: light ? Colors.white70 : Colors.grey[500],
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -2110,7 +2134,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 14,
-                          color: Colors.grey[400],
+                          color: light ? Colors.white38 : Colors.grey[400],
                         ),
                       ],
                     ),
@@ -2289,13 +2313,14 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
         title: Text(
           widget.category,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: AppColors.secondary,
+        backgroundColor: AppColors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -2367,11 +2392,7 @@ class _CategoryPostsScreenState extends State<CategoryPostsScreen> {
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   )
-                                : const LinearGradient(
-                                    colors: [Colors.white, Color(0xFFFAFAFA)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
+                                : AppColors.serviceButtonGradient,
                             border: status == 'private'
                                 ? Border.all(
                                     color: const Color(0xFFFF9800)
@@ -2596,6 +2617,7 @@ class _CustomWebViewScreenState extends State<CustomWebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -2662,7 +2684,7 @@ class WebcamScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.loggedInBackground,
       body: Container(
         child: SafeArea(
           child: Padding(
@@ -6661,15 +6683,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     if (isLoadingUserData) {
       return Scaffold(
+        backgroundColor: AppColors.loggedInBackground,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
               const SizedBox(height: 20),
               const Text(
                 'Caricamento dati...',
-                style: TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: 16, color: Colors.white70),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -6692,14 +6717,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             : 'Utente';
 
     return Scaffold(
+      backgroundColor: AppColors.loggedInBackground,
       endDrawer: Drawer(
         child: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.secondaryBlue],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: AppColors.loggedInBackgroundGradient,
           ),
           child: SafeArea(
             child: Column(
@@ -6981,7 +7003,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         preferredSize: const Size.fromHeight(60),
         child: Builder(
           builder: (ctx) => AppBar(
-            backgroundColor: AppColors.secondary,
+            backgroundColor: AppColors.white,
             elevation: 8,
             automaticallyImplyLeading: false,
             centerTitle: true,
@@ -6998,7 +7020,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       ),
       body: _getBody(),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: AppColors.secondary,
+        backgroundColor: AppColors.white,
         selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.black54,
         currentIndex: _selectedIndex,
@@ -7074,19 +7096,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget _homeContent() {
     // Mostra indicatore di caricamento se i post urgenti sono vuoti e stiamo ancora caricando
     if (urgentPosts.isEmpty && isLoadingPosts) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'Caricamento comunicazioni urgenti...',
               style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF666666),
+                color: Colors.white70,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -7119,11 +7141,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF81D4FA), Color(0xFFE1F5FE)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        gradient: AppColors.loggedInBackgroundGradient,
       ),
       child: Center(
         child: Padding(
@@ -7202,7 +7220,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                       color: isUrgente
                                           ? const Color(
                                               0xFFFFEBEE) // Sfondo rosso chiaro per urgenti
-                                          : Colors.white,
+                                          : null,
+                                      gradient: isUrgente
+                                          ? null
+                                          : AppColors.serviceButtonGradient,
                                       borderRadius: BorderRadius.circular(24),
                                       border: isUrgente
                                           ? Border.all(
@@ -7525,7 +7546,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
                     const SizedBox(height: 40),
                     const Icon(Icons.inbox_outlined,
-                        size: 64, color: Colors.grey),
+                        size: 64, color: Colors.white70),
                     const SizedBox(height: 16),
                     const Text(
                       'Nessuna comunicazione disponibile',
@@ -7533,7 +7554,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey),
+                          color: Colors.white70),
                     ),
                     const SizedBox(height: 24),
                     Center(
@@ -7544,7 +7565,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         icon: const Icon(Icons.refresh),
                         label: const Text('Ricarica'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
+                          backgroundColor: AppColors.secondaryBlue,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 24, vertical: 12),
@@ -7572,14 +7593,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
             const SizedBox(height: 16),
             const Text(
               'Caricamento comunicazioni urgenti...',
               style: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF666666),
+                color: Colors.white70,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -7619,15 +7640,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     // Mostra indicatore durante il rendering iniziale se necessario
     if (visiblePosts.isNotEmpty && isLoadingPosts) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+            const SizedBox(height: 16),
+            const Text(
               'Rendering comunicazioni urgenti...',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(fontSize: 16, color: Colors.white70),
             ),
           ],
         ),
@@ -7637,11 +7660,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF81D4FA), Color(0xFFE1F5FE)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        gradient: AppColors.loggedInBackgroundGradient,
       ),
       child: Center(
         child: Padding(
@@ -7713,14 +7732,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                           )
-                                        : const LinearGradient(
-                                            colors: [
-                                              Colors.white,
-                                              Color(0xFFFAFAFA)
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
+                                        : AppColors.serviceButtonGradient,
                                 border: isUrgente
                                     ? Border.all(
                                         color: const Color(0xFFE53935)
@@ -8074,7 +8086,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(Icons.inbox_outlined,
-                        size: 64, color: Colors.grey),
+                        size: 64, color: Colors.white70),
                     const SizedBox(height: 16),
                     const Text(
                       'Nessuna comunicazione disponibile',
@@ -8082,7 +8094,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey),
+                          color: Colors.white70),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
@@ -8092,7 +8104,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Ricarica'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
+                        backgroundColor: AppColors.secondaryBlue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 24, vertical: 12),
@@ -8363,29 +8375,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   // Metodo per costruire i pulsanti dei servizi
   Widget _buildButton(BuildContext context, String label, String imagePath) {
-    // Tutti i servizi usano il colore blu principale
-    const Color primaryColor = AppColors.primary;
-    const Color secondaryColor = AppColors.secondaryBlue;
-
     return Container(
       width: double.infinity,
       height: 70,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [primaryColor, secondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+      decoration: AppColors.serviceButtonBoxDecoration(radius: 20),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -8887,14 +8881,15 @@ class TabScreen extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 22,
-              color: Colors.white,
+              color: AppColors.primary,
             ),
           ),
-          backgroundColor: AppColors.secondary, // Giallo sole
+          backgroundColor: AppColors.white,
+          foregroundColor: AppColors.primary,
           centerTitle: true,
           elevation: 6,
         ),
-        backgroundColor: const Color(0xFFFFF8E1), // Sabbia chiara
+        backgroundColor: AppColors.loggedInBackground,
         body: TabBarView(
           children: [
             posts.isEmpty
@@ -8908,7 +8903,7 @@ class TabScreen extends StatelessWidget {
           ],
         ),
         bottomNavigationBar: Container(
-          color: const Color(0xFFFFC107), // Giallo sole
+          color: Colors.white,
           child: const TabBar(
             indicatorColor: Color(0xFF1565C0),
             // Blu mare
@@ -8938,10 +8933,10 @@ class AppInfoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE0F7FA),
+      backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
         title: const Text('Informazioni App'),
-        backgroundColor: AppColors.secondary,
+        backgroundColor: AppColors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -9255,14 +9250,7 @@ class PostTab extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF81D4FA), // Azzurro mare
-            Color(0xFFE1F5FE), // Celeste chiaro
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        gradient: AppColors.loggedInBackgroundGradient,
       ),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -9275,7 +9263,7 @@ class PostTab extends StatelessWidget {
           return Container(
             margin: const EdgeInsets.only(bottom: 24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              gradient: AppColors.serviceButtonGradient,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -9359,17 +9347,10 @@ class ContactOptionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppColors.loggedInBackground,
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.primary,
-              AppColors.secondaryBlue,
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+          gradient: AppColors.loggedInBackgroundGradient,
         ),
         child: SafeArea(
           child: Padding(
@@ -9646,29 +9627,11 @@ class ContactOptionsScreen extends StatelessWidget {
   }
 
   Widget _buildButton(BuildContext context, String label, String imagePath) {
-    // Pulsanti servizi con azzurro chiaro
-    const Color primaryColor = Color(0xFF7CCBFF);
-    const Color secondaryColor = Color(0xFFA8DEFF);
-
     return Container(
       width: double.infinity,
       height: 70,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [primaryColor, secondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+      decoration: AppColors.serviceButtonBoxDecoration(radius: 20),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -9866,97 +9829,152 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
         title: const Text('Ritiro rifiuti'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Seleziona la fascia oraria',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Container(
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade100),
-              ),
-              child: const Text(
-                'Fasce disponibili:\n'
-                '- 09:00 - 16:00 (feriali)\n'
-                '- 09:00 - 12:00 (festivi)',
-                style: TextStyle(fontSize: 14),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _selectedSlot,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                prefixIcon: const Icon(Icons.schedule),
-              ),
-              items: _timeSlots
-                  .map((slot) => DropdownMenuItem(value: slot, child: Text(slot)))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) setState(() => _selectedSlot = value);
-              },
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Richiesta ritiro',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _requestController,
-              maxLines: 6,
-              decoration: InputDecoration(
-                hintText:
-                    'Scrivi qui i dettagli del ritiro rifiuti da pianificare...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _submitWasteRequest,
-                icon: _isLoading
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.send),
-                label: Text(_isLoading
-                    ? 'Invio in corso...'
-                    : 'Invia comunicazione ritiro'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blueGrey.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
-                ),
+                ],
+              ),
+              padding: const EdgeInsets.all(28.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 48,
+                    color: Color(0xFF0288D1),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Richiesta ritiro rifiuti',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF01579B),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Seleziona la fascia oraria',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textGray,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade100),
+                    ),
+                    child: const Text(
+                      'Fasce disponibili:\n'
+                      '- 09:00 - 16:00 (feriali)\n'
+                      '- 09:00 - 12:00 (festivi)',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _selectedSlot,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      prefixIcon: const Icon(Icons.schedule),
+                    ),
+                    items: _timeSlots
+                        .map((slot) =>
+                            DropdownMenuItem(value: slot, child: Text(slot)))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) setState(() => _selectedSlot = value);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Richiesta ritiro',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textGray,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _requestController,
+                    maxLines: 6,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Scrivi qui i dettagli del ritiro rifiuti da pianificare...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration:
+                          AppColors.serviceButtonBoxDecoration(radius: 12),
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _submitWasteRequest,
+                        icon: _isLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send, color: Colors.white),
+                        label: Text(
+                          _isLoading
+                              ? 'Invio in corso...'
+                              : 'Invia comunicazione ritiro',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -10114,14 +10132,14 @@ class _EmailFormTabState extends State<EmailFormTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE0F7FA),
+      backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
         title: Text(
           widget.subject,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: AppColors.secondary,
+        backgroundColor: AppColors.white,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -10207,34 +10225,49 @@ class _EmailFormTabState extends State<EmailFormTab> {
                   maxLines: 4,
                 ),
                 const SizedBox(height: 30),
-                ElevatedButton.icon(
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(Icons.send, color: Colors.white),
-                  label: Text(_isLoading
-                      ? 'Invio in corso...'
-                      : AppLocalizations.of(context).send),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD54F),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 4,
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    decoration:
+                        AppColors.serviceButtonBoxDecoration(radius: 30),
+                    child: ElevatedButton.icon(
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.send, color: Colors.white),
+                      label: Text(
+                        _isLoading
+                            ? 'Invio in corso...'
+                            : AppLocalizations.of(context).send,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                        textStyle: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: _isLoading ? null : _submitForm,
                     ),
                   ),
-                  onPressed: _isLoading ? null : _submitForm,
                 ),
               ],
             ),
@@ -10334,6 +10367,7 @@ class PostDetailScreen extends StatelessWidget {
         : 'Senza categoria';
 
     return Scaffold(
+      backgroundColor: AppColors.loggedInBackground,
       appBar: AppBar(
         title: const Text('Dettaglio Post'),
         backgroundColor: AppColors.primary,
@@ -10381,7 +10415,7 @@ class PostDetailScreen extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF01579B),
+                color: Colors.white,
                 height: 1.3,
               ),
               maxLines: 5,
@@ -10393,7 +10427,14 @@ class PostDetailScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.serviceButtonAzure.withOpacity(0.35),
+                    AppColors.serviceButtonAzureEnd.withOpacity(0.28),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.withOpacity(0.3)),
               ),
@@ -10453,7 +10494,7 @@ class PostDetailScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF01579B),
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 12),
@@ -10461,7 +10502,7 @@ class PostDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                gradient: AppColors.serviceButtonGradient,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey.withOpacity(0.3)),
                 boxShadow: [

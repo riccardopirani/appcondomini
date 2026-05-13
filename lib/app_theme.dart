@@ -19,6 +19,41 @@ class AppColors {
   static const Color background = Color(0xFFF8F9FA);
   static const Color error = Color(0xFFFF5722);
   static const Color success = Color(0xFF4CAF50);
+
+  /// Tonalità media tra [primary] e [secondaryBlue] (stessa palette del drawer).
+  static const Color loggedInBackground = Color(0xFF002DB3);
+
+  /// Stesso gradiente del menu laterale, per sfondi a tutta pagina dopo il login.
+  static const LinearGradient loggedInBackgroundGradient = LinearGradient(
+    colors: [primary, secondaryBlue],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  /// Azzurro pulsanti servizi (gradiente: un filo più scuro del celeste chiaro, senza appesantire).
+  static const Color serviceButtonAzure = Color(0xFF52A8E8);
+  static const Color serviceButtonAzureEnd = Color(0xFF74BAEE);
+
+  static const LinearGradient serviceButtonGradient = LinearGradient(
+    colors: [serviceButtonAzure, serviceButtonAzureEnd],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  /// Sfondo condiviso per pulsanti servizio e «Invia» (gradiente + ombra leggera).
+  static BoxDecoration serviceButtonBoxDecoration({double radius = 20}) {
+    return BoxDecoration(
+      gradient: serviceButtonGradient,
+      borderRadius: BorderRadius.circular(radius),
+      boxShadow: [
+        BoxShadow(
+          color: serviceButtonAzure.withOpacity(0.3),
+          blurRadius: 12,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+  }
 }
 
 // Tema dell'app
@@ -75,7 +110,7 @@ class AppTheme {
         ),
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.secondary,
+        backgroundColor: AppColors.white,
         foregroundColor: AppColors.primary,
         elevation: 0,
         titleTextStyle: TextStyle(
@@ -84,6 +119,11 @@ class AppTheme {
           color: AppColors.primary,
           fontFamily: 'Karla',
         ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColors.white,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Colors.black54,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
