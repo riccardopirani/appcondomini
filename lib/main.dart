@@ -7130,7 +7130,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           _buildButton(
                               context, "Numeri di Emergenza", 'assets/emergenza.png'),
                           _buildButton(context, "Assistenza medica",
-                              'assets/ritiro_rifiuti.png'),
+                              'assets/assistenza-medica.png'),
                           _buildButton(
                               context, "Segnala Guasto", 'assets/guasto.png'),
                           _buildButton(context, "Ritiro rifiuti",
@@ -7511,7 +7511,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     _buildButton(context, "Comunicazioni", 'assets/logo.png'),
                     _buildButton(context, "Numeri di Emergenza", 'assets/emergenza.png'),
                     _buildButton(context, "Assistenza medica",
-                        'assets/ritiro_rifiuti.png'),
+                        'assets/assistenza-medica.png'),
                     _buildButton(
                         context, "Segnala Guasto", 'assets/guasto.png'),
                     _buildButton(
@@ -10308,45 +10308,18 @@ class PostDetailScreen extends StatelessWidget {
         .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
   }
 
-  String _formatItalianDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      final months = [
-        'gennaio',
-        'febbraio',
-        'marzo',
-        'aprile',
-        'maggio',
-        'giugno',
-        'luglio',
-        'agosto',
-        'settembre',
-        'ottobre',
-        'novembre',
-        'dicembre'
-      ];
-      return '${date.day} ${months[date.month - 1]} ${date.year}';
-    } catch (e) {
-      return dateString;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final title = decodeHtmlEntities(
         post['title']?['rendered'] ?? 'Titolo non disponibile');
     final content = _removeHtmlTags(
         post['content']?['rendered'] ?? 'Contenuto non disponibile');
-    final status = post['status'] ?? '';
-    final date = post['date'] ?? '';
     final url = post['link'] ?? '';
-    final categories = post['_embedded']?['wp:term']?[0];
-    final categoryNames = (categories != null && categories.isNotEmpty)
-        ? categories.map<String>((c) => (c['name'] ?? '') as String).join(', ')
-        : 'Senza categoria';
+
+    const contentCardBlue = Color(0xFF8BC8ED);
 
     return Scaffold(
-      backgroundColor: AppColors.loggedInBackground,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
           title,
@@ -10398,78 +10371,13 @@ class PostDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // Informazioni del post
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.serviceButtonAzure.withOpacity(0.35),
-                    AppColors.serviceButtonAzureEnd.withOpacity(0.28),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        status == 'private' ? Icons.lock : Icons.public,
-                        size: 16,
-                        color:
-                            status == 'private' ? Colors.orange : Colors.green,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        status == 'private' ? 'Privato' : 'Pubblico',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: status == 'private'
-                              ? Colors.orange
-                              : Colors.green,
-                        ),
-                      ),
-                      const Spacer(),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Categorie: $categoryNames',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (date.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Data: ${_formatItalianDate(date)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
             // Contenuto principale
-            const Text(
+            Text(
               'Contenuto:',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 12),
@@ -10477,13 +10385,15 @@ class PostDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: AppColors.serviceButtonGradient,
+                color: contentCardBlue,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppColors.serviceButtonAzure.withOpacity(0.35),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
                 ],
@@ -10492,7 +10402,7 @@ class PostDetailScreen extends StatelessWidget {
                 content,
                 style: const TextStyle(
                   fontSize: 16,
-                  color: Color(0xFF424242),
+                  color: Colors.white,
                   height: 1.6,
                 ),
               ),
