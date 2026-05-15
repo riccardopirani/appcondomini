@@ -10316,7 +10316,7 @@ class PostDetailScreen extends StatelessWidget {
         post['content']?['rendered'] ?? 'Contenuto non disponibile');
     final url = post['link'] ?? '';
 
-    const contentCardBlue = Color(0xFF8BC8ED);
+    const contentCardBlue = Color(0xFF6AB0E3);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -10328,11 +10328,11 @@ class PostDetailScreen extends StatelessWidget {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: AppColors.secondary,
           ),
         ),
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        foregroundColor: AppColors.secondary,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
