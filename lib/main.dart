@@ -3836,6 +3836,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Map<String, dynamic>? userData;
   bool isLoadingUserData = true;
   bool isLoadingPosts = true;
+  String _startupLoadingMessage = 'Caricamento dati...';
+  String? _startupLoadingError;
   bool _isRendering = false;
   final Set<int> _notifiedUrgentPostIds = {};
   DateTime? _watcherStartTime; // Timestamp di quando parte il watcher
@@ -4979,45 +4981,38 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     debugPrint('=== INIZIALIZZAZIONE DATI ===');
 
     try {
-      // Esegui le operazioni in sequenza per evitare che un errore blocchi tutto
-      await _initializeWithTimeout(() => fetchUserData(), 'fetchUserData', 15);
-
-      // Ora che i dati utente sono caricati, mostra l'UI
       if (mounted) {
         setState(() {
-          isLoadingUserData = false;
+          isLoadingUserData = true;
+          isLoadingPosts = true;
+          _startupLoadingError = null;
+          _startupLoadingMessage = 'Caricamento dati utente...';
         });
       }
 
-      // Carica i post e il menu in background
-      _initializeWithTimeout(() => fetchPosts(), 'fetchPosts', 60).then((_) {
-        // Fallback: assicurati che isLoadingPosts sia false dopo il caricamento
-        if (mounted && isLoadingPosts) {
-          debugPrint('Fallback: imposto isLoadingPosts = false');
-          setState(() {
-            isLoadingPosts = false;
-          });
-        }
-        _loadingTimeoutTimer?.cancel();
-      }).catchError((e) {
-        debugPrint('Errore caricamento post: $e');
+      // Esegui le operazioni necessarie prima di mostrare la Home.
+      await _initializeWithTimeout(() => fetchUserData(), 'fetchUserData', 15);
+
+      if (mounted) {
+        setState(() {
+          _startupLoadingMessage = 'Scaricamento comunicazioni...';
+        });
+      }
+
+      // Dopo il login la Home deve apparire solo quando almeno un post è disponibile.
+      await _initializeWithTimeout(() => fetchPosts(), 'fetchPosts', 60);
+
+      if (posts.isEmpty) {
+        debugPrint('Nessun post disponibile dopo il caricamento iniziale');
         if (mounted) {
           setState(() {
+            _startupLoadingError =
+                'Non riesco a scaricare le comunicazioni. Verifica la connessione e riprova.';
             isLoadingPosts = false;
           });
         }
-        _loadingTimeoutTimer?.cancel();
-      });
-
-      // Timer di sicurezza: se dopo 30 secondi i post non sono ancora caricati, forza il caricamento
-      _loadingTimeoutTimer = Timer(const Duration(seconds: 30), () {
-        if (mounted && isLoadingPosts) {
-          debugPrint('Timeout sicurezza: forzo isLoadingPosts = false');
-          setState(() {
-            isLoadingPosts = false;
-          });
-        }
-      });
+        return;
+      }
 
       _initializeWithTimeout(() => fetchWpMenu(), 'fetchWpMenu', 30)
           .catchError((e) {
@@ -5034,6 +5029,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         // Avvia il watcher DOPO che i post sono stati caricati
         // Il watcher verrà riavviato automaticamente ad ogni aggiornamento dei post
         startTokenRefreshTimer();
+        setState(() {
+          isLoadingUserData = false;
+          isLoadingPosts = false;
+          _startupLoadingError = null;
+        });
       }
 
       debugPrint('Inizializzazione completata');
@@ -5041,7 +5041,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('Errore durante inizializzazione: $e');
       if (mounted) {
         setState(() {
-          isLoadingUserData = false;
+          _startupLoadingError =
+              'Errore durante il caricamento delle comunicazioni. Riprova.';
+          isLoadingPosts = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -6613,27 +6615,52 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       return Scaffold(
         backgroundColor: AppColors.loggedInBackground,
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Caricamento dati...',
-                style: TextStyle(fontSize: 16, color: Colors.white70),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    isLoadingUserData = false;
-                  });
-                },
-                child: const Text('Salta caricamento'),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_startupLoadingError == null) ...[
+                  const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    _startupLoadingMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ] else ...[
+                  const Icon(
+                    Icons.cloud_off,
+                    color: Colors.white,
+                    size: 44,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _startupLoadingError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _initializeData,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Riprova'),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       );
