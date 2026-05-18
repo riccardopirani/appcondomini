@@ -166,8 +166,8 @@ class AppSettings {
   // EMAIL
   // ==========================================
 
-  /// Email webmaster per contatti
-  static const String emailWebmaster = 'webmaster@portobellodigallura.it';
+  /// Email segreteria per le richieste inviate dai moduli.
+  static const String emailSegreteria = 'segreteria@portobellodigallura.it';
 
   // ==========================================
   // PARAMETRI POST API

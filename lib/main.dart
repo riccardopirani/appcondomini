@@ -213,6 +213,12 @@ class EmailService {
     String? subject,
     String? replyTo,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('demoMode') ?? false) {
+      debugPrint('[EmailService] Invio email bloccato in modalità demo');
+      throw StateError('Invio email disabilitato in modalità demo');
+    }
+
     final buffer = StringBuffer()
       ..writeln('Servizio: $service')
       ..writeln(
@@ -3111,24 +3117,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _continueAsGuest() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isGuest', true);
-    await prefs.setBool('demoMode', false);
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const MyHomePage(
-          title: '',
-          userEmail: '',
-          userName: '',
-          isGuest: true,
-        ),
-      ),
-    );
-  }
-
   Future<void> _enableDemoModeForReview() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isGuest', true);
@@ -3368,8 +3356,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: TextField(
                               controller: _usernameController,
                               decoration: InputDecoration(
-                                labelText: 'Nome utente',
-                                hintText: 'Inserisci il tuo username',
+                                labelText: 'Email o nome utente',
+                                hintText: 'Inserisci email o username',
                                 prefixIcon: Container(
                                   margin: const EdgeInsets.all(8),
                                   padding: const EdgeInsets.all(8),
@@ -3545,23 +3533,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          Column(
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: _isLoading ? null : _continueAsGuest,
-                                icon: const Icon(Icons.person_outline),
-                                label: const Text('Continua come ospite'),
-                              ),
-                              const SizedBox(height: 6),
-                              TextButton(
-                                onPressed:
-                                    _isLoading ? null : _enableDemoModeForReview,
-                                child: const Text(
-                                  'Modalità demo',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                            ],
+                          TextButton(
+                            onPressed:
+                                _isLoading ? null : _enableDemoModeForReview,
+                            child: const Text(
+                              'Modalità demo',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
                           ),
                         ],
                       ),
@@ -3647,7 +3625,6 @@ class _SplashScreenState extends State<SplashScreen>
     final prefs = await SharedPreferences.getInstance();
     final savedToken = prefs.getString('jwtToken');
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    final isDemoMode = prefs.getBool('demoMode') ?? false;
     final username = prefs.getString('username');
     final password = prefs.getString('password');
 
@@ -3657,26 +3634,6 @@ class _SplashScreenState extends State<SplashScreen>
     debugPrint('- isLoggedIn: $isLoggedIn');
     debugPrint('- Username: ${username != null ? "Presente" : "Assente"}');
     debugPrint('- Password: ${password != null ? "Presente" : "Assente"}');
-
-    // Se è in demo mode, entra direttamente in home (senza login)
-    if (isDemoMode) {
-      debugPrint('🧪 Demo mode attivo: apro Home senza login');
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const MyHomePage(
-              title: '',
-              userEmail: '',
-              userName: '',
-              isGuest: true,
-              isDemoMode: true,
-            ),
-          ),
-        );
-      }
-      return;
-    }
 
     // Se l'utente ha fatto login almeno una volta, mantienilo loggato
     if (isLoggedIn && username != null && password != null) {
@@ -3705,18 +3662,13 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } else {
-      debugPrint('👤 Nessun login precedente: apro Home in modalità Ospite');
+      debugPrint('👤 Nessun login precedente: apro schermata di login');
+      await prefs.setBool('isGuest', false);
+      await prefs.setBool('demoMode', false);
       if (context.mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => const MyHomePage(
-              title: '',
-              userEmail: '',
-              userName: '',
-              isGuest: true,
-            ),
-          ),
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
       }
     }
@@ -6593,6 +6545,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               )
             : const NoAccessMessage();
       case 2:
+        if (!isLoggedIn || _isGuestMode || _isDemoMode) {
+          return _loginRequiredContent();
+        }
+
         return ContactOptionsScreen(
           userName: userData?['name'] ?? '',
           userEmail: userData?['email'] ?? '',
@@ -8345,6 +8301,98 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _loginRequiredContent() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.lock_outline,
+                color: AppColors.primary,
+                size: 42,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Accedi per usare i moduli',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Le richieste possono essere inviate solo dopo il login.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textGray),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Vai al login'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLoginRequiredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Login richiesto'),
+        content: const Text(
+          'Per inviare richieste tramite i moduli devi prima effettuare il login.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Annulla'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            child: const Text('Login'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Metodo per costruire i pulsanti dei servizi
   Widget _buildButton(BuildContext context, String label, String imagePath) {
     return Container(
@@ -8371,6 +8419,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               label == "Servizi sanitari") {
             _showMedicalServicesDialog(context);
           } else if (label == "Ritiro rifiuti" || label == "Ritiro Rifiuti") {
+            if (!isLoggedIn || _isGuestMode || _isDemoMode) {
+              _showLoginRequiredDialog(context);
+              return;
+            }
+
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -8381,6 +8434,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               ),
             );
           } else {
+            if (!isLoggedIn || _isGuestMode || _isDemoMode) {
+              _showLoginRequiredDialog(context);
+              return;
+            }
+
             // Per gli altri servizi, apri il form email
             Navigator.push(
               context,
@@ -9737,6 +9795,24 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
       return;
     }
 
+    final prefs = await SharedPreferences.getInstance();
+    final isDemoMode = prefs.getBool('demoMode') ?? false;
+    final hasAuthenticatedSession = (prefs.getBool('isLoggedIn') ?? false) &&
+        !(prefs.getBool('isGuest') ?? false) &&
+        !isDemoMode;
+
+    if (!hasAuthenticatedSession) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isDemoMode
+              ? 'Modalità demo: invio richieste disabilitato.'
+              : 'Effettua il login per inviare la richiesta.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -9762,7 +9838,7 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
       // 2) Fallback email se endpoint non risponde bene
       if (response.statusCode < 200 || response.statusCode >= 300) {
         await EmailService.sendAppEmail(
-          to: AppSettings.emailWebmaster,
+          to: AppSettings.emailSegreteria,
           service: 'Ritiro rifiuti',
           senderName: widget.userName,
           senderEmail: widget.userEmail,
@@ -10026,6 +10102,24 @@ class _EmailFormTabState extends State<EmailFormTab> {
       return;
     }
 
+    final prefs = await SharedPreferences.getInstance();
+    final isDemoMode = prefs.getBool('demoMode') ?? false;
+    final hasAuthenticatedSession = (prefs.getBool('isLoggedIn') ?? false) &&
+        !(prefs.getBool('isGuest') ?? false) &&
+        !isDemoMode;
+
+    if (!hasAuthenticatedSession) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isDemoMode
+              ? 'Modalità demo: invio email disabilitato.'
+              : 'Effettua il login per inviare il modulo.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -10033,7 +10127,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
     try {
       // Invia email tramite funzione centralizzata
       await EmailService.sendAppEmail(
-        to: AppSettings.emailWebmaster,
+        to: AppSettings.emailSegreteria,
         service: widget.subject,
         senderName: name,
         senderEmail: email,
