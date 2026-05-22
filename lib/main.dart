@@ -1028,6 +1028,10 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   // 🔥 Categorie dall'API (per mostrare tutte le categorie disponibili)
   List<Map<String, dynamic>> _apiCategories = [];
 
+  bool get _isNewsView => widget.showDirectList;
+  bool get _isArticoliView => !widget.showDirectList;
+  bool get _useLightCardText => _isNewsView || _isArticoliView;
+
   @override
   void initState() {
     super.initState();
@@ -1511,12 +1515,12 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.secondaryBlue.withOpacity(0.1),
+                          color: Colors.white.withOpacity(0.18),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.folder_outlined,
-                          color: AppColors.secondaryBlue,
+                          color: Colors.white,
                           size: 24,
                         ),
                       ),
@@ -1530,7 +1534,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black,
+                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1550,7 +1554,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                                   '$postCount $articlesText',
                                   style: const TextStyle(
                                     fontSize: 14,
-                                    color: Colors.black87,
+                                    color: Colors.white70,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 );
@@ -1561,7 +1565,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                       ),
                       const Icon(
                         Icons.arrow_forward_ios,
-                        color: Colors.black54,
+                        color: Colors.white70,
                         size: 16,
                       ),
                     ],
@@ -1582,11 +1586,11 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
         if (!widget.showDirectList)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.white,
+            color: Colors.transparent,
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: _goBackToCategories,
                   tooltip: 'Torna alle categorie',
                 ),
@@ -1597,7 +1601,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2C3E50),
+                      color: Colors.white,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1697,19 +1701,19 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
         // Contatore risultati
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.white,
+          color: _isArticoliView ? Colors.transparent : Colors.white,
           child: Row(
             children: [
               Icon(
                 Icons.article_outlined,
                 size: 16,
-                color: Colors.grey[600],
+                color: _isArticoliView ? Colors.white70 : Colors.grey[600],
               ),
               const SizedBox(width: 8),
               Text(
                 '${filteredPosts.length} ${AppLocalizations.of(context).articlesIn} "$currentCategory"',
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: _isArticoliView ? Colors.white : Colors.grey[600],
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1861,7 +1865,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
           Icon(
             Icons.search_off,
             size: 64,
-            color: Colors.grey[400],
+            color: _isNewsView || _isArticoliView ? Colors.white70 : Colors.grey[400],
           ),
           const SizedBox(height: 16),
           Text(
@@ -1869,7 +1873,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
+              color: _isNewsView || _isArticoliView ? Colors.white : Colors.grey[600],
             ),
           ),
           const SizedBox(height: 8),
@@ -1877,7 +1881,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
             tryModifyText,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: _isNewsView || _isArticoliView ? Colors.white70 : Colors.grey[500],
             ),
           ),
         ],
@@ -1900,6 +1904,46 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       final categoryNames = (categories != null && categories.isNotEmpty)
           ? categories.map<String>((c) => c['name'] as String).toList()
           : ['Senza categoria'];
+
+      final titleColor = _useLightCardText
+          ? (isUrgente ? const Color(0xFFB71C1C) : Colors.white)
+          : (status == 'private'
+              ? const Color(0xFFE65100)
+              : Colors.black);
+      final statusBadgeColor = isUrgente
+          ? const Color(0xFFE53935)
+          : (status == 'private'
+              ? const Color(0xFFFF9800)
+              : (_useLightCardText ? Colors.white : const Color(0xFF4CAF50)));
+      final statusBadgeBackground = isUrgente
+          ? const Color(0xFFE53935).withOpacity(0.1)
+          : (status == 'private'
+              ? const Color(0xFFFF9800).withOpacity(0.1)
+              : (_useLightCardText
+                  ? Colors.white.withOpacity(0.18)
+                  : const Color(0xFF4CAF50).withOpacity(0.1)));
+      final excerptColor = _useLightCardText
+          ? (isUrgente
+              ? const Color(0xFF5D4037).withOpacity(0.9)
+              : Colors.white.withOpacity(0.92))
+          : (status == 'private'
+              ? const Color(0xFFBF360C).withOpacity(0.8)
+              : Colors.black87);
+      final metaColor = _useLightCardText
+          ? (isUrgente ? const Color(0xFF6D4C41) : Colors.white70)
+          : Colors.grey[800]!;
+      final arrowColor = _useLightCardText
+          ? (isUrgente ? const Color(0xFF6D4C41) : Colors.white70)
+          : Colors.black54;
+      final headerIconColor = _useLightCardText
+          ? (isUrgente
+              ? const Color(0xFFB71C1C)
+              : (status == 'private'
+                  ? const Color(0xFFFFE0B2)
+                  : Colors.white))
+          : (status == 'private'
+              ? const Color(0xFFFF9800)
+              : AppColors.secondaryBlue);
 
       return Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -1983,9 +2027,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             status == 'private'
                                 ? Icons.lock_rounded
                                 : Icons.article_rounded,
-                            color: status == 'private'
-                                ? const Color(0xFFFF9800)
-                                : AppColors.secondaryBlue,
+                            color: headerIconColor,
                             size: 20,
                           ),
                         ),
@@ -1996,9 +2038,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: status == 'private'
-                                  ? const Color(0xFFE65100)
-                                  : Colors.black,
+                              color: titleColor,
                               height: 1.3,
                             ),
                             maxLines: 2,
@@ -2009,11 +2049,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isUrgente
-                                ? const Color(0xFFE53935).withOpacity(0.1)
-                                : (status == 'private'
-                                    ? const Color(0xFFFF9800).withOpacity(0.1)
-                                    : const Color(0xFF4CAF50).withOpacity(0.1)),
+                            color: statusBadgeBackground,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -2025,11 +2061,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isUrgente
-                                  ? const Color(0xFFE53935)
-                                  : (status == 'private'
-                                      ? const Color(0xFFFF9800)
-                                      : const Color(0xFF4CAF50)),
+                              color: statusBadgeColor,
                             ),
                           ),
                         ),
@@ -2050,16 +2082,20 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color:
-                                    const Color(0xFFE3F2FD).withOpacity(0.8),
+                                color: _useLightCardText
+                                    ? Colors.white.withOpacity(0.18)
+                                    : const Color(0xFFE3F2FD)
+                                        .withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 category,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
+                                  color: _useLightCardText
+                                      ? Colors.white
+                                      : Colors.black87,
                                 ),
                               ),
                             );
@@ -2075,9 +2111,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         _removeHtmlTags(excerpt),
                         style: TextStyle(
                           fontSize: 14,
-                          color: status == 'private'
-                              ? const Color(0xFFBF360C).withOpacity(0.8)
-                              : Colors.black87,
+                          color: excerptColor,
                           height: 1.4,
                         ),
                         maxLines: 3,
@@ -2093,14 +2127,14 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: Colors.grey[800],
+                            color: metaColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _formatDate(date),
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey[800],
+                              color: metaColor,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -2109,7 +2143,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 14,
-                          color: Colors.black54,
+                          color: arrowColor,
                         ),
                       ],
                     ),
@@ -9995,11 +10029,12 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'Specificare l\'orario di ritiro',
+                  const Text(
+                    'Specificare il giorno e possibilmente l\'orario in cui deve essere effettuato il ritiro',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[700],
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
                       height: 1.35,
                     ),
                   ),
@@ -10319,6 +10354,30 @@ class _EmailFormTabState extends State<EmailFormTab> {
                   icon: Icons.email,
                   keyboardType: TextInputType.emailAddress,
                 ),
+                if (widget.subject == 'Bombole Gas') ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Specificare se bombola grande o piccola',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (widget.subject == 'Segnalazione Guasto' ||
+                    widget.subject == 'Segnala Guasto') ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'I guasti da segnalare all\'amministrazione sono esclusivamente quelli sulla rete idrica, elettrica e stradale condominiale',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 15),
                 _buildTextField(
                   controller: _messageController,
