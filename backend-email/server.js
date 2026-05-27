@@ -22,6 +22,110 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function toTitleCase(value) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function splitNameAndSurname(fullName) {
+  const normalized = (fullName || '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return { name: '', surname: '', fullName: '' };
+
+  const parts = normalized.split(' ');
+  const name = toTitleCase(parts[0] || '');
+  const surname = toTitleCase(parts.slice(1).join(' '));
+  return {
+    name,
+    surname,
+    fullName: [name, surname].filter(Boolean).join(' '),
+  };
+}
+
+function parseNameFromEmail(email) {
+  const atIndex = (email || '').indexOf('@');
+  if (atIndex <= 0) return { name: '', surname: '', fullName: '' };
+
+  const localPart = email.slice(0, atIndex).replace(/[._-]+/g, ' ').trim();
+  return splitNameAndSurname(localPart);
+}
+
+function getTextLineValue(text, label) {
+  if (!text) return '';
+  const match = text.match(new RegExp(`^${label}:\\s*(.+)$`, 'im'));
+  return match?.[1]?.trim() || '';
+}
+
+function resolveRequesterIdentity({
+  requestName,
+  requestSurname,
+  requestFullName,
+  text,
+  replyTo,
+}) {
+  const explicitName = (requestName || '').trim();
+  const explicitSurname = (requestSurname || '').trim();
+  const explicitFullName = (requestFullName || '').trim();
+  const fromFullName = splitNameAndSurname(explicitFullName);
+  const fromExplicitFields = splitNameAndSurname(
+    [explicitName, explicitSurname].filter(Boolean).join(' '),
+  );
+  const fromTextLine = splitNameAndSurname(getTextLineValue(text, 'Nome'));
+  const fromEmail = parseNameFromEmail(replyTo);
+
+  // Priorita: campi espliciti, poi parsing dal testo, poi parsing dall'email.
+  // Se una fonte contiene solo il nome, completiamo il cognome con la fonte successiva.
+  const resolvedName =
+    fromFullName.name ||
+    fromExplicitFields.name ||
+    fromTextLine.name ||
+    fromEmail.name ||
+    explicitName;
+  const resolvedSurname =
+    fromFullName.surname ||
+    fromExplicitFields.surname ||
+    fromTextLine.surname ||
+    fromEmail.surname ||
+    explicitSurname;
+
+  return {
+    name: resolvedName || 'Non disponibile',
+    surname: resolvedSurname || 'Non disponibile',
+  };
+}
+
+function isWastePickupRequest(subject, text, html) {
+  const normalized = [subject, text, html]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return normalized.includes('ritiro rifiuti');
+}
+
+function appendIdentityToText(text, identity) {
+  const base = (text || '').trimEnd();
+  const identityBlock = [
+    '',
+    '---',
+    'Dati richiedente (backend):',
+    `Nome: ${identity.name}`,
+    `Cognome: ${identity.surname}`,
+  ].join('\n');
+  return `${base}${identityBlock}`;
+}
+
+function appendIdentityToHtml(html, identity) {
+  const base = (html || '').trimEnd();
+  const identityBlock =
+    '<hr><p><strong>Dati richiedente (backend):</strong><br>' +
+    `Nome: ${identity.name}<br>` +
+    `Cognome: ${identity.surname}</p>`;
+  return `${base}${identityBlock}`;
+}
+
 app.use((req, _res, next) => {
   console.log(
     `[${nowIso()}] [http] ${req.method} ${req.originalUrl} ip=${req.ip} ua="${req.get('user-agent') || 'n/a'}"`,
@@ -36,7 +140,18 @@ app.get('/health', (_, res) => {
 app.post('/send-email', async (req, res) => {
   const requestId = `mail-${Date.now()}-${++requestCounter}`;
   const startMs = Date.now();
-  const { to, subject, text, html, replyTo } = req.body || {};
+  const {
+    to,
+    subject,
+    text: incomingText,
+    html: incomingHtml,
+    replyTo,
+    name,
+    surname,
+    fullName,
+  } = req.body || {};
+  let text = incomingText;
+  let html = incomingHtml;
 
   console.log(
     `[${nowIso()}] [${requestId}] payload to=${to || 'missing'} subject="${subject || 'missing'}" text=${Boolean(text)} html=${Boolean(html)} replyTo=${Boolean(replyTo)} from="${SMTP_FROM_NAME}" <${SMTP_FROM}>`,
@@ -48,6 +163,21 @@ app.post('/send-email', async (req, res) => {
       ok: false,
       error: 'Missing required fields: to, subject, text/html',
     });
+  }
+
+  if (isWastePickupRequest(subject, text, html)) {
+    const identity = resolveRequesterIdentity({
+      requestName: name,
+      requestSurname: surname,
+      requestFullName: fullName,
+      text,
+      replyTo,
+    });
+    text = appendIdentityToText(text, identity);
+    html = appendIdentityToHtml(html, identity);
+    console.log(
+      `[${nowIso()}] [${requestId}] waste-pickup identity attached name="${identity.name}" surname="${identity.surname}"`,
+    );
   }
 
   /** Mittente: nome visualizzato + indirizzo (TurboSMTP: from + from_name). */
