@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PdG App API (PublishPress-safe + Categories)
  * Description: API per app mobile: login + accesso ai soli post leggibili secondo PublishPress Permissions (permessi su post/categorie). Endpoint categorie "navigabile". Hardening endpoint sensibili.
- * Version: 3.4
+ * Version: 3.6
  * Author: Portobello di Gallura
  */
 
@@ -30,6 +30,71 @@ if (!defined('PDG_APP_MAX_CATEGORIES')) {
 // DEBUG: Abilita logging per debug permessi (impostare su false in produzione)
 if (!defined('PDG_APP_DEBUG_PERMISSIONS')) {
     define('PDG_APP_DEBUG_PERMISSIONS', false);
+}
+
+// ⚡ Fidati del filtro di PublishPress sulla WP_Query (suppress_filters=false):
+// la query restituisce GIÀ solo i post leggibili dall'utente corrente, quindi
+// possiamo evitare il doppio controllo permessi su OGNI post (grosso risparmio
+// di CPU con molti post/utenti). Se PublishPress non è attivo, il check per-post
+// viene comunque eseguito come fallback di sicurezza.
+// Per disattivare l'ottimizzazione: define('PDG_APP_TRUST_QUERY_FILTER', false);
+if (!defined('PDG_APP_TRUST_QUERY_FILTER')) {
+    define('PDG_APP_TRUST_QUERY_FILTER', true);
+}
+
+// ⚡ Cache server-side (transient, usa object cache/Redis se disponibile).
+// TTL post: cache breve per restare reattivi ma reggere picchi di utenti.
+if (!defined('PDG_APP_POSTS_CACHE_TTL')) {
+    define('PDG_APP_POSTS_CACHE_TTL', 120); // secondi (2 min)
+}
+// TTL categorie: cambiano di rado, cache più lunga.
+if (!defined('PDG_APP_CATS_CACHE_TTL')) {
+    define('PDG_APP_CATS_CACHE_TTL', 600); // secondi (10 min)
+}
+
+/* ---------------------------
+ * Cache helpers
+ *
+ * Le risposte sono per-utente (i permessi PublishPress dipendono dall'utente),
+ * quindi la chiave cache include lo user_id. Una "versione" globale viene
+ * incrementata ad ogni modifica di contenuti/categorie: così tutte le cache
+ * vengono invalidate automaticamente senza doverle eliminare una per una.
+ * --------------------------- */
+
+function pdg_app_cache_version(): int {
+    $v = (int) get_option('pdg_app_cache_ver', 0);
+    if ($v <= 0) {
+        $v = 1;
+        update_option('pdg_app_cache_ver', $v, false);
+    }
+    return $v;
+}
+
+function pdg_app_bump_cache_version(): void {
+    $v = (int) get_option('pdg_app_cache_ver', 1);
+    update_option('pdg_app_cache_ver', $v + 1, false);
+}
+
+// Invalida la cache quando cambiano post o categorie.
+add_action('save_post_post', 'pdg_app_bump_cache_version');
+add_action('deleted_post', 'pdg_app_bump_cache_version');
+add_action('trashed_post', 'pdg_app_bump_cache_version');
+add_action('transition_post_status', 'pdg_app_bump_cache_version');
+add_action('created_category', 'pdg_app_bump_cache_version');
+add_action('edited_category', 'pdg_app_bump_cache_version');
+add_action('delete_category', 'pdg_app_bump_cache_version');
+
+function pdg_app_cache_get(string $key) {
+    return get_transient($key);
+}
+
+function pdg_app_cache_set(string $key, $value, int $ttl): void {
+    set_transient($key, $value, $ttl);
+}
+
+// Permette all'app/proxy di bypassare la cache con ?nocache=1
+function pdg_app_cache_bypass(WP_REST_Request $request): bool {
+    return (int) ($request->get_param('nocache') ?: 0) === 1;
 }
 
 /* ---------------------------
@@ -117,6 +182,20 @@ function pdg_app_get_user_from_token(WP_REST_Request $request) {
     $now = time();
     $token_hash = hash('sha256', $token);
 
+    // ⚡ Fast path: lookup O(1) via transient (evita scan di fino a 1000 utenti).
+    $cached_user_id = get_transient('pdg_app_tok_' . $token_hash);
+    if ($cached_user_id) {
+        $user_id = (int) $cached_user_id;
+        $stored_hash = (string) get_user_meta($user_id, PDG_APP_TOKEN_META, true);
+        $exp         = (int) get_user_meta($user_id, PDG_APP_TOKEN_EXP_META, true);
+
+        if ($exp >= $now && $stored_hash && hash_equals($stored_hash, $token_hash)) {
+            return get_user_by('id', $user_id);
+        }
+        delete_transient('pdg_app_tok_' . $token_hash);
+    }
+
+    // Slow path (fallback): scan utenti con token non scaduto.
     $q = new WP_User_Query([
         'meta_query' => [
             [
@@ -135,6 +214,9 @@ function pdg_app_get_user_from_token(WP_REST_Request $request) {
         $exp         = (int) get_user_meta($u->ID, PDG_APP_TOKEN_EXP_META, true);
 
         if ($exp >= $now && $stored_hash && hash_equals($stored_hash, $token_hash)) {
+            // Popola la cache per le prossime richieste.
+            $ttl = max(60, $exp - $now);
+            set_transient('pdg_app_tok_' . $token_hash, (int) $u->ID, $ttl);
             return get_user_by('id', $u->ID);
         }
     }
@@ -287,6 +369,44 @@ function pdg_app_user_can_read_post_by_terms(int $user_id, WP_Post $post): bool 
     return false; // Di default, non concediamo accesso extra qui
 }
 
+/**
+ * ⚡ Check permessi VELOCE per uso in loop.
+ *
+ * Presuppone che l'utente corrente sia GIÀ stato impostato UNA volta per la
+ * richiesta (via pdg_app_set_current_user). NON re-inizializza PublishPress ad
+ * ogni post: la re-inizializzazione per-post era il principale collo di
+ * bottiglia (decine/centinaia di reinit per richiesta, moltiplicato per utenti).
+ *
+ * PublishPress filtra current_user_can('read_post') tramite 'user_has_cap',
+ * con cache per-richiesta: quindi questo check è leggero. Manteniamo anche
+ * il fallback diretto a presspermit()->userCan(), senza reinit per-post.
+ */
+function pdg_app_user_can_read_post_fast(int $post_id, $post_obj = null): bool {
+    if ($post_id <= 0) return false;
+
+    if (current_user_can('read_post', $post_id)) {
+        return true;
+    }
+
+    // Fallback per post privati leggibili dal ruolo.
+    if ($post_obj instanceof WP_Post
+        && $post_obj->post_status === 'private'
+        && current_user_can('read_private_posts')) {
+        return true;
+    }
+
+    // Fallback diretto PublishPress: preserva compatibilità senza il costo di
+    // re-inizializzare l'utente a ogni post.
+    if (function_exists('presspermit')) {
+        $pp = presspermit();
+        if ($pp && method_exists($pp, 'userCan')) {
+            return (bool) $pp->userCan('read', $post_id, 'post');
+        }
+    }
+
+    return false;
+}
+
 /* ---------------------------
  * REST endpoints
  * --------------------------- */
@@ -361,6 +481,9 @@ function pdg_app_authenticate_user(WP_REST_Request $request) {
     update_user_meta($user->ID, PDG_APP_TOKEN_META, $hash);
     update_user_meta($user->ID, PDG_APP_TOKEN_EXP_META, $exp);
 
+    // ⚡ Cache lookup token -> user_id per richieste successive (O(1)).
+    set_transient('pdg_app_tok_' . $hash, (int) $user->ID, 30 * DAY_IN_SECONDS);
+
     return rest_ensure_response([
         'success' => true,
         'user' => [
@@ -379,21 +502,19 @@ function pdg_app_authenticate_user(WP_REST_Request $request) {
 
 function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $user_id = pdg_app_current_user_id($request);
-    
-    // CRITICO: Imposta l'utente PRIMA di qualsiasi query
-    // Questo permette a PublishPress Permissions di applicare i filtri
+
+    // CRITICO: Imposta l'utente UNA volta per richiesta.
     pdg_app_set_current_user($user_id);
 
-    // 🔥 Supporto per caricare TUTTI i post: per_page=-1 o all=1
     $load_all = (int) ($request->get_param('all') ?: 0) === 1;
-    
+
     $per_page = (int) ($request->get_param('per_page') ?: 20);
     if ($per_page === -1) {
         $load_all = true;
     }
     if (!$load_all) {
         if ($per_page < 1) $per_page = 20;
-        if ($per_page > 100) $per_page = 100; // Aumentato limite max per pagina
+        if ($per_page > 100) $per_page = 100;
     }
 
     $page = (int) ($request->get_param('page') ?: 1);
@@ -408,20 +529,41 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
 
     $cat = (int) ($request->get_param('category') ?: 0);
 
+    // ⚡ Cache per-utente (permessi PublishPress dipendono dall'utente).
+    $cache_ver = pdg_app_cache_version();
+    $cache_key = 'pdg_app_posts_' . $cache_ver . '_' . $user_id . '_'
+        . md5(wp_json_encode([
+            'all'     => $load_all ? 1 : 0,
+            'per'     => $per_page,
+            'page'    => $page,
+            'orderby' => $orderby,
+            'order'   => $order,
+            'cat'     => $cat,
+        ]));
+
+    if (!pdg_app_cache_bypass($request)) {
+        $cached = pdg_app_cache_get($cache_key);
+        if (is_array($cached)) {
+            $cached['cache'] = 'hit';
+            return rest_ensure_response($cached);
+        }
+    }
+
     // IMPORTANTE: suppress_filters = false permette a PublishPress Permissions
     // di applicare i suoi filtri (posts_where, posts_join, etc.)
     $args = [
-        'post_type'        => 'post',
-        'post_status'      => ['publish', 'private'],
-        'posts_per_page'   => $load_all ? -1 : ($per_page * 6),  // -1 = tutti, altrimenti oversampling
-        'orderby'          => $orderby,
-        'order'            => $order,
-        'no_found_rows'    => $load_all, // Ottimizzazione se carichiamo tutto
-        'suppress_filters' => false, // CRITICO: permette filtri di PublishPress
+        'post_type'           => 'post',
+        'post_status'         => ['publish', 'private'],
+        'posts_per_page'      => $load_all ? -1 : $per_page,
+        'orderby'             => $orderby,
+        'order'               => $order,
+        'no_found_rows'       => !$load_all,
+        'suppress_filters'    => false,
         'ignore_sticky_posts' => true,
+        'update_post_meta_cache' => false,
+        'update_post_term_cache' => true,
     ];
-    
-    // Paginazione solo se non carichiamo tutto
+
     if (!$load_all) {
         $args['paged'] = $page;
     }
@@ -429,7 +571,7 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     if ($cat > 0) {
         $args['cat'] = $cat;
     }
-    
+
     if (PDG_APP_DEBUG_PERMISSIONS) {
         $user = wp_get_current_user();
         $roles = implode(',', $user->roles ?: []);
@@ -437,7 +579,7 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     }
 
     $query = new WP_Query($args);
-    
+
     if (PDG_APP_DEBUG_PERMISSIONS) {
         error_log("[PDG-APP] Query returned " . count($query->posts ?: []) . " posts before permission check");
     }
@@ -446,11 +588,14 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $checked = 0;
     $denied = 0;
 
+    // ⚡ Se PublishPress è attivo e ci fidiamo del filtro sulla WP_Query, la
+    // query restituisce già SOLO i post leggibili: saltiamo il check per-post.
+    $pp_active = defined('PRESSPERMIT_VERSION') || defined('PP_VERSION') || defined('PPC_VERSION');
+    $trust_filter = PDG_APP_TRUST_QUERY_FILTER && $pp_active;
+
     foreach (($query->posts ?: []) as $p) {
-        // Se non carichiamo tutto, rispetta il limite per_page
         if (!$load_all && count($posts) >= $per_page) break;
 
-        // Normalizza WP_Post o ID
         $post_obj = null;
         $post_id  = 0;
 
@@ -467,9 +612,11 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
         if (!in_array($post_obj->post_status, ['publish', 'private'], true)) continue;
 
         $checked++;
-        
-        if (pdg_app_user_can_read_post($user_id, $post_id)) {
-            $formatted = pdg_app_format_post($post_obj);
+
+        // ⚡ trust_filter: salta il doppio check; altrimenti check veloce per-post.
+        if ($trust_filter || pdg_app_user_can_read_post_fast($post_id, $post_obj)) {
+            // ⚡ Lista: payload leggero (no the_content, no featured image).
+            $formatted = pdg_app_format_post($post_obj, false);
             if (!empty($formatted)) {
                 $posts[] = $formatted;
             }
@@ -477,20 +624,28 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
             $denied++;
         }
     }
-    
+
     if (PDG_APP_DEBUG_PERMISSIONS) {
         error_log("[PDG-APP] Permission check: checked=$checked, allowed=" . count($posts) . ", denied=$denied");
     }
 
-    return rest_ensure_response([
-        'posts'        => $posts,
-        'current_page' => $load_all ? 1 : $page,
-        'total_posts'  => count($posts),
+    $response = [
+        'posts'         => $posts,
+        'current_page'  => $load_all ? 1 : $page,
+        'total_posts'   => count($posts),
         'total_checked' => $checked,
-        'total_denied' => $denied,
-        'load_all'     => $load_all,
-        'note'         => $load_all ? 'All readable posts loaded' : 'Filtered by PublishPress Permissions',
-    ]);
+        'total_denied'  => $denied,
+        'load_all'      => $load_all,
+        'has_more'      => !$load_all && count($posts) >= $per_page,
+        'note'          => $load_all ? 'All readable posts loaded' : 'Filtered by PublishPress Permissions',
+        'cache'         => 'miss',
+    ];
+
+    if (!pdg_app_cache_bypass($request)) {
+        pdg_app_cache_set($cache_key, $response, PDG_APP_POSTS_CACHE_TTL);
+    }
+
+    return rest_ensure_response($response);
 }
 
 function pdg_app_get_readable_single_post(WP_REST_Request $request) {
@@ -512,7 +667,7 @@ function pdg_app_get_readable_single_post(WP_REST_Request $request) {
         return new WP_Error('rest_forbidden', 'Forbidden', ['status' => 403]);
     }
 
-    return rest_ensure_response(pdg_app_format_post($post));
+    return rest_ensure_response(pdg_app_format_post($post, true));
 }
 
 /* ---------------------------
@@ -523,9 +678,20 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
     $user_id = pdg_app_current_user_id($request);
     pdg_app_set_current_user($user_id);
 
+    $cache_ver = pdg_app_cache_version();
+    $include_empty = (int) ($request->get_param('include_empty') ?: 0);
+    $cache_key = 'pdg_app_cats_' . $cache_ver . '_' . $user_id . '_ie' . $include_empty;
+
+    if (!pdg_app_cache_bypass($request)) {
+        $cached = pdg_app_cache_get($cache_key);
+        if (is_array($cached)) {
+            return rest_ensure_response($cached);
+        }
+    }
+
     $cats = get_categories([
         'taxonomy'   => 'category',
-        'hide_empty' => false,     // vogliamo anche categorie vuote (ma poi filtriamo per leggibilità)
+        'hide_empty' => false,
         'number'     => PDG_APP_MAX_CATEGORIES,
         'orderby'    => 'name',
         'order'      => 'ASC',
@@ -537,41 +703,39 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
         $cat_id = (int) $cat->term_id;
         if ($cat_id <= 0) continue;
 
-        // Se la categoria ha zero post, NON possiamo dedurre permesso "reale".
-        // Per sicurezza: la includiamo SOLO se l'app chiede esplicitamente include_empty=1 E l'utente può almeno leggere qualcosa nel sito.
-        // (Default: la nascondiamo per non leakare struttura.)
         if ((int)$cat->count === 0) {
-            $include_empty = (int) ($request->get_param('include_empty') ?: 0);
             if ($include_empty !== 1) {
                 continue;
             }
-            // include_empty=1: includiamo ma marcando readable=false (l'app può mostrarla "grigia")
             $out[] = [
-                'id'     => $cat_id,
-                'name'   => (string) $cat->name,
-                'slug'   => (string) $cat->slug,
-                'parent' => (int) $cat->parent,
+                'id'       => $cat_id,
+                'name'     => (string) $cat->name,
+                'slug'     => (string) $cat->slug,
+                'parent'   => (int) $cat->parent,
                 'readable' => false,
             ];
             continue;
         }
 
-        // Campioniamo alcuni post della categoria e vediamo se ALMENO UNO è leggibile
+        // ⚡ Campiona pochi post; PublishPress filtra già la query.
         $sample = new WP_Query([
-            'post_type'        => 'post',
-            'post_status'      => ['publish', 'private'],
-            'posts_per_page'   => PDG_APP_CATEGORY_SAMPLE_POSTS,
-            'fields'           => 'ids',
-            'no_found_rows'    => true,
-            'cat'              => $cat_id,
-            'suppress_filters' => false, // Permetti filtri PublishPress
-            'ignore_sticky_posts' => true,
+            'post_type'              => 'post',
+            'post_status'            => ['publish', 'private'],
+            'posts_per_page'         => PDG_APP_CATEGORY_SAMPLE_POSTS,
+            'fields'                 => 'ids',
+            'no_found_rows'          => true,
+            'cat'                    => $cat_id,
+            'suppress_filters'       => false,
+            'ignore_sticky_posts'    => true,
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
         ]);
 
         $readable = false;
         foreach (($sample->posts ?: []) as $pid) {
-            $pid = (int)$pid;
-            if ($pid > 0 && pdg_app_user_can_read_post($user_id, $pid)) {
+            $pid = (int) $pid;
+            // ⚡ Check veloce (utente già impostato sopra).
+            if ($pid > 0 && pdg_app_user_can_read_post_fast($pid)) {
                 $readable = true;
                 break;
             }
@@ -579,13 +743,17 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
 
         if ($readable) {
             $out[] = [
-                'id'     => $cat_id,
-                'name'   => (string) $cat->name,
-                'slug'   => (string) $cat->slug,
-                'parent' => (int) $cat->parent,
+                'id'       => $cat_id,
+                'name'     => (string) $cat->name,
+                'slug'     => (string) $cat->slug,
+                'parent'   => (int) $cat->parent,
                 'readable' => true,
             ];
         }
+    }
+
+    if (!pdg_app_cache_bypass($request)) {
+        pdg_app_cache_set($cache_key, $out, PDG_APP_CATS_CACHE_TTL);
     }
 
     return rest_ensure_response($out);
@@ -595,7 +763,13 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
  * Output post (minimo e robusto)
  * --------------------------- */
 
-function pdg_app_format_post($post): array {
+/**
+ * Formatta un post per l'app.
+ *
+ * @param bool $include_full_content true = dettaglio (the_content completo),
+ *                                 false = lista (excerpt leggero, no immagine).
+ */
+function pdg_app_format_post($post, bool $include_full_content = false): array {
     if (is_numeric($post)) {
         $post = get_post((int)$post);
     }
@@ -603,21 +777,22 @@ function pdg_app_format_post($post): array {
         return [];
     }
 
-    $featured_image = '';
-    if (has_post_thumbnail($post->ID)) {
-        $featured_image = (string) get_the_post_thumbnail_url($post->ID, 'full');
-    }
-
-    // 🔥 Estrai categorie dal post
-    $categories = [];
+    // Categorie: ID + nomi embedded (evita fetch /categories separato sull'app).
+    $category_ids = [];
+    $category_terms = [];
     $post_categories = get_the_category($post->ID);
     if (!empty($post_categories) && !is_wp_error($post_categories)) {
         foreach ($post_categories as $cat) {
-            $categories[] = (int) $cat->term_id;
+            $category_ids[] = (int) $cat->term_id;
+            $category_terms[] = [
+                'id'   => (int) $cat->term_id,
+                'name' => (string) $cat->name,
+                'slug' => (string) $cat->slug,
+            ];
         }
     }
 
-    return [
+    $formatted = [
         'id'       => (int) $post->ID,
         'date'     => (string) $post->post_date,
         'modified' => (string) $post->post_modified,
@@ -625,11 +800,33 @@ function pdg_app_format_post($post): array {
         'status'   => (string) $post->post_status,
         'link'     => (string) get_permalink($post->ID),
         'title'    => ['rendered' => (string) $post->post_title],
-        'content'  => ['rendered' => apply_filters('the_content', $post->post_content)],
-        'excerpt'  => ['rendered' => (string) ($post->post_excerpt ?: wp_strip_all_tags(wp_trim_words($post->post_content, 55)))],
-        'featured_image_url' => $featured_image,
-        'categories' => $categories, // 🔥 NUOVO: ID delle categorie
+        'categories' => $category_ids,
+        '_embedded' => [
+            'wp:term' => [$category_terms],
+        ],
     ];
+
+    if ($include_full_content) {
+        $featured_image = '';
+        if (has_post_thumbnail($post->ID)) {
+            // ⚡ 'large' invece di 'full': immagine molto più leggera da scaricare.
+            $featured_image = (string) get_the_post_thumbnail_url($post->ID, 'large');
+        }
+        $formatted['content'] = ['rendered' => apply_filters('the_content', $post->post_content)];
+        $formatted['excerpt'] = ['rendered' => (string) ($post->post_excerpt ?: wp_strip_all_tags(wp_trim_words($post->post_content, 55)))];
+        $formatted['featured_image_url'] = $featured_image;
+    } else {
+        // ⚡ Lista: NO apply_filters('the_content') — era il collo di bottiglia
+        // principale (shortcode, oEmbed, wpautop su ogni post).
+        $excerpt_raw = $post->post_excerpt;
+        if (!$excerpt_raw) {
+            $excerpt_raw = wp_trim_words(wp_strip_all_tags($post->post_content), 40, '…');
+        }
+        $formatted['content'] = ['rendered' => (string) $excerpt_raw];
+        $formatted['excerpt'] = ['rendered' => (string) $excerpt_raw];
+    }
+
+    return $formatted;
 }
 
 /* ---------------------------
