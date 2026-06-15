@@ -10869,26 +10869,42 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   Map<String, dynamic>? _fullPost;
-  bool _loadingFull = false;
+  bool _fetchingFull = false;
 
   @override
   void initState() {
     super.initState();
-    _loadFullPost();
+    // ⚡ Mostriamo SUBITO il contenuto già disponibile (dalla lista/cache) e
+    // scarichiamo la versione completa in background SOLO se quello che
+    // abbiamo è un excerpt troncato. Niente più spinner bloccante.
+    if (_needsFullContent(widget.post)) {
+      _loadFullPost();
+    }
   }
 
-  /// ⚡ La lista invia solo excerpt leggero; qui scarichiamo il contenuto completo.
+  /// Capisce se il contenuto attuale è solo l'excerpt leggero del backend
+  /// (testo semplice troncato con "…", senza HTML) e quindi va completato.
+  bool _needsFullContent(Map<String, dynamic> post) {
+    final content = (post['content']?['rendered'] ?? '').toString().trim();
+    if (content.isEmpty) return true;
+    final hasHtml = content.contains('<');
+    final looksTruncated =
+        content.endsWith('…') || content.endsWith('...');
+    return !hasHtml || looksTruncated;
+  }
+
+  /// ⚡ Scarica il contenuto completo in background, senza bloccare la UI.
   Future<void> _loadFullPost() async {
     final rawId = widget.post['id'];
     final postId = rawId is int ? rawId : int.tryParse('$rawId');
     if (postId == null || !apiService.isAuthenticated) return;
 
-    setState(() => _loadingFull = true);
+    if (mounted) setState(() => _fetchingFull = true);
     final full = await apiService.fetchPost(postId);
     if (mounted) {
       setState(() {
         if (full != null) _fullPost = full;
-        _loadingFull = false;
+        _fetchingFull = false;
       });
     }
   }
@@ -10995,21 +11011,45 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
                 ],
               ),
-              child: _loadingFull
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : Text(
-                      content,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                        height: 1.6,
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      height: 1.6,
                     ),
+                  ),
+                  // Indicatore non bloccante: il testo resta visibile mentre
+                  // arriva la versione completa.
+                  if (_fetchingFull) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Carico il testo completo…',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             // Bottone per aprire il link web
