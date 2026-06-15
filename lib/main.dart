@@ -4140,6 +4140,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Timer? _loadingTimeoutTimer;
   Timer? _postsRefreshTimer;
   bool _isHandlingPendingNotification = false;
+  // Evita che i refresh periodici si accavallino: Timer.periodic non attende
+  // il completamento del callback, quindi senza questa guardia più fetchPosts()
+  // (anche da 60s di timeout) partivano in parallelo martellando rete e CPU.
+  bool _isRefreshingPosts = false;
 
   // Cache locale
   DateTime? lastCacheUpdate;
@@ -5122,11 +5126,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   void _startPeriodicPostsRefresh() {
     _postsRefreshTimer?.cancel();
-    // Controlla ogni 3 secondi per rilevare rapidamente nuovi post urgenti
+    // ⚡ 60s invece di 3s: l'intervallo di 3 secondi causava download
+    // sovrapposti (fetchPosts può durare anche minuti in caso di timeout) e
+    // teneva rete/CPU/batteria costantemente sotto carico. 60s è più che
+    // sufficiente per rilevare nuovi post urgenti; il watcher backup (30s)
+    // resta come ulteriore rete di sicurezza.
     _postsRefreshTimer =
-        Timer.periodic(const Duration(seconds: 3), (timer) async {
+        Timer.periodic(const Duration(seconds: 60), (timer) async {
       if (!mounted) {
         timer.cancel();
+        return;
+      }
+      // Guardia anti-accavallamento: salta se un refresh è ancora in corso.
+      if (_isRefreshingPosts) {
+        debugPrint('⏭️ Skip refresh: download precedente ancora in corso');
         return;
       }
       final online = await _isDeviceOnline();
@@ -5134,12 +5147,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint('⏱️ Skip refresh post: dispositivo offline');
         return;
       }
-      debugPrint(
-          '⏱️ Refresh periodico post (ogni 3 secondi per rilevare urgenti)');
+      debugPrint('⏱️ Refresh periodico post (ogni 60s per rilevare urgenti)');
+      _isRefreshingPosts = true;
       try {
         await fetchPosts();
       } catch (e) {
         debugPrint('Errore nel refresh periodico dei post: $e');
+      } finally {
+        _isRefreshingPosts = false;
       }
     });
   }
