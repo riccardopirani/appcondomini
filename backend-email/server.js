@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
+const { createPostsRouter } = require('./posts');
 
 const PORT = Number(process.env.PORT) || 8080;
 
@@ -15,6 +17,10 @@ const SMTP_FROM_NAME =
 const app = express();
 let requestCounter = 0;
 
+// ⚡ Compressione gzip/deflate: riduce ~70-80% il payload JSON dei post.
+// Il pacchetto http di Flutter decomprime automaticamente, nessuna modifica
+// lato app necessaria.
+app.use(compression({ threshold: 1024 }));
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
@@ -136,6 +142,9 @@ app.use((req, _res, next) => {
 app.get('/health', (_, res) => {
   res.json({ ok: true, service: 'pdg-email-backend' });
 });
+
+// Cache + proxy dei post/categorie del plugin WordPress (download veloce app).
+app.use('/', createPostsRouter());
 
 app.post('/send-email', async (req, res) => {
   const requestId = `mail-${Date.now()}-${++requestCounter}`;

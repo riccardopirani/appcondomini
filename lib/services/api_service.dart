@@ -16,9 +16,14 @@ class ApiService {
   // Costanti
   static const String apiBaseUrl = 'https://www.portobellodigallura.it/wp-json/pdg-app/v1';
   static const String apiKeyHeaderName = 'x-pdg-api-key';
-  
+
   // ⚠️ CAMBIA QUESTA CHIAVE IN wp-config.php
   static const String apiKey = 'Tz7Wq8GlWVlVhZg3sGQgRrSn7lOc8AHe';
+
+  // Backend con cache server-side (proxy + arricchimento categorie).
+  // Velocizza il download dei post: una sola richiesta, risposta cache-ata.
+  static const String backendBaseUrl = 'https://appcondomini.onrender.com';
+  static const bool useBackendCache = true;
 
   // Variabili di stato
   String? _token;
@@ -112,8 +117,9 @@ class ApiService {
           
           // Salva nelle SharedPreferences
           final prefs = await SharedPreferences.getInstance();
-          // 🧹 Pulisci cache locale ad ogni nuovo login riuscito
-          await _clearCachesOnNewLogin(prefs);
+          // 🧹 Pulisci cache locale SOLO se cambia utente (login più veloce
+          // per lo stesso utente: la Home riappare subito dalla cache).
+          await _clearCachesOnNewLogin(prefs, username);
           await prefs.setString('pdg_app_token', _token!);
           await prefs.setInt('pdg_app_token_expiry', expiryMs);
           
@@ -199,11 +205,24 @@ class ApiService {
     ).timeout(const Duration(seconds: 30));
   }
 
-  /// Pulisce cache persistenti + cache immagini in memoria ad ogni nuovo login.
+  /// Pulisce cache persistenti + cache immagini in memoria SOLO quando cambia
+  /// l'utente loggato. Se rientra lo stesso utente la cache viene mantenuta,
+  /// così la Home riappare subito senza riscaricare post e immagini.
   /// NON cancella credenziali/setting: rimuove solo chiavi legate a "cache".
-  Future<void> _clearCachesOnNewLogin(SharedPreferences prefs) async {
+  Future<void> _clearCachesOnNewLogin(
+      SharedPreferences prefs, String username) async {
     try {
-      // In-memory image cache (utile se cambiano utenti/contenuti)
+      final normalizedUser = username.trim().toLowerCase();
+      final lastUser = prefs.getString('pdg_last_login_user');
+
+      if (lastUser != null && lastUser == normalizedUser) {
+        // Stesso utente: mantieni la cache per un login veloce.
+        debugPrint('🔁 Stesso utente ($normalizedUser): cache mantenuta');
+        return;
+      }
+
+      // Utente diverso (o primo login): pulisci le cache.
+      // In-memory image cache (i contenuti potrebbero essere cambiati)
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
 
@@ -218,7 +237,9 @@ class ApiService {
         }
       }
 
-      debugPrint('🧹 Cache pulita (SharedPreferences + image cache) per nuovo login');
+      await prefs.setString('pdg_last_login_user', normalizedUser);
+      debugPrint(
+          '🧹 Cambio utente -> cache pulita (SharedPreferences + image cache)');
     } catch (e) {
       debugPrint('❌ Errore pulizia cache nuovo login: $e');
     }
@@ -235,6 +256,40 @@ class ApiService {
     };
   }
 
+  /// Header per il backend con cache. Inoltra il token solo se disponibile,
+  /// così funziona anche per i contenuti pubblici (senza login).
+  Map<String, String> _getBackendHeaders() {
+    final headers = <String, String>{
+      apiKeyHeaderName: apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_token != null && _token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $_token';
+      headers['x-pdg-token'] = _token!;
+    }
+    return headers;
+  }
+
+  /// GET verso il backend con cache. Ritorna null se il backend non risponde
+  /// (così il chiamante può fare fallback su WordPress diretto).
+  Future<http.Response?> _backendGet(
+    String endpoint, {
+    Map<String, String>? queryParams,
+  }) async {
+    try {
+      final uri = Uri.parse('$backendBaseUrl$endpoint');
+      final uriWithParams =
+          queryParams != null ? uri.replace(queryParameters: queryParams) : uri;
+      return await http
+          .get(uriWithParams, headers: _getBackendHeaders())
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      debugPrint('⚠️ Backend cache non raggiungibile ($endpoint): $e');
+      return null;
+    }
+  }
+
   /// Ricarica il token se scaduto (utile per logout)
   Future<void> logout() async {
     _token = null;
@@ -247,8 +302,127 @@ class ApiService {
     debugPrint('🔓 Logout completato');
   }
 
-  /// Ottiene i post leggibili per l'utente autenticato
+  /// Ottiene i post leggibili per l'utente autenticato.
+  ///
+  /// Prova prima il backend con cache server-side (veloce, post già arricchiti
+  /// con le categorie); se non risponde, fa fallback su WordPress diretto.
   Future<List<Map<String, dynamic>>> fetchPosts({
+    int page = 1,
+    int perPage = 60,
+    String orderBy = 'date',
+    String order = 'DESC',
+    int? category,
+  }) async {
+    if (useBackendCache) {
+      final backendPosts = await _fetchPostsViaBackend(
+        page: page,
+        perPage: perPage,
+        orderBy: orderBy,
+        order: order,
+        category: category,
+      );
+      if (backendPosts != null) {
+        return backendPosts;
+      }
+      debugPrint('↩️ Fallback a WordPress diretto per i post');
+    }
+    return _fetchPostsDirect(
+      page: page,
+      perPage: perPage,
+      orderBy: orderBy,
+      order: order,
+      category: category,
+    );
+  }
+
+  /// Scarica SOLO i post urgenti (categoria con nome che contiene "urgent").
+  ///
+  /// Usato all'avvio per un caricamento leggero. Se non esiste una categoria
+  /// urgente leggibile o non ci sono post urgenti, fa fallback sugli ultimi
+  /// [limit] post (così l'app non resta mai senza contenuti all'avvio).
+  Future<List<Map<String, dynamic>>> fetchUrgentPosts({int limit = 3}) async {
+    try {
+      final categories = await fetchCategories();
+      Map<String, dynamic>? urgentCat;
+      for (final c in categories) {
+        final name = (c['name'] as String?)?.toLowerCase() ?? '';
+        final readable = c['readable'];
+        if (name.contains('urgent') && readable != false) {
+          urgentCat = c;
+          break;
+        }
+      }
+
+      if (urgentCat != null && urgentCat['id'] != null) {
+        final id = urgentCat['id'] is int
+            ? urgentCat['id'] as int
+            : int.tryParse('${urgentCat['id']}');
+        if (id != null) {
+          final urgent = await fetchPosts(category: id, perPage: limit);
+          if (urgent.isNotEmpty) {
+            debugPrint(
+                '🚨 fetchUrgentPosts: ${urgent.length} post urgenti (cat $id)');
+            return urgent;
+          }
+        }
+      }
+
+      // Fallback: ultimi post recenti (così l'avvio non resta mai vuoto).
+      debugPrint(
+          '🚨 fetchUrgentPosts: nessun urgente, fallback agli ultimi $limit post');
+      return await fetchPosts(perPage: limit);
+    } catch (e) {
+      debugPrint('❌ fetchUrgentPosts errore: $e');
+      return await fetchPosts(perPage: limit);
+    }
+  }
+
+  /// Scarica i post dal backend con cache. Ritorna null in caso di errore
+  /// (per consentire il fallback su WordPress diretto). Una lista vuota è
+  /// invece una risposta valida (l'utente non ha post visibili).
+  Future<List<Map<String, dynamic>>?> _fetchPostsViaBackend({
+    int page = 1,
+    int perPage = 60,
+    String orderBy = 'date',
+    String order = 'DESC',
+    int? category,
+  }) async {
+    final queryParams = {
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+      'orderby': orderBy,
+      'order': order,
+    };
+    if (category != null) {
+      queryParams['category'] = category.toString();
+    }
+
+    final response = await _backendGet('/posts', queryParams: queryParams);
+    if (response == null) return null;
+
+    if (response.statusCode == 200) {
+      try {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic> && data['ok'] != false) {
+          final posts =
+              (data['posts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final cache = data['cache'];
+          debugPrint(
+              '⚡ Post via backend cache: ${posts.length} (cache=$cache)');
+          return posts;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Parsing risposta backend /posts fallito: $e');
+        return null;
+      }
+    }
+
+    debugPrint('⚠️ Backend /posts status ${response.statusCode}');
+    return null;
+  }
+
+  /// Scarica i post direttamente dal plugin WordPress (fallback).
+  Future<List<Map<String, dynamic>>> _fetchPostsDirect({
     int page = 1,
     int perPage = 60,
     String orderBy = 'date',
@@ -345,8 +519,26 @@ class ApiService {
     }
   }
 
-  /// Ottiene le categorie leggibili per l'utente autenticato
+  /// Ottiene le categorie leggibili per l'utente autenticato.
+  /// Prova prima il backend con cache, poi fallback su WordPress diretto.
   Future<List<Map<String, dynamic>>> fetchCategories() async {
+    if (useBackendCache) {
+      final response = await _backendGet('/categories');
+      if (response != null && response.statusCode == 200) {
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is List) {
+            final categories = decoded.cast<Map<String, dynamic>>();
+            debugPrint('⚡ Categorie via backend cache: ${categories.length}');
+            return categories;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Parsing risposta backend /categories fallito: $e');
+        }
+      }
+      debugPrint('↩️ Fallback a WordPress diretto per le categorie');
+    }
+
     try {
       final response = await get('/categories');
 

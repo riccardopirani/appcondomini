@@ -1028,6 +1028,12 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   // 🔥 Categorie dall'API (per mostrare tutte le categorie disponibili)
   List<Map<String, dynamic>> _apiCategories = [];
 
+  // 🚀 Paginazione lazy per categoria: carichiamo 5 articoli alla volta.
+  static const int _categoryPageSize = 5;
+  final Map<String, int> _categoryPage = {}; // ultima pagina caricata
+  final Map<String, bool> _categoryHasMore = {}; // se ci sono altri articoli
+  String? _loadingMoreCategory; // categoria per cui si sta caricando "altri 5"
+
   bool get _isNewsView => widget.showDirectList;
   bool get _isArticoliView => !widget.showDirectList;
   bool get _useLightCardText => _isNewsView || _isArticoliView;
@@ -1265,79 +1271,129 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
       currentCategory = category;
       filteredPosts = categoryMap[category] ?? [];
     });
-    
-    // 🔥 CARICA POST DELLA CATEGORIA DAL PLUGIN API se autenticato
-    if (apiService.isAuthenticated) {
-      _loadPostsByCategory(category);
+
+    // 🚀 LAZY LOAD: carica la PRIMA pagina (5 articoli) solo se non già caricata.
+    if (apiService.isAuthenticated &&
+        (categoryMap[category]?.isEmpty ?? true)) {
+      _loadCategoryPage(category, reset: true);
     }
   }
 
-  /// 🔥 CARICA POST DI UNA CATEGORIA DAL PLUGIN API
-  Future<void> _loadPostsByCategory(String categoryName) async {
+  /// 🚀 Carica "altri 5" articoli della categoria corrente (paginazione).
+  Future<void> _loadMoreCategoryPosts() async {
+    if (currentCategory.isEmpty) return;
+    await _loadCategoryPage(currentCategory, reset: false);
+  }
+
+  /// 🚀 Risolve l'ID categoria dal nome usando la cache locale (_apiCategories).
+  /// Evita una chiamata HTTP extra a /categories ad ogni pagina caricata.
+  Map<String, dynamic>? _categoryMetaByName(String categoryName) {
+    for (final c in _apiCategories) {
+      if (c['name'] == categoryName && c['readable'] == true) {
+        return c;
+      }
+    }
+    return null;
+  }
+
+  /// 🚀 CARICA UNA PAGINA DI POST DI UNA CATEGORIA DAL PLUGIN API.
+  ///
+  /// [reset] true = prima pagina (sostituisce), false = pagina successiva
+  /// (aggiunge altri [_categoryPageSize] articoli alla lista già presente).
+  Future<void> _loadCategoryPage(String categoryName,
+      {required bool reset}) async {
     try {
-      debugPrint('📂 Caricamento post per categoria: $categoryName');
-      
-      // Trova l'ID della categoria dal nome
-      final categories = await apiService.fetchCategories();
-      final category = categories.firstWhere(
-        (c) => c['name'] == categoryName && c['readable'] == true,
-        orElse: () => {},
-      );
-      
-      if (category.isEmpty) {
+      debugPrint(
+          '📂 Caricamento categoria "$categoryName" (reset=$reset, pageSize=$_categoryPageSize)');
+
+      // ⚡ Usa categorie già in memoria; fetch solo se mancanti.
+      Map<String, dynamic>? category = _categoryMetaByName(categoryName);
+      if (category == null && apiService.isAuthenticated) {
+        final categories = await apiService.fetchCategories();
+        if (mounted) {
+          setState(() => _apiCategories = categories);
+        }
+        category = _categoryMetaByName(categoryName);
+      }
+
+      if (category == null || category.isEmpty) {
         debugPrint('⚠️ Categoria "$categoryName" non trovata o non leggibile');
         return;
       }
-      
-      final categoryId = category['id'] as int;
-      debugPrint('📂 ID categoria: $categoryId');
-      
-      // Carica post della categoria
-      final posts = await apiService.fetchPosts(category: categoryId, perPage: 60);
-      
-      if (posts.isNotEmpty) {
-        debugPrint('✅ Post caricati per categoria "$categoryName": ${posts.length}');
-        
-        // 🔥 AGGIUNGI CATEGORIA AI POST (se non presente)
-        final postsWithCategory = posts.map((post) {
-          final postCopy = Map<String, dynamic>.from(post);
-          
-          // Se il post non ha categorie embedded, aggiungile
-          if (postCopy['_embedded'] == null || postCopy['_embedded']?['wp:term'] == null) {
-            postCopy['_embedded'] = {
-              'wp:term': [
-                [
-                  {
-                    'id': categoryId,
-                    'name': categoryName,
-                    'slug': category['slug'],
-                  }
-                ]
-              ]
-            };
-          }
-          
-          return postCopy;
-        }).toList();
-        
-        // Aggiorna la mappa delle categorie
-        setState(() {
-          categoryMap[categoryName] = postsWithCategory;
-          filteredPosts = postsWithCategory;
-        });
-        
-        // Log dei post
-        for (int i = 0; i < (posts.length > 3 ? 3 : posts.length); i++) {
-          debugPrint('   ${i + 1}. "${posts[i]['title']['rendered']}"');
-        }
-        if (posts.length > 3) {
-          debugPrint('   ... e altri ${posts.length - 3} post');
-        }
-      } else {
-        debugPrint('📭 Nessun post trovato per categoria "$categoryName"');
+
+      final categoryMeta = category;
+      final rawId = categoryMeta['id'];
+      final categoryId = rawId is int ? rawId : int.tryParse('$rawId');
+      if (categoryId == null) {
+        debugPrint('⚠️ ID categoria non valido per "$categoryName"');
+        return;
       }
+      final nextPage = reset ? 1 : (_categoryPage[categoryName] ?? 0) + 1;
+
+      setState(() {
+        if (reset) {
+          isLoading = true;
+        } else {
+          _loadingMoreCategory = categoryName;
+        }
+      });
+
+      final newPosts = await apiService.fetchPosts(
+        category: categoryId,
+        page: nextPage,
+        perPage: _categoryPageSize,
+      );
+
+      // 🔥 AGGIUNGI CATEGORIA AI POST (se non presente).
+      final fetched = newPosts.map((post) {
+        final postCopy = Map<String, dynamic>.from(post);
+        if (postCopy['_embedded'] == null ||
+            postCopy['_embedded']?['wp:term'] == null) {
+          postCopy['_embedded'] = {
+            'wp:term': [
+              [
+                {
+                  'id': categoryId,
+                  'name': categoryName,
+                  'slug': categoryMeta['slug'],
+                }
+              ]
+            ]
+          };
+        }
+        return postCopy;
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        final existing =
+            reset ? <dynamic>[] : List<dynamic>.from(categoryMap[categoryName] ?? []);
+        final existingIds = existing.map((p) => p['id']).toSet();
+        for (final p in fetched) {
+          if (!existingIds.contains(p['id'])) existing.add(p);
+        }
+        categoryMap[categoryName] = existing;
+        if (currentCategory == categoryName) {
+          filteredPosts = existing;
+        }
+        _categoryPage[categoryName] = nextPage;
+        // Se la pagina è "piena" probabilmente ci sono altri articoli.
+        _categoryHasMore[categoryName] =
+            newPosts.length >= _categoryPageSize;
+        isLoading = false;
+        _loadingMoreCategory = null;
+      });
+
+      debugPrint(
+          '✅ Categoria "$categoryName": +${fetched.length} (pagina $nextPage, hasMore=${_categoryHasMore[categoryName]})');
     } catch (e) {
       debugPrint('❌ Errore caricamento post categoria: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          _loadingMoreCategory = null;
+        });
+      }
     }
   }
 
@@ -1471,12 +1527,17 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
   }
 
   Widget _buildCategoriesView() {
-    // 🔥 Filtra categorie in base ai ruoli utente E che abbiano almeno 1 post
+    // 🔥 Filtra categorie in base ai ruoli utente.
+    // 🚀 Con il lazy load mostriamo TUTTE le categorie leggibili dall'API anche
+    // se non hanno ancora post caricati (verranno scaricati al tap, 5 alla volta).
+    final apiCategoryNames =
+        _apiCategories.map((c) => c['name'] as String? ?? '').toSet();
     final allCategories = categoryMap.keys.toList()..sort();
     final categories = allCategories.where((cat) {
       final hasPost = (categoryMap[cat]?.length ?? 0) > 0;
+      final isApiCategory = apiCategoryNames.contains(cat);
       final canView = _canViewCategory(cat);
-      return hasPost && canView;
+      return (hasPost || isApiCategory) && canView;
     }).toList();
 
     return ListView.builder(
@@ -1551,7 +1612,9 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                                       '⚠️ Errore caricamento localizzazioni: $e');
                                 }
                                 return Text(
-                                  '$postCount $articlesText',
+                                  postCount > 0
+                                      ? '$postCount $articlesText'
+                                      : 'Tocca per aprire',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.white70,
@@ -1830,17 +1893,67 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                           onRefresh: _refreshPosts,
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
-                            itemCount: filteredPosts.length,
+                            // +1 per il pulsante "Carica altri 5" in fondo.
+                            itemCount: filteredPosts.length + 1,
                             itemBuilder: (context, index) {
-                              if (index >= filteredPosts.length) {
-                                return const SizedBox.shrink();
+                              if (index < filteredPosts.length) {
+                                return _buildArticleCard(filteredPosts[index]);
                               }
-                              return _buildArticleCard(filteredPosts[index]);
+                              return _buildLoadMoreButton();
                             },
                           ),
                         ),
         ),
       ],
+    );
+  }
+
+  /// 🚀 Pulsante "Carica altri 5 articoli" in fondo al dettaglio categoria.
+  /// Compare solo dentro la singola categoria (non in News), quando non si sta
+  /// cercando e quando ci sono altri articoli da scaricare.
+  Widget _buildLoadMoreButton() {
+    // Solo nella vista Articoli (categoria), mai in News.
+    if (widget.showDirectList) return const SizedBox.shrink();
+    // Durante la ricerca/filtri non paginiamo.
+    if (searchQuery.isNotEmpty) return const SizedBox.shrink();
+    // Niente altri articoli per questa categoria.
+    if (_categoryHasMore[currentCategory] != true) {
+      return const SizedBox.shrink();
+    }
+
+    final isLoadingMore = _loadingMoreCategory == currentCategory;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 24),
+      child: Center(
+        child: isLoadingMore
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              )
+            : ElevatedButton.icon(
+                onPressed: _loadMoreCategoryPosts,
+                icon: const Icon(Icons.expand_more, size: 20),
+                label: const Text('Carica altri 5 articoli'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFB71C1C),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+              ),
+      ),
     );
   }
 
@@ -3139,6 +3252,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
+/// Gestione della durata della sessione utente.
+/// - keep30: la sessione resta valida 30 giorni dal login.
+/// - logoutOnClose: la sessione viene chiusa alla chiusura dell'app.
+class SessionPrefs {
+  static const String keyMode = 'session_mode';
+  static const String keyExpiry = 'session_expiry'; // ms epoch (solo keep30)
+
+  static const String modeKeep30 = 'keep30';
+  static const String modeLogoutOnClose = 'logout_on_close';
+
+  static const Duration keepDuration = Duration(days: 30);
+
+  /// Salva la modalità scelta al login.
+  static Future<void> save(SharedPreferences prefs,
+      {required bool keepLoggedIn}) async {
+    if (keepLoggedIn) {
+      await prefs.setString(keyMode, modeKeep30);
+      await prefs.setInt(
+        keyExpiry,
+        DateTime.now().add(keepDuration).millisecondsSinceEpoch,
+      );
+    } else {
+      await prefs.setString(keyMode, modeLogoutOnClose);
+      await prefs.remove(keyExpiry);
+    }
+  }
+}
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -3150,6 +3291,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+
+  /// true  = mantieni l'accesso per 30 giorni
+  /// false = scollega a fine utilizzo (logout alla chiusura dell'app)
+  bool _keepLoggedIn = true;
 
   Future<void> _enableDemoModeForReview() async {
     final prefs = await SharedPreferences.getInstance();
@@ -3263,7 +3408,11 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('originalUsername', username);
         await prefs.setString('originalEmail', username);
 
-        debugPrint('✅ Login completato, navigo alla home');
+        // Durata sessione scelta dall'utente (30 giorni o logout a fine uso).
+        await SessionPrefs.save(prefs, keepLoggedIn: _keepLoggedIn);
+
+        debugPrint(
+            '✅ Login completato (modalità sessione: ${_keepLoggedIn ? "30 giorni" : "logout a fine uso"}), navigo alla home');
 
         if (context.mounted) {
           Navigator.pushReplacement(
@@ -3466,7 +3615,75 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 16),
+
+                          // Opzione durata sessione
+                          InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: _isLoading
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _keepLoggedIn = !_keepLoggedIn;
+                                    });
+                                  },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: Checkbox(
+                                      value: _keepLoggedIn,
+                                      activeColor: AppColors.secondaryBlue,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                      ),
+                                      onChanged: _isLoading
+                                          ? null
+                                          : (value) {
+                                              setState(() {
+                                                _keepLoggedIn = value ?? true;
+                                              });
+                                            },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _keepLoggedIn
+                                              ? 'Mantieni l\'accesso per 30 giorni'
+                                              : 'Scollega a fine utilizzo',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF2C3E50),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _keepLoggedIn
+                                              ? 'Resterai connesso anche dopo aver chiuso l\'app.'
+                                              : 'Dovrai accedere di nuovo alla prossima apertura.',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFF7F8C8D),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
 
                           // Pulsante login
                           SizedBox(
@@ -3669,6 +3886,31 @@ class _SplashScreenState extends State<SplashScreen>
     debugPrint('- Username: ${username != null ? "Presente" : "Assente"}');
     debugPrint('- Password: ${password != null ? "Presente" : "Assente"}');
 
+    // 🔒 Applica la modalità di sessione scelta dall'utente al login.
+    if (isLoggedIn) {
+      final sessionMode = prefs.getString(SessionPrefs.keyMode);
+
+      // "Scollega a fine utilizzo": ad ogni avvio a freddo serve un nuovo login.
+      if (sessionMode == SessionPrefs.modeLogoutOnClose) {
+        debugPrint('🔒 Sessione "logout a fine uso": richiedo nuovo login');
+        await _clearSession(prefs);
+        _goToLogin();
+        return;
+      }
+
+      // "30 giorni": se la sessione è scaduta, serve un nuovo login.
+      if (sessionMode == SessionPrefs.modeKeep30) {
+        final expiry = prefs.getInt(SessionPrefs.keyExpiry);
+        if (expiry != null &&
+            DateTime.now().millisecondsSinceEpoch > expiry) {
+          debugPrint('🔒 Sessione 30 giorni scaduta: richiedo nuovo login');
+          await _clearSession(prefs);
+          _goToLogin();
+          return;
+        }
+      }
+    }
+
     // Se l'utente ha fatto login almeno una volta, mantienilo loggato
     if (isLoggedIn && username != null && password != null) {
       debugPrint('✅ Utente precedentemente loggato, mantengo la sessione');
@@ -3706,6 +3948,25 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     }
+  }
+
+  /// Chiude la sessione corrente (senza cancellare le credenziali salvate,
+  /// così l'utente può riaccedere rapidamente).
+  Future<void> _clearSession(SharedPreferences prefs) async {
+    await prefs.setBool('isLoggedIn', false);
+    await prefs.remove('jwtToken');
+    await prefs.remove('pdg_app_token');
+    await prefs.remove('pdg_app_token_expiry');
+    await prefs.remove(SessionPrefs.keyExpiry);
+    await apiService.logout();
+  }
+
+  void _goToLogin() {
+    if (!context.mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
   }
 
   Future<bool> _verifySessionValidity() async {
@@ -5020,21 +5281,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           isLoadingUserData = true;
           isLoadingPosts = true;
           _startupLoadingError = null;
-          _startupLoadingMessage = 'Caricamento dati utente...';
-        });
-      }
-
-      // Esegui le operazioni necessarie prima di mostrare la Home.
-      await _initializeWithTimeout(() => fetchUserData(), 'fetchUserData', 15);
-
-      if (mounted) {
-        setState(() {
           _startupLoadingMessage = 'Scaricamento comunicazioni...';
         });
       }
 
-      // Dopo il login la Home deve apparire solo quando almeno un post è disponibile.
-      await _initializeWithTimeout(() => fetchPosts(), 'fetchPosts', 60);
+      // ⚡ Avvio più veloce: dati utente e post in PARALLELO.
+      // I post passano dal backend con cache e dipendono solo dal token
+      // (già caricato in initState), non dai dati utente.
+      await Future.wait([
+        _initializeWithTimeout(() => fetchUserData(), 'fetchUserData', 15),
+        _initializeWithTimeout(() => fetchPosts(), 'fetchPosts', 60),
+      ]);
 
       if (posts.isEmpty) {
         debugPrint('Nessun post disponibile dopo il caricamento iniziale');
@@ -5144,9 +5401,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         // Server disponibile, marca come tale
         appSettings.markServerAvailable();
-
-        // Test se ci sono post disponibili
-        await _testPostsAvailability();
         return true;
       } else {
         debugPrint('WordPress API non accessibile: ${response.statusCode}');
@@ -5158,38 +5412,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       // Server non risponde, marca come non disponibile
       appSettings.markServerUnavailable();
       return false;
-    }
-  }
-
-  Future<void> _testPostsAvailability() async {
-    try {
-      debugPrint('Test disponibilità post...');
-
-      // Test endpoint post base
-      final response = await http.get(
-        Uri.parse('${appSettings.urlApi}posts?per_page=5'),
-        headers: {
-          'User-Agent': 'Flutter App/1.0',
-          'Accept': 'application/json',
-        },
-      );
-
-      debugPrint('Test post status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        debugPrint('Post disponibili (test): ${data.length}');
-
-        if (data.isNotEmpty) {
-          debugPrint('Primo post: ${data[0]['title']['rendered']}');
-          debugPrint('Status primo post: ${data[0]['status']}');
-        }
-      } else {
-        debugPrint('Errore test post: ${response.statusCode}');
-        debugPrint('Response body: ${response.body}');
-      }
-    } catch (e) {
-      debugPrint('Errore test disponibilità post: $e');
     }
   }
 
@@ -5640,25 +5862,28 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final previousPostIds = posts.map((p) => p['id']).toSet();
       final tempPosts = <dynamic>[];
 
-      // Prima verifica che l'API REST sia accessibile
-      final serverOk = await _testWordPressAPI();
-      if (!serverOk) {
-        debugPrint('🚫 Server non risponde, uso solo cache');
-        return;
-      }
-
-      // 🔌 PRIMO TENTATIVO: Usa il plugin API se autenticato
+      // 🚀 FAST PATH: prova SUBITO il backend con cache (post già arricchiti).
+      // Se funziona, saltiamo i test e i fallback WordPress diretti (lenti).
       if (apiService.isAuthenticated) {
-        debugPrint('🔌 Provo prima con il plugin API...');
+        debugPrint('🔌 Provo prima con il plugin API (backend cache)...');
         final pluginApiSuccess = await _tryFetchPostsViaPluginApi();
         if (pluginApiSuccess) {
           tempPosts.addAll(posts);
-          debugPrint('✅ Caricamento riuscito via plugin API');
+          debugPrint('✅ Caricamento riuscito via plugin API (fast path)');
         }
       }
 
-      // 🔄 FALLBACK: Se il plugin API non ha funzionato, usa i metodi legacy
+      // 🐢 SLOW PATH: solo se il fast path non ha prodotto post.
+      // (test WordPress + autenticazione legacy/cookie + endpoint alternativi)
       if (tempPosts.isEmpty) {
+        // Verifica che l'API REST WordPress sia accessibile.
+        final serverOk = await _testWordPressAPI();
+        if (!serverOk) {
+          debugPrint('🚫 Server non risponde, uso solo cache');
+          return;
+        }
+
+        // FALLBACK: metodi legacy (cookie) o senza autenticazione.
         if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
           debugPrint('Caricamento post con autenticazione legacy...');
           await _tryFetchUserSpecificPosts();
@@ -5668,13 +5893,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           await _tryFetchPostsWithoutAuth();
           tempPosts.addAll(posts);
         }
-      }
 
-      // Se non ha funzionato, prova endpoint alternativi
-      if (tempPosts.isEmpty) {
-        debugPrint('Provo endpoint alternativi...');
-        await _tryFetchPostsAlternative();
-        tempPosts.addAll(posts);
+        // Se non ha funzionato, prova endpoint alternativi.
+        if (tempPosts.isEmpty) {
+          debugPrint('Provo endpoint alternativi...');
+          await _tryFetchPostsAlternative();
+          tempPosts.addAll(posts);
+        }
       }
 
       // Se ancora non ci sono post, prova login automatico
@@ -5859,10 +6084,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       }
 
       debugPrint('🔌 Tentativa caricamento post via plugin API...');
-      
-      // 🔥 Carica TUTTI i post accessibili all'utente
-      final pluginPosts = await apiService.fetchPosts();
-      
+
+      // 🚀 LAZY LOAD: all'avvio scarichiamo SOLO i 3 post urgenti.
+      // Il resto degli articoli viene caricato on-demand per categoria
+      // (5 alla volta) dalla sezione Articoli.
+      final pluginPosts = await apiService.fetchUrgentPosts(limit: 3);
+
       if (pluginPosts.isNotEmpty) {
         debugPrint('✅ Plugin API: ${pluginPosts.length} post caricati');
      await _processPosts(pluginPosts);
@@ -6260,6 +6487,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   /// 🔥 ARRICCHISCI I POST CON CATEGORIE DAL PLUGIN API
   Future<List<dynamic>> _enrichPostsWithCategories(List<dynamic> postsToEnrich) async {
     try {
+      // ⚡ Server v3.5+ include già _embedded con nomi categoria: skip tutto.
+      final allEnriched = postsToEnrich.every((post) {
+        final terms = post['_embedded']?['wp:term']?[0];
+        return terms is List &&
+            terms.isNotEmpty &&
+            terms.first is Map &&
+            (terms.first as Map)['name'] != null;
+      });
+      if (allEnriched) {
+        debugPrint('⚡ Post già arricchiti dal server, skip fetchCategories');
+        return postsToEnrich;
+      }
+
       debugPrint('🏷️ Arricchimento post con categorie dal plugin API...');
       
       // Carica le categorie dal plugin
@@ -9456,6 +9696,8 @@ class ContactOptionsScreen extends StatelessWidget {
                 _buildButton(
                     context, "Segnalazione Guasto", 'assets/guasto.png'),
                 _buildButton(context, "Ormeggio", 'assets/ormeggio.png'),
+                _buildButton(
+                    context, "Pulizia fosse", 'assets/pulizia_fosse.png'),
               ],
             ),
           ),
@@ -9749,6 +9991,13 @@ class ContactOptionsScreen extends StatelessWidget {
                 ),
               ),
             );
+          } else if (label == "Pulizia fosse") {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const PuliziaFosseScreen(),
+              ),
+            );
           } else {
             // Per gli altri servizi, apri il form email
             Navigator.push(
@@ -9792,6 +10041,124 @@ class ContactOptionsScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class PuliziaFosseScreen extends StatelessWidget {
+  const PuliziaFosseScreen({super.key});
+
+  static final Uri _pdfUri =
+      Uri.parse('https://portobellodigallura.it/app/fosse.pdf');
+
+  Future<void> _openPdf(BuildContext context) async {
+    try {
+      if (await canLaunchUrl(_pdfUri)) {
+        await launchUrl(_pdfUri, mode: LaunchMode.externalApplication);
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Impossibile aprire il modulo. Verifica la connessione.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Errore apertura modulo: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.loggedInBackground,
+      appBar: AppBar(
+        title: const Text(
+          'Pulizia fosse',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        backgroundColor: AppColors.white,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blueGrey.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(28.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(Icons.cleaning_services,
+                    size: 48, color: Color(0xFF0288D1)),
+                const SizedBox(height: 12),
+                const Text(
+                  'Pulizia fosse',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF01579B),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () => _openPdf(context),
+                  icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+                  label: const Text(
+                    'Download modulo',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0288D1),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Si apre il PDF sul browser del dispositivo (Safari o Chrome).',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -10301,7 +10668,11 @@ class _EmailFormTabState extends State<EmailFormTab> {
                     size: 48, color: Color(0xFF0288D1)),
                 const SizedBox(height: 12),
                 Text(
-                  AppLocalizations.of(context).sendMessage,
+                  widget.subject == 'Bombole Gas'
+                      ? 'Richiedi una Bombola'
+                      : widget.subject == 'Ormeggio'
+                          ? 'Richiedi un Ormeggio'
+                          : AppLocalizations.of(context).sendMessage,
                   style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -10341,6 +10712,8 @@ class _EmailFormTabState extends State<EmailFormTab> {
                     textAlign: TextAlign.center,
                   ),
                 ],
+                // Ormeggio: solo download modulo, nessun form email.
+                if (widget.subject != 'Ormeggio') ...[
                 const SizedBox(height: 20),
                 _buildTextField(
                   controller: _nameController,
@@ -10430,6 +10803,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
                     ),
                   ),
                 ),
+                ], // fine form (nascosto per Ormeggio)
               ],
             ),
           ),
@@ -10462,7 +10836,7 @@ class _EmailFormTabState extends State<EmailFormTab> {
   }
 }
 
-class PostDetailScreen extends StatelessWidget {
+class PostDetailScreen extends StatefulWidget {
   final Map<String, dynamic> post;
   final String userName;
   final String userEmail;
@@ -10474,22 +10848,52 @@ class PostDetailScreen extends StatelessWidget {
     required this.userEmail,
   });
 
+  @override
+  State<PostDetailScreen> createState() => _PostDetailScreenState();
+}
+
+class _PostDetailScreenState extends State<PostDetailScreen> {
+  Map<String, dynamic>? _fullPost;
+  bool _loadingFull = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFullPost();
+  }
+
+  /// ⚡ La lista invia solo excerpt leggero; qui scarichiamo il contenuto completo.
+  Future<void> _loadFullPost() async {
+    final rawId = widget.post['id'];
+    final postId = rawId is int ? rawId : int.tryParse('$rawId');
+    if (postId == null || !apiService.isAuthenticated) return;
+
+    setState(() => _loadingFull = true);
+    final full = await apiService.fetchPost(postId);
+    if (mounted) {
+      setState(() {
+        if (full != null) _fullPost = full;
+        _loadingFull = false;
+      });
+    }
+  }
+
+  Map<String, dynamic> get _displayPost => _fullPost ?? widget.post;
+
   String _removeHtmlTags(String htmlText) {
     if (htmlText.isEmpty) return htmlText;
 
-    // Prima decodifica le entità HTML
     final decodedText = decodeHtmlEntities(htmlText);
-
-    // Poi rimuovi i tag HTML rimanenti
     final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: true);
     return decodedText
         .replaceAll(regex, '')
         .replaceAll('::', '')
-        .replaceAll(RegExp(r'/\d+'), ''); // Rimuove /2, /3, /4, etc.
+        .replaceAll(RegExp(r'/\d+'), '');
   }
 
   @override
   Widget build(BuildContext context) {
+    final post = _displayPost;
     final title = decodeHtmlEntities(
         post['title']?['rendered'] ?? 'Titolo non disponibile');
     final content = _removeHtmlTags(
@@ -10519,7 +10923,6 @@ class PostDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Messaggio informativo sui contenuti multimediali
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -10551,7 +10954,6 @@ class PostDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // Contenuto principale
             Text(
               'Contenuto:',
               style: TextStyle(
@@ -10578,14 +10980,21 @@ class PostDetailScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Text(
-                content,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                  height: 1.6,
-                ),
-              ),
+              child: _loadingFull
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  : Text(
+                      content,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        height: 1.6,
+                      ),
+                    ),
             ),
             const SizedBox(height: 24),
             // Bottone per aprire il link web
