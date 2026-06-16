@@ -308,7 +308,7 @@ class ApiService {
   /// con le categorie); se non risponde, fa fallback su WordPress diretto.
   Future<List<Map<String, dynamic>>> fetchPosts({
     int page = 1,
-    int perPage = 60,
+    int perPage = 100,
     String orderBy = 'date',
     String order = 'DESC',
     int? category,

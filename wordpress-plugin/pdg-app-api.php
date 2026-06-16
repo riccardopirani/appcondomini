@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PdG App API (PublishPress-safe + Categories)
  * Description: API per app mobile: login + accesso ai soli post leggibili secondo PublishPress Permissions (permessi su post/categorie). Endpoint categorie "navigabile". Hardening endpoint sensibili.
- * Version: 3.6
+ * Version: 3.7
  * Author: Portobello di Gallura
  */
 
@@ -764,6 +764,49 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
  * --------------------------- */
 
 /**
+ * Estrae i link a file PDF dal contenuto HTML di un post.
+ * Cerca sia gli href dei tag <a>, sia eventuali URL "nudi" che finiscono in .pdf.
+ * Ritorna una lista di URL assoluti, deduplicati.
+ */
+function pdg_app_extract_pdf_links($content): array {
+    if (!is_string($content) || $content === '') {
+        return [];
+    }
+
+    $links = [];
+
+    // href="...pdf" oppure href='...pdf'
+    if (preg_match_all(
+        '/href\s*=\s*["\']([^"\']+\.pdf[^"\']*)["\']/i',
+        $content,
+        $matches
+    )) {
+        foreach ($matches[1] as $u) {
+            $u = trim(html_entity_decode($u, ENT_QUOTES));
+            if ($u !== '') {
+                $links[] = $u;
+            }
+        }
+    }
+
+    // URL "nudi" che terminano in .pdf (con eventuale query string)
+    if (preg_match_all(
+        '#https?://[^\s"\'<>]+\.pdf[^\s"\'<>]*#i',
+        $content,
+        $matchesBare
+    )) {
+        foreach ($matchesBare[0] as $u) {
+            $u = trim(html_entity_decode($u, ENT_QUOTES));
+            if ($u !== '') {
+                $links[] = $u;
+            }
+        }
+    }
+
+    return array_values(array_unique($links));
+}
+
+/**
  * Formatta un post per l'app.
  *
  * @param bool $include_full_content true = dettaglio (the_content completo),
@@ -804,6 +847,10 @@ function pdg_app_format_post($post, bool $include_full_content = false): array {
         '_embedded' => [
             'wp:term' => [$category_terms],
         ],
+        // 📄 Link a PDF presenti nel post: disponibili anche in lista, così
+        // l'app può mostrare subito il pulsante di download senza dover
+        // scaricare e analizzare l'HTML completo.
+        'pdf_links' => pdg_app_extract_pdf_links($post->post_content),
     ];
 
     if ($include_full_content) {

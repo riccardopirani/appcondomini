@@ -4150,6 +4150,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   static const String CACHE_KEY_POSTS = 'cached_posts';
   static const String CACHE_KEY_TIMESTAMP = 'cache_timestamp';
   static const String CACHE_KEY_NOTIFIED = 'notified_urgent_posts';
+  // ⏳ Dopo 6 ore la cache locale è considerata scaduta: i post vengono
+  // riscaricati interamente dal server.
+  static const Duration cacheMaxAge = Duration(hours: 6);
 
   List<dynamic> wpMenuItems = [];
   bool isLoadingMenu = true;
@@ -5389,47 +5392,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  /// Testa la disponibilità dell'API WordPress.
-  /// Restituisce true se il server risponde, false altrimenti.
-  /// In caso di fallimento, marca il server come non disponibile.
-  Future<bool> _testWordPressAPI() async {
-    try {
-      debugPrint('Test API WordPress 6.8.2...');
-
-      // Test endpoint base con timeout
-      final response = await http
-          .get(
-            Uri.parse('${appSettings.urlApi}'),
-            headers: {
-              'User-Agent': 'Flutter App/1.0',
-              'Accept': 'application/json',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
-
-      debugPrint('WordPress API Status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        debugPrint('WordPress API disponibile: ${data['name']}');
-        debugPrint('WordPress versione: ${data['version']}');
-
-        // Server disponibile, marca come tale
-        appSettings.markServerAvailable();
-        return true;
-      } else {
-        debugPrint('WordPress API non accessibile: ${response.statusCode}');
-        appSettings.markServerUnavailable();
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Errore test WordPress API: $e');
-      // Server non risponde, marca come non disponibile
-      appSettings.markServerUnavailable();
-      return false;
-    }
-  }
-
   void startTokenRefreshTimer() {
     Timer.periodic(const Duration(minutes: 30), (timer) async {
       if (!mounted) {
@@ -5442,133 +5404,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         await regenerateToken();
       }
     });
-  }
-
-  // ------- fetchWpMenu / fetchPosts / helper: invariati dal tuo codice -------
-
-  Future<bool> _autoLoginWithFallbackCredentials() async {
-    try {
-      debugPrint('=== TENTATIVO LOGIN AUTOMATICO IN BACKGROUND ===');
-      const fallbackUsername = 'riccardo@marconisoftware.com';
-      const fallbackPassword = '4817Riccardo*';
-
-      // Salva i dati dell'utente originale prima del login automatico
-      final prefs = await SharedPreferences.getInstance();
-
-      // Se non esistono ancora dati originali, salva quelli attuali
-      String? originalUsername = prefs.getString('originalUsername');
-      String? originalEmail = prefs.getString('originalEmail');
-
-      if (originalUsername == null || originalEmail == null) {
-        // Salva l'utente corrente come originale
-        final currentUsername = prefs.getString('username');
-        if (currentUsername != null) {
-          await prefs.setString('originalUsername', currentUsername);
-          await prefs.setString('originalEmail', currentUsername);
-          originalUsername = currentUsername;
-          originalEmail = currentUsername;
-          debugPrint(
-              '✅ Salvati dati utente corrente come originali: $currentUsername');
-        }
-      }
-
-      debugPrint(
-          'Utente originale che verrà mostrato nella UI: $originalUsername ($originalEmail)');
-
-      // Step 1: Ottieni il nonce necessario per il login
-      final nonceResponse = await http.get(
-        Uri.parse('${appSettings.urlLogin}'),
-        headers: {
-          'User-Agent': AppSettings.userAgent,
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      );
-
-      debugPrint(
-          'Auto-login nonce response status: ${nonceResponse.statusCode}');
-
-      // Estrai il nonce dalla risposta HTML
-      String nonce = '';
-      final nonceMatch = RegExp(r'name="_wpnonce" value="([^"]+)"')
-          .firstMatch(nonceResponse.body);
-      if (nonceMatch != null) {
-        nonce = nonceMatch.group(1)!;
-        debugPrint('Auto-login nonce estratto: $nonce');
-      }
-
-      // Step 2: Effettua login con il nonce
-      final loginResponse = await http.post(
-        Uri.parse('${appSettings.urlLogin}'),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': AppSettings.userAgent,
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Referer': '${appSettings.urlLogin}',
-        },
-        body: nonce.isNotEmpty
-            ? 'log=$fallbackUsername&pwd=$fallbackPassword&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1&_wpnonce=$nonce'
-            : 'log=$fallbackUsername&pwd=$fallbackPassword&wp-submit=Log+In&redirect_to=${appSettings.urlAdmin}&testcookie=1',
-      );
-
-      debugPrint('Auto-login response status: ${loginResponse.statusCode}');
-
-      // Step 3: Verifica se il login è riuscito controllando i cookie
-      if (loginResponse.headers['set-cookie'] != null) {
-        final cookies = loginResponse.headers['set-cookie']!;
-        debugPrint('Auto-login cookies ricevuti: $cookies');
-
-        // Verifica il login
-        if (loginResponse.statusCode == 302 ||
-            loginResponse.headers['location']?.contains('wp-admin') == true ||
-            loginResponse.body.contains('wp-admin') ||
-            cookies.contains('wordpress_logged_in')) {
-          // Login riuscito - salva i cookie
-          appSettings.setToken(cookies);
-
-          // Salva solo le credenziali per l'autenticazione, NON sovrascrivere i dati originali dell'utente
-          await prefs.setString('jwtToken', appSettings.jwtToken!);
-          await prefs.setString('username', fallbackUsername);
-          await prefs.setString('password', fallbackPassword);
-          await prefs.setBool('isLoggedIn', true);
-
-          // IMPORTANTE: Mantieni sempre i dati dell'utente originale per la visualizzazione
-          if (originalUsername != null && originalEmail != null) {
-            await prefs.setString('originalUsername', originalUsername);
-            await prefs.setString('originalEmail', originalEmail);
-            debugPrint(
-                '✅ Dati utente originale preservati per la UI: $originalUsername');
-            debugPrint(
-                '   (Credenziali fallback usate solo per scaricare i post)');
-
-            // Aggiorna userData per mostrare l'utente originale nella UI
-            if (mounted) {
-              setState(() {
-                userData = {
-                  'name': originalUsername,
-                  'email': originalEmail,
-                  'id': 1,
-                };
-              });
-              debugPrint('✅ UI aggiornata con dati utente originale');
-            }
-          }
-
-          debugPrint('✅ Auto-login completato con successo, cookies salvati');
-          return true;
-        } else {
-          debugPrint('❌ Auto-login fallito - login non riuscito');
-          return false;
-        }
-      } else {
-        debugPrint('❌ Auto-login fallito - nessun cookie ricevuto');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('❌ Errore durante auto-login: $e');
-      return false;
-    }
   }
 
   Future<void> fetchWpMenu() async {
@@ -5640,7 +5475,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   /// Carica post dalla cache locale
-  Future<List<dynamic>> _loadPostsFromCache() async {
+  Future<List<dynamic>> _loadPostsFromCache({bool ignoreExpiry = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedJson = prefs.getString(CACHE_KEY_POSTS);
@@ -5648,6 +5483,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       if (cachedJson != null && timestamp != null) {
         lastCacheUpdate = DateTime.fromMillisecondsSinceEpoch(timestamp);
+
+        // ⏳ Scadenza cache: oltre 6 ore i post vengono riscaricati da zero.
+        // Non cancelliamo i dati salvati (restano come fallback se il device è
+        // offline e il download fallisce): restituiamo vuoto per forzare il
+        // ridownload dal server. Con ignoreExpiry=true ritorniamo comunque i
+        // dati salvati (fallback offline).
+        final age = DateTime.now().difference(lastCacheUpdate!);
+        if (!ignoreExpiry && age > cacheMaxAge) {
+          debugPrint(
+              '⏳ Cache scaduta (età ${age.inHours}h > ${cacheMaxAge.inHours}h): ricarico dal server');
+          return [];
+        }
+
         final List<dynamic> cachedPosts = json.decode(cachedJson);
 
         // Conta urgenti vs normali
@@ -5838,6 +5686,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       // 🎯 STEP 1: Carica dalla cache locale (immediato)
       final cachedPosts = await _loadPostsFromCache();
+      final staleCachePosts = cachedPosts.isEmpty
+          ? await _loadPostsFromCache(ignoreExpiry: true)
+          : cachedPosts;
       if (cachedPosts.isNotEmpty) {
         debugPrint('✅ Cache trovata: ${cachedPosts.length} post');
         setState(() {
@@ -5853,6 +5704,23 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           startUrgentNotificationWatcher(currentContext, cachedPosts);
           debugPrint('🔔 Watcher popup avviato dopo caricamento da cache');
         }
+      } else if (staleCachePosts.isNotEmpty) {
+        // Cache scaduta (>6h): la mostriamo comunque subito per non lasciare
+        // la UI vuota, poi sotto proviamo a riscaricare i post freschi.
+        debugPrint(
+            '📦 Cache scaduta disponibile: mostro ${staleCachePosts.length} post mentre riscarico dal server');
+        setState(() {
+          posts = staleCachePosts;
+          urgentPosts = _extractUrgentPosts(staleCachePosts);
+          translatedPosts = staleCachePosts;
+          isLoadingPosts = false;
+        });
+
+        final currentContext = navigatorKey.currentContext;
+        if (currentContext != null) {
+          startUrgentNotificationWatcher(currentContext, staleCachePosts);
+          debugPrint('🔔 Watcher popup avviato con cache scaduta fallback');
+        }
       } else {
         debugPrint('📭 Nessuna cache trovata, scarico dal server...');
       }
@@ -5862,6 +5730,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         debugPrint(
             '🚫 Server non disponibile, skip chiamate REST. Uso solo cache.');
         if (cachedPosts.isEmpty) {
+          // Cache scaduta ma offline: meglio mostrare i dati vecchi che nulla.
+          if (staleCachePosts.isNotEmpty) {
+            debugPrint(
+                '📦 Offline: uso cache scaduta come fallback (${staleCachePosts.length} post)');
+            setState(() {
+              posts = staleCachePosts;
+              urgentPosts = _extractUrgentPosts(staleCachePosts);
+              translatedPosts = staleCachePosts;
+            });
+          }
           setState(() {
             isLoadingPosts = false;
           });
@@ -5869,73 +5747,30 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return;
       }
 
-      // 🌐 STEP 2: Prova a scaricare nuovi post dal server (in background)
-      debugPrint(
-          'JWT Token disponibile: ${appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty}');
-
-      // Salva i post precedenti per confronto
+      // 🌐 STEP 2: Scarica post via unico endpoint canonico (plugin API).
+      //
+      // Non usiamo più la cascata di fallback legacy (Basic Auth admin,
+      // cookie nonce, wp-admin-ajax, endpoint alternativi, auto-login, post
+      // pubblici) perché ogni tentativo fallisce con 403/timeout e genera solo
+      // rumore nei log e attesa per l'utente. Il plugin API è l'unica fonte
+      // affidabile: usa backend cache → WordPress diretto come failover
+      // interno, senza bisogno di riprovare a livello app.
+      // Se il server non è raggiungibile, la cache stale già mostrata in UI
+      // è sufficiente.
+      debugPrint('🔌 Download post via plugin API (unico endpoint)...');
       final previousPostIds = posts.map((p) => p['id']).toSet();
       final tempPosts = <dynamic>[];
 
-      // 🚀 FAST PATH: prova SUBITO il backend con cache (post già arricchiti).
-      // Se funziona, saltiamo i test e i fallback WordPress diretti (lenti).
       if (apiService.isAuthenticated) {
-        debugPrint('🔌 Provo prima con il plugin API (backend cache)...');
         final pluginApiSuccess = await _tryFetchPostsViaPluginApi();
         if (pluginApiSuccess) {
           tempPosts.addAll(posts);
-          debugPrint('✅ Caricamento riuscito via plugin API (fast path)');
-        }
-      }
-
-      // 🐢 SLOW PATH: solo se il fast path non ha prodotto post.
-      // (test WordPress + autenticazione legacy/cookie + endpoint alternativi)
-      if (tempPosts.isEmpty) {
-        // Verifica che l'API REST WordPress sia accessibile.
-        final serverOk = await _testWordPressAPI();
-        if (!serverOk) {
-          debugPrint('🚫 Server non risponde, uso solo cache');
-          return;
-        }
-
-        // FALLBACK: metodi legacy (cookie) o senza autenticazione.
-        if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
-          debugPrint('Caricamento post con autenticazione legacy...');
-          await _tryFetchUserSpecificPosts();
-          tempPosts.addAll(posts);
+          debugPrint('✅ Caricamento riuscito via plugin API');
         } else {
-          debugPrint('Caricamento post senza autenticazione...');
-          await _tryFetchPostsWithoutAuth();
-          tempPosts.addAll(posts);
+          debugPrint('⚠️ Plugin API non ha restituito post, mantengo cache');
         }
-
-        // Se non ha funzionato, prova endpoint alternativi.
-        if (tempPosts.isEmpty) {
-          debugPrint('Provo endpoint alternativi...');
-          await _tryFetchPostsAlternative();
-          tempPosts.addAll(posts);
-        }
-      }
-
-      // Se ancora non ci sono post, prova login automatico
-      if (tempPosts.isEmpty && cachedPosts.isEmpty) {
-        debugPrint('⚠️ Tentativo login automatico...');
-        final loginSuccess = await _autoLoginWithFallbackCredentials();
-        if (loginSuccess && appSettings.jwtToken != null) {
-          await _tryFetchUserSpecificPosts();
-          tempPosts.addAll(posts);
-          if (tempPosts.isEmpty) {
-            await _tryFetchPostsAlternative();
-            tempPosts.addAll(posts);
-          }
-        }
-      }
-
-      // Ultimo fallback: scarica post pubblici senza auth
-      if (tempPosts.isEmpty && cachedPosts.isEmpty) {
-        debugPrint('🔄 Ultimo fallback: post pubblici senza auth...');
-        await _tryFetchPostsWithoutAuth();
-        tempPosts.addAll(posts);
+      } else {
+        debugPrint('⚠️ Utente non autenticato, skip download post');
       }
 
       // 🔄 STEP 3: Aggiorna cache solo se ci sono nuovi post
@@ -5966,8 +5801,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         } else {
           debugPrint('📦 Nessun nuovo post, uso cache esistente');
         }
-      } else if (cachedPosts.isNotEmpty) {
-        debugPrint('⚠️ Server non risponde, uso cache offline');
+      } else if (staleCachePosts.isNotEmpty) {
+        debugPrint(
+            '⚠️ Server non risponde, mantengo cache locale (${staleCachePosts.length} post)');
+        if (posts.isEmpty) {
+          setState(() {
+            posts = staleCachePosts;
+            urgentPosts = _extractUrgentPosts(staleCachePosts);
+            translatedPosts = staleCachePosts;
+            isLoadingPosts = false;
+          });
+        }
       }
 
       debugPrint(
@@ -6098,12 +5942,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         return false;
       }
 
-      debugPrint('🔌 Tentativa caricamento post via plugin API...');
+      debugPrint('🔌 Caricamento tutti i post via plugin API...');
 
-      // 🚀 LAZY LOAD: all'avvio scarichiamo SOLO i 3 post urgenti.
-      // Il resto degli articoli viene caricato on-demand per categoria
-      // (5 alla volta) dalla sezione Articoli.
-      final pluginPosts = await apiService.fetchUrgentPosts(limit: 3);
+      final pluginPosts = await apiService.fetchPosts();
 
       if (pluginPosts.isNotEmpty) {
         debugPrint('✅ Plugin API: ${pluginPosts.length} post caricati');
@@ -6116,116 +5957,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('❌ Plugin API: Errore durante caricamento - $e');
       return false;
-    }
-  }
-
-  Future<void> _tryFetchPostsWithoutAuth() async {
-    try {
-      debugPrint('Tentativo 1: Caricamento post senza autenticazione');
-
-      final response = await http.get(
-        Uri.parse('${appSettings.urlApi}posts?per_page=20&status=publish'),
-      );
-
-      debugPrint('Status code (no auth): ${response.statusCode}');
-      debugPrint('Response body (no auth): ${response.body}');
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        debugPrint('Post ricevuti (no auth): ${data.length}');
-
-        if (data.isNotEmpty) {
-          _processPosts(data);
-          return;
-        }
-      }
-    } catch (e) {
-      debugPrint('Errore caricamento senza auth: $e');
-    }
-  }
-
-  Future<void> _tryFetchUserSpecificPosts() async {
-    try {
-      debugPrint('Caricamento post specifici per utente con Basic Auth');
-
-      // Prima prova con Basic Auth
-      await _tryFetchPostsWithBasicAuth();
-
-      // Se non funziona, prova con l'approccio precedente
-      if (posts.isEmpty) {
-        debugPrint('Basic Auth fallito, provo approccio precedente...');
-        await _verifyAuthentication();
-        final userId = await _getCurrentUserId();
-        await _tryFetchPostsViaAdminAjax();
-
-        if (posts.isEmpty) {
-          await _tryFetchPostsViaREST(userId);
-        }
-      }
-
-      debugPrint('Post scaricati dopo primo tentativo: ${posts.length}');
-    } catch (e) {
-      debugPrint('Errore caricamento post specifici utente: $e');
-    }
-  }
-
-  Future<void> _tryFetchPostsWithBasicAuth() async {
-    try {
-      debugPrint(
-          '=== TENTATIVO CON BASIC AUTH (ADMIN per scaricare TUTTI i post) ===');
-
-      // 🔥 USA CREDENZIALI ADMIN per scaricare TUTTI i post del condominio
-      final basicAuth = createBasicAuth(
-          AppSettings.adminUsername, AppSettings.adminAppPassword);
-      debugPrint(
-          'Basic Auth creata per ADMIN: $AppSettings.adminUsername (scarica TUTTI i post)');
-
-      // 🔥 Lista di endpoint che scaricano TUTTI i post del condominio (non filtrati per author)
-      final endpoints = [
-        '${appSettings.urlApi}posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-        '${appSettings.urlApi}posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
-        '${appSettings.urlApi}posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
-        '${appSettings.urlApi}posts?per_page=100&orderby=date&order=desc',
-        '${appSettings.urlApi}posts?per_page=100',
-      ];
-
-      for (final endpoint in endpoints) {
-        try {
-          debugPrint('Provando Basic Auth con endpoint: $endpoint');
-
-          final response = await http.get(
-            Uri.parse(endpoint),
-            headers: {
-              'Authorization': basicAuth,
-              'Content-Type': 'application/json',
-              'User-Agent': 'Flutter App/1.0',
-              'Accept': 'application/json',
-            },
-          );
-
-          debugPrint('Basic Auth status code: ${response.statusCode}');
-          debugPrint('Basic Auth response body: ${response.body}');
-
-          if (response.statusCode == 200) {
-            final List<dynamic> data = json.decode(response.body);
-            debugPrint('Post ricevuti con Basic Auth: ${data.length}');
-
-            if (data.isNotEmpty) {
-              await _processPosts(data);
-              debugPrint('SUCCESS: Post caricati con Basic Auth!');
-              return;
-            }
-          } else if (response.statusCode == 401) {
-            debugPrint('Basic Auth fallita (401) - credenziali non valide');
-          } else if (response.statusCode == 403) {
-            debugPrint('Basic Auth fallita (403) - permessi insufficienti');
-          }
-        } catch (e) {
-          debugPrint('Errore Basic Auth con endpoint $endpoint: $e');
-        }
-      }
-    } catch (e) {
-      debugPrint('Errore generale Basic Auth: $e');
     }
   }
 
@@ -6282,146 +6013,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _tryFetchPostsViaAdminAjax() async {
-    try {
-      debugPrint('Tentativo di recupero post via wp-admin-ajax...');
-
-      final response = await http.post(
-        Uri.parse('${appSettings.urlAdmin}admin-ajax.php'),
-        headers: {
-          'Cookie': appSettings.jwtToken!,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': AppSettings.userAgent,
-          'Referer': '${appSettings.urlAdmin}',
-        },
-        body:
-            'action=query_posts&post_type=post&post_status=publish,private&posts_per_page=20&orderby=date&order=desc',
-      );
-
-      debugPrint('Admin-ajax response status: ${response.statusCode}');
-      debugPrint('Admin-ajax response body: ${response.body}');
-
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        try {
-          final data = json.decode(response.body);
-          if (data is List && data.isNotEmpty) {
-            debugPrint('Post trovati via admin-ajax: ${data.length}');
-            await _processPosts(data);
-          }
-        } catch (e) {
-          debugPrint('Errore parsing admin-ajax response: $e');
-        }
-      }
-    } catch (e) {
-      debugPrint('Errore admin-ajax: $e');
-    }
-  }
-
-  Future<void> _tryFetchPostsViaREST(int? userId) async {
-    // Endpoint SENZA filtro author per vedere TUTTI i post del condominio
-    List<String> endpoints = [];
-
-    // 🔥 SCARICA TUTTI I POST DEL CONDOMINIO (SENZA filtro author)
-    endpoints.addAll([
-      '${appSettings.urlApi}posts?per_page=100&status=publish,private&_embed=wp:term,wp:featuredmedia&orderby=date&order=desc',
-      '${appSettings.urlApi}posts?per_page=100&status=publish&_embed=wp:term&orderby=date&order=desc',
-      '${appSettings.urlApi}posts?per_page=100&_embed=wp:term&orderby=date&order=desc',
-      '${appSettings.urlApi}posts?per_page=100&orderby=date&order=desc',
-      '${appSettings.urlApi}posts?per_page=100',
-    ]);
-
-    for (final endpoint in endpoints) {
-      try {
-        debugPrint('Provando endpoint specifico utente: $endpoint');
-
-        final response = await http.get(
-          Uri.parse(endpoint),
-          headers: {
-            'Cookie': appSettings.jwtToken!,
-            'Content-Type': 'application/json',
-            'User-Agent': 'Flutter App/1.0',
-            'Accept': 'application/json',
-            'X-WP-Nonce': '', // Per WordPress 6.8.2
-          },
-        );
-
-        debugPrint('Status code (user specific): ${response.statusCode}');
-        debugPrint('Response body (user specific): ${response.body}');
-
-        if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body);
-          debugPrint('Post ricevuti (user specific): ${data.length}');
-
-          if (data.isNotEmpty) {
-            await _processPosts(data);
-            return;
-          }
-        } else if (response.statusCode == 401) {
-          debugPrint(
-              'Errore 401: Token di autenticazione non valido per post utente');
-          // Prova a rigenerare il token
-          await regenerateToken();
-          continue;
-        }
-      } catch (e) {
-        debugPrint('Errore con endpoint utente $endpoint: $e');
-      }
-    }
-  }
-
-  Future<void> _verifyAuthentication() async {
-    try {
-      debugPrint('Verifica autenticazione...');
-
-      if (appSettings.jwtToken == null || appSettings.jwtToken!.isEmpty) {
-        debugPrint('Nessun token disponibile per verifica autenticazione');
-        return;
-      }
-
-      // Prova a verificare l'autenticazione con diversi endpoint
-      final endpoints = [
-        '${appSettings.urlApi}users/me',
-        '${appSettings.urlAdmin}admin-ajax.php?action=heartbeat',
-        '${appSettings.urlApi}',
-      ];
-
-      for (final endpoint in endpoints) {
-        try {
-          debugPrint('Test autenticazione con: $endpoint');
-
-          final response = await http.get(
-            Uri.parse(endpoint),
-            headers: {
-              'Cookie': appSettings.jwtToken!,
-              'Content-Type': 'application/json',
-              'User-Agent': 'Flutter App/1.0',
-              'Accept': 'application/json',
-            },
-          );
-
-          debugPrint('Auth test status: ${response.statusCode}');
-
-          if (response.statusCode == 200) {
-            debugPrint('Autenticazione verificata con successo');
-            return;
-          } else if (response.statusCode == 401) {
-            debugPrint('Autenticazione fallita (401) - token non valido');
-          } else if (response.statusCode == 403) {
-            debugPrint('Accesso negato (403) - permessi insufficienti');
-          }
-        } catch (e) {
-          debugPrint('Errore test autenticazione $endpoint: $e');
-        }
-      }
-
-      debugPrint(
-          'Autenticazione non verificata - tentativo di rigenerazione token');
-      await regenerateToken();
-    } catch (e) {
-      debugPrint('Errore verifica autenticazione: $e');
-    }
-  }
-
   Future<int?> _getCurrentUserId() async {
     try {
       debugPrint('Recupero ID utente corrente...');
@@ -6462,40 +6053,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Errore recupero ID utente: $e');
       return null;
-    }
-  }
-
-  Future<void> _tryFetchPostsAlternative() async {
-    try {
-      debugPrint('Tentativo 3: Endpoint alternativi');
-
-      // Prova endpoint diversi
-      final endpoints = [
-        '${appSettings.urlApi}posts',
-      ];
-
-      for (final endpoint in endpoints) {
-        try {
-          debugPrint('Provando endpoint: $endpoint');
-
-          final response = await http.get(Uri.parse(endpoint));
-          debugPrint('Status code per $endpoint: ${response.statusCode}');
-
-          if (response.statusCode == 200) {
-            final List<dynamic> data = json.decode(response.body);
-            debugPrint('Post ricevuti da $endpoint: ${data.length}');
-
-            if (data.isNotEmpty) {
-              await _processPosts(data);
-              return;
-            }
-          }
-        } catch (e) {
-          debugPrint('Errore con endpoint $endpoint: $e');
-        }
-      }
-    } catch (e) {
-      debugPrint('Errore endpoint alternativi: $e');
     }
   }
 
@@ -6898,6 +6455,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  Future<bool> _handleMainBackButton() async {
+    // Android system back: dalle sezioni principali torna alla Home invece di
+    // chiudere l'app. Dalla Home manteniamo il comportamento nativo.
+    if (_selectedIndex != 0) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+      return false;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoadingUserData) {
@@ -6960,9 +6529,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             ? userData!['name'] as String
             : 'Utente';
 
-    return Scaffold(
-      backgroundColor: AppColors.loggedInBackground,
-      endDrawer: Drawer(
+    return WillPopScope(
+      onWillPop: _handleMainBackButton,
+      child: Scaffold(
+        backgroundColor: AppColors.loggedInBackground,
+        endDrawer: Drawer(
         child: Container(
           decoration: const BoxDecoration(
             gradient: AppColors.loggedInBackgroundGradient,
@@ -7288,6 +6859,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           const BottomNavigationBarItem(
               icon: Icon(Icons.camera_alt), label: 'WebCam'),
         ],
+        ),
       ),
     );
   }
@@ -10922,6 +10494,95 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         .replaceAll(RegExp(r'/\d+'), '');
   }
 
+  /// Estrae i link a file PDF del post.
+  ///
+  /// 1) Preferisce il campo `pdf_links` fornito dall'API (plugin v3.7+),
+  ///    disponibile anche in lista senza scaricare l'HTML completo.
+  /// 2) Fallback: analizza il contenuto HTML (href dei tag <a> e URL "nudi").
+  List<String> _extractPdfLinks(Map<String, dynamic> post) {
+    final links = <String>{};
+
+    // 1) Campo esplicito dall'API.
+    final apiLinks = post['pdf_links'];
+    if (apiLinks is List) {
+      for (final l in apiLinks) {
+        final s = l?.toString().trim() ?? '';
+        if (s.isNotEmpty) links.add(decodeHtmlEntities(s));
+      }
+    }
+
+    // 2) Fallback: parsing dell'HTML del contenuto.
+    final raw = (post['content']?['rendered'] ?? '').toString();
+    if (links.isEmpty && raw.isEmpty) return [];
+
+    // href="...pdf" / href='...pdf'
+    final hrefRegex = RegExp(
+      'href\\s*=\\s*["\\\']([^"\\\']+\\.pdf[^"\\\']*)["\\\']',
+      caseSensitive: false,
+    );
+    for (final m in hrefRegex.allMatches(raw)) {
+      final u = m.group(1);
+      if (u != null && u.trim().isNotEmpty) {
+        links.add(decodeHtmlEntities(u.trim()));
+      }
+    }
+
+    // URL "nudi" che terminano con .pdf (eventuali query string incluse)
+    final bareRegex = RegExp(
+      'https?://[^\\s"\\\'<>]+\\.pdf[^\\s"\\\'<>]*',
+      caseSensitive: false,
+    );
+    for (final m in bareRegex.allMatches(raw)) {
+      final u = m.group(0);
+      if (u != null) links.add(decodeHtmlEntities(u.trim()));
+    }
+
+    return links.toList();
+  }
+
+  /// Nome file leggibile da mostrare sul pulsante di download.
+  String _pdfFileName(String url) {
+    try {
+      final path = Uri.parse(url).path;
+      final segment = path.split('/').where((s) => s.isNotEmpty).toList();
+      if (segment.isNotEmpty) {
+        return Uri.decodeComponent(segment.last);
+      }
+    } catch (_) {}
+    return 'documento.pdf';
+  }
+
+  Future<void> _openPdfLink(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Impossibile aprire il PDF. Verifica la connessione.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Errore apertura PDF: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final post = _displayPost;
@@ -10930,6 +10591,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final content = _removeHtmlTags(
         post['content']?['rendered'] ?? 'Contenuto non disponibile');
     final url = post['link'] ?? '';
+    final pdfLinks = _extractPdfLinks(post);
 
     const contentCardBlue = Color(0xFF6AB0E3);
 
@@ -11051,6 +10713,50 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ],
               ),
             ),
+            // 📄 Allegati PDF trovati nel contenuto: pulsanti di download.
+            if (pdfLinks.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                pdfLinks.length > 1 ? 'Documenti PDF:' : 'Documento PDF:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...pdfLinks.map(
+                (pdfUrl) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openPdfLink(pdfUrl),
+                      icon: const Icon(Icons.picture_as_pdf,
+                          color: Colors.white),
+                      label: Text(
+                        _pdfFileName(pdfUrl),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD32F2F),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 3,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             // Bottone per aprire il link web
             if (url.isNotEmpty)
