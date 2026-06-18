@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PdG App API (PublishPress-safe + Categories)
  * Description: API per app mobile: login + accesso ai soli post leggibili secondo PublishPress Permissions (permessi su post/categorie). Endpoint categorie "navigabile". Hardening endpoint sensibili.
- * Version: 3.7
+ * Version: 3.8
  * Author: Portobello di Gallura
  */
 
@@ -11,6 +11,14 @@ if (!defined('ABSPATH')) exit;
 // API key: definibile in wp-config.php per evitare di hardcodarla nel plugin.
 if (!defined('PDG_APP_API_KEY')) {
     define('PDG_APP_API_KEY', 'CHANGE_ME_IN_WP_CONFIG');
+}
+
+// Chiave attualmente compilata nell'app Flutter/backend Render.
+// Serve come fallback controllato quando il wp-config.php contiene una chiave
+// diversa: in quel caso Android arriva correttamente in rete, ma WordPress
+// risponde 403 "Invalid API key" e i post non vengono mai scaricati.
+if (!defined('PDG_APP_BUNDLED_API_KEY')) {
+    define('PDG_APP_BUNDLED_API_KEY', 'Tz7Wq8GlWVlVhZg3sGQgRrSn7lOc8AHe');
 }
 
 define('PDG_APP_TOKEN_META', 'pdg_app_token_hash');
@@ -111,10 +119,21 @@ function pdg_app_verify_api_key(WP_REST_Request $request) {
     if (!$api_key) {
         return new WP_Error('rest_forbidden', 'Missing API key', ['status' => 403]);
     }
-    if (!hash_equals(PDG_APP_API_KEY, $api_key)) {
-        return new WP_Error('rest_forbidden', 'Invalid API key', ['status' => 403]);
+
+    $accepted_keys = array_filter([
+        defined('PDG_APP_API_KEY') ? (string) PDG_APP_API_KEY : '',
+        defined('PDG_APP_BUNDLED_API_KEY') ? (string) PDG_APP_BUNDLED_API_KEY : '',
+    ], function ($key) {
+        return $key !== '' && $key !== 'CHANGE_ME_IN_WP_CONFIG';
+    });
+
+    foreach (array_unique($accepted_keys) as $valid_key) {
+        if (hash_equals($valid_key, $api_key)) {
+            return true;
+        }
     }
-    return true;
+
+    return new WP_Error('rest_forbidden', 'Invalid API key', ['status' => 403]);
 }
 
 function pdg_app_get_raw_authorization_header(WP_REST_Request $request): string {

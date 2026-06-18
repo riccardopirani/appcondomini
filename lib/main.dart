@@ -3396,6 +3396,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // ── STEP 3: Salva credenziali e naviga, oppure mostra errore ──
       if (loginSucceeded) {
+        if (!apiService.isAuthenticated) {
+          debugPrint(
+              '⚠️ Login cookie riuscito ma token plugin assente: provo a rigenerarlo prima della Home');
+          final apiOk = await apiService.login(username, password);
+          if (!apiOk || !apiService.isAuthenticated) {
+            loginSucceeded = false;
+            debugPrint(
+                '❌ Login annullato: senza token plugin non posso scaricare i post');
+          }
+        }
+      }
+
+      if (loginSucceeded) {
         final prefs = await SharedPreferences.getInstance();
         if (appSettings.jwtToken != null && appSettings.jwtToken!.isNotEmpty) {
           await prefs.setString('jwtToken', appSettings.jwtToken!);
@@ -5760,6 +5773,21 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       debugPrint('🔌 Download post via plugin API (unico endpoint)...');
       final previousPostIds = posts.map((p) => p['id']).toSet();
       final tempPosts = <dynamic>[];
+
+      if (!apiService.isAuthenticated) {
+        final prefs = await SharedPreferences.getInstance();
+        final username = prefs.getString('username');
+        final password = prefs.getString('password');
+        if (username != null && password != null) {
+          debugPrint('🔐 Token plugin mancante/scaduto: login prima dei post...');
+          final loginSuccess = await apiService.login(username, password);
+          if (loginSuccess) {
+            debugPrint('✅ Token plugin rigenerato prima del download post');
+          } else {
+            debugPrint('❌ Impossibile rigenerare token plugin per i post');
+          }
+        }
+      }
 
       if (apiService.isAuthenticated) {
         final pluginApiSuccess = await _tryFetchPostsViaPluginApi();
