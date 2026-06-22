@@ -1063,6 +1063,31 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
     languageProvider.addListener(_onLanguageChanged);
   }
 
+  @override
+  void didUpdateWidget(covariant ModernArticlesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.posts, widget.posts)) return;
+
+    // Dentro il dettaglio categoria: non resettare la lista (evita salti durante
+    // scroll o refresh periodico dei post dalla Home).
+    if (!showCategories && currentCategory.isNotEmpty) {
+      return;
+    }
+
+    translatedPosts = widget.posts;
+    filteredPosts = widget.posts;
+    _categoryPage.clear();
+    _categoryHasMore.clear();
+    _loadingMoreCategory = null;
+
+    if (currentLanguage != 'it') {
+      _translatePostsOnInit();
+    } else {
+      _buildCategoryMap();
+      _filterPosts();
+    }
+  }
+
   /// 🔥 Carica i ruoli dell'utente per filtrare le categorie
   Future<void> _loadUserRoles() async {
     try {
@@ -1856,7 +1881,7 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                         ),
                       ),
                       TextSpan(
-                        text: 'gli ultimi 50 articoli',
+                        text: 'gli ultimi 100 articoli',
                         style: TextStyle(
                           color: Color(0xFFB71C1C),
                           fontWeight: FontWeight.bold,
@@ -1888,20 +1913,17 @@ class _ModernArticlesScreenState extends State<ModernArticlesScreen> {
                             return _buildArticleCard(filteredPosts[index]);
                           },
                         )
-                      : RefreshIndicator(
-                          // ARTICOLI: con pull-to-refresh
-                          onRefresh: _refreshPosts,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            // +1 per il pulsante "Carica altri 5" in fondo.
-                            itemCount: filteredPosts.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index < filteredPosts.length) {
-                                return _buildArticleCard(filteredPosts[index]);
-                              }
-                              return _buildLoadMoreButton();
-                            },
-                          ),
+                      : ListView.builder(
+                          // Dettaglio categoria: niente pull-to-refresh (evita
+                          // refresh involontario con scroll elastico / bounce).
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredPosts.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index < filteredPosts.length) {
+                              return _buildArticleCard(filteredPosts[index]);
+                            }
+                            return _buildLoadMoreButton();
+                          },
                         ),
         ),
       ],
@@ -4157,6 +4179,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   // il completamento del callback, quindi senza questa guardia più fetchPosts()
   // (anche da 60s di timeout) partivano in parallelo martellando rete e CPU.
   bool _isRefreshingPosts = false;
+  bool _isForceRefreshingPosts = false;
+  int _postsContentKey = 0;
 
   // Cache locale
   DateTime? lastCacheUpdate;
@@ -5902,6 +5926,109 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     }
   }
 
+  /// Refresh manuale da Home: riscarica tutti i post dal server e aggiorna
+  /// Home, News e Articoli (via posts/translatedPosts condivisi).
+  Future<void> _forceRefreshAllPosts() async {
+    if (_isForceRefreshingPosts) return;
+    if (!isLoggedIn || _isGuestMode || _isDemoMode) return;
+
+    setState(() => _isForceRefreshingPosts = true);
+
+    try {
+      final online = await _isDeviceOnline();
+      if (!online) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nessuna connessione. Verifica internet e riprova.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      appSettings.resetServerStatus();
+
+      if (!apiService.isAuthenticated) {
+        final prefs = await SharedPreferences.getInstance();
+        final username = prefs.getString('username');
+        final password = prefs.getString('password');
+        if (username != null && password != null) {
+          await apiService.login(username, password);
+        }
+      }
+
+      if (!apiService.isAuthenticated) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sessione scaduta. Effettua di nuovo il login.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      debugPrint('🔄 Refresh forzato di tutti i post...');
+      final fetched = await apiService.fetchPosts(perPage: 100);
+
+      if (fetched.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nessun post scaricato. Riprova tra poco.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      await _processPosts(fetched);
+      await _savePostsToCache(posts);
+
+      if (mounted) {
+        setState(() {
+          urgentPosts = _extractUrgentPosts(posts);
+          translatedPosts = posts;
+          isLoadingPosts = false;
+          _postsContentKey++;
+        });
+
+        final ctx = navigatorKey.currentContext;
+        if (ctx != null) {
+          startUrgentNotificationWatcher(ctx, posts);
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Aggiornati ${posts.length} post'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      await _fetchCategoriesFromPlugin();
+    } catch (e) {
+      debugPrint('❌ Errore refresh forzato: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore aggiornamento: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isForceRefreshingPosts = false);
+      }
+    }
+  }
+
   List<dynamic> _buildDemoPosts() {
     final now = DateTime.now();
     return [
@@ -6414,6 +6541,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         return allPostsNews.isNotEmpty
             ? ModernArticlesScreen(
+                key: ValueKey('news_$_postsContentKey'),
                 posts: allPostsNews,
                 userName: userData?['name'] ?? '',
                 userEmail: userData?['email'] ?? '',
@@ -6469,6 +6597,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
         return allPosts.isNotEmpty
             ? ModernArticlesScreen(
+                key: ValueKey('articoli_$_postsContentKey'),
                 posts: allPosts,
                 userName: userData?['name'] ?? '',
                 userEmail: userData?['email'] ?? '',
@@ -6862,6 +6991,28 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
       ),
       body: _getBody(),
+      floatingActionButton: _selectedIndex == 0 &&
+              isLoggedIn &&
+              !_isGuestMode &&
+              !_isDemoMode
+          ? FloatingActionButton(
+              onPressed:
+                  _isForceRefreshingPosts ? null : _forceRefreshAllPosts,
+              backgroundColor: AppColors.secondary,
+              tooltip: 'Aggiorna post',
+              child: _isForceRefreshingPosts
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Icon(Icons.settings, color: Colors.black),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: AppColors.white,
         selectedItemColor: AppColors.primary,
@@ -7375,6 +7526,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         childCount: visiblePosts.length,
                       ),
                     ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 88)),
                   ],
                 )
               : ListView(
@@ -7388,6 +7540,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         context, "Segnala Guasto", 'assets/guasto.png'),
                     _buildButton(
                         context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
+                    const SizedBox(height: 88),
                     const SizedBox(height: 40),
                     const Icon(Icons.inbox_outlined,
                         size: 64, color: Colors.white70),
@@ -9926,154 +10079,220 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
         backgroundColor: AppColors.white,
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blueGrey.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blueGrey.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 48,
+                  color: Color(0xFF0288D1),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Richiesta ritiro rifiuti',
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF01579B),
+                    height: 1.25,
                   ),
-                ],
-              ),
-              padding: const EdgeInsets.all(28.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Icon(
-                    Icons.delete_outline_rounded,
-                    size: 48,
-                    color: Color(0xFF0288D1),
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Seleziona la fascia oraria',
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textGray,
+                    height: 1.3,
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Richiesta ritiro rifiuti',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF01579B),
-                    ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade100),
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Seleziona la fascia oraria',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textGray,
-                    ),
+                  child: const Text(
+                    'Fasce disponibili:\n'
+                    '• 09:00 - 16:00 (feriali)\n'
+                    '• 09:00 - 12:00 (festivi)',
+                    softWrap: true,
+                    style: TextStyle(fontSize: 14, height: 1.5),
                   ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: _selectedSlot,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade100),
                     ),
-                    child: const Text(
-                      'Fasce disponibili:\n'
-                      '- 09:00 - 16:00 (feriali)\n'
-                      '- 09:00 - 12:00 (festivi)',
-                      style: TextStyle(fontSize: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
                     ),
+                    prefixIcon: const Icon(Icons.schedule),
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: _selectedSlot,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.schedule),
-                    ),
-                    items: _timeSlots
-                        .map((slot) =>
-                            DropdownMenuItem(value: slot, child: Text(slot)))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) setState(() => _selectedSlot = value);
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Richiesta ritiro',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textGray,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Specificare il giorno e possibilmente l\'orario in cui deve essere effettuato il ritiro',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                      fontWeight: FontWeight.w500,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _requestController,
-                    maxLines: 6,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Scrivi qui i dettagli del ritiro rifiuti da pianificare...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    width: double.infinity,
-                    child: Container(
-                      decoration:
-                          AppColors.serviceButtonBoxDecoration(radius: 12),
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _submitWasteRequest,
-                        icon: _isLoading
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.send, color: Colors.white),
-                        label: Text(
-                          _isLoading
-                              ? 'Invio in corso...'
-                              : 'Invia comunicazione ritiro',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                  items: _timeSlots
+                      .map(
+                        (slot) => DropdownMenuItem(
+                          value: slot,
+                          child: Text(
+                            slot,
+                            softWrap: true,
+                            maxLines: 2,
+                            overflow: TextOverflow.visible,
+                            style: const TextStyle(height: 1.3),
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => _selectedSlot = value);
+                  },
+                ),
+                const SizedBox(height: 28),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Il condominio ritira solo rifiuti ordinari: umido, '
+                        'vetro, carta e plastica.',
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.5,
                         ),
                       ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Non ritira ingombranti e secco residuo/indifferenziata.',
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Richiesta ritiro',
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textGray,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Specificare il giorno e possibilmente l\'orario in cui '
+                  'deve essere effettuato il ritiro',
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w500,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _requestController,
+                  maxLines: 6,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Scrivi qui i dettagli del ritiro rifiuti da pianificare...',
+                    hintMaxLines: 3,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.all(14),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: Container(
+                    decoration:
+                        AppColors.serviceButtonBoxDecoration(radius: 12),
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _submitWasteRequest,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Invia comunicazione ritiro',
+                              textAlign: TextAlign.center,
+                              softWrap: true,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                height: 1.3,
+                              ),
+                            ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

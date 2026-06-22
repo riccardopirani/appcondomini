@@ -24,14 +24,30 @@ flutter clean
 echo "==> Download dipendenze"
 flutter pub get
 
-echo "==> Generazione APK (release)"
-flutter build apk --release "$@"
+APK_DIR="build/app/outputs/flutter-apk"
+mkdir -p "$APK_DIR"
 
-APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+# --split-per-abi confligge con ndk.abiFilters in android/app/build.gradle;
+# compiliamo ogni ABI separatamente con --target-platform.
+declare -a BUILDS=(
+  "android-arm:armeabi-v7a"
+  "android-arm64:arm64-v8a"
+  "android-x64:x86_64"
+)
 
-if [[ -f "$APK_PATH" ]]; then
-  echo "==> APK generato correttamente in: $ROOT_DIR/$APK_PATH"
-else
-  echo "Attenzione: build completata ma non trovo l'APK atteso in $ROOT_DIR/$APK_PATH" >&2
-fi
+APK_PATHS=()
 
+echo "==> Generazione APK debug (tutte le ABI)"
+for entry in "${BUILDS[@]}"; do
+  platform="${entry%%:*}"
+  suffix="${entry##*:}"
+  echo "==> Build debug: ${suffix} (${platform})"
+  flutter build apk --debug --target-platform "$platform" "$@"
+  cp "${APK_DIR}/app-debug.apk" "${APK_DIR}/app-${suffix}-debug.apk"
+  APK_PATHS+=("${APK_DIR}/app-${suffix}-debug.apk")
+done
+
+echo "==> APK debug generati:"
+for apk in "${APK_PATHS[@]}"; do
+  echo "    $ROOT_DIR/$apk"
+done

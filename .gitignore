@@ -49,3 +49,7 @@ app.*.map.json
 /android/app/*.jks
 /android/app/release-keystore.jks
 /keys/
+
+# Coding agent (chiavi API locali)
+/scripts/coding_agent.env
+/.coding_agent_backups/
