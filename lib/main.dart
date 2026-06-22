@@ -5928,6 +5928,34 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   /// Refresh manuale da Home: riscarica tutti i post dal server e aggiorna
   /// Home, News e Articoli (via posts/translatedPosts condivisi).
+  Future<void> _onRefreshArticlesPressed() async {
+    if (_isForceRefreshingPosts || _isRefreshingPosts) return;
+
+    if (isLoggedIn && !_isGuestMode && !_isDemoMode) {
+      await _forceRefreshAllPosts();
+      return;
+    }
+
+    setState(() => _isForceRefreshingPosts = true);
+    try {
+      await fetchPosts();
+      if (mounted) {
+        setState(() => _postsContentKey++);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Aggiornati ${posts.length} post'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isForceRefreshingPosts = false);
+      }
+    }
+  }
+
   Future<void> _forceRefreshAllPosts() async {
     if (_isForceRefreshingPosts) return;
     if (!isLoggedIn || _isGuestMode || _isDemoMode) return;
@@ -6991,28 +7019,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         ),
       ),
       body: _getBody(),
-      floatingActionButton: _selectedIndex == 0 &&
-              isLoggedIn &&
-              !_isGuestMode &&
-              !_isDemoMode
-          ? FloatingActionButton(
-              onPressed:
-                  _isForceRefreshingPosts ? null : _forceRefreshAllPosts,
-              backgroundColor: AppColors.secondary,
-              tooltip: 'Aggiorna post',
-              child: _isForceRefreshingPosts
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
-                    )
-                  : const Icon(Icons.settings, color: Colors.black),
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: AppColors.white,
         selectedItemColor: AppColors.primary,
@@ -7158,7 +7164,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                               context, "Segnala Guasto", 'assets/guasto.png'),
                           _buildButton(context, "Ritiro rifiuti",
                               'assets/ritiro_rifiuti.png'),
-                          const SizedBox(height: 24),
+                          _buildRefreshArticlesButton(),
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),
@@ -7540,7 +7547,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         context, "Segnala Guasto", 'assets/guasto.png'),
                     _buildButton(
                         context, "Ritiro rifiuti", 'assets/ritiro_rifiuti.png'),
-                    const SizedBox(height: 88),
+                    _buildRefreshArticlesButton(),
+                    const SizedBox(height: 24),
                     const SizedBox(height: 40),
                     const Icon(Icons.inbox_outlined,
                         size: 64, color: Colors.white70),
@@ -7552,24 +7560,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                           color: Colors.white70),
-                    ),
-                    const SizedBox(height: 24),
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          await fetchPosts();
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Ricarica'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondaryBlue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -8463,6 +8453,61 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   // Metodo per costruire i pulsanti dei servizi
+  Widget _buildRefreshArticlesButton() {
+    return Container(
+      width: double.infinity,
+      height: 70,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: AppColors.serviceButtonBoxDecoration(radius: 20),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        ),
+        onPressed:
+            _isForceRefreshingPosts ? null : _onRefreshArticlesPressed,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _isForceRefreshingPosts
+                ? const SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Aggiorna Articoli',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildButton(BuildContext context, String label, String imagePath) {
     return Container(
       width: double.infinity,
