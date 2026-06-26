@@ -18,6 +18,18 @@ fi
 echo "==> Versione Flutter"
 flutter --version
 
+echo "==> Rimozione APK esistenti"
+removed=0
+while IFS= read -r apk; do
+  [[ -z "$apk" ]] && continue
+  echo "    elimino: $apk"
+  rm -f "$apk"
+  removed=$((removed + 1))
+done < <(find "$ROOT_DIR" -type f -name '*.apk' 2>/dev/null || true)
+if [[ "$removed" -eq 0 ]]; then
+  echo "    nessun APK trovato"
+fi
+
 echo "==> Pulizia progetto"
 flutter clean
 
@@ -27,17 +39,15 @@ flutter pub get
 APK_DIR="build/app/outputs/flutter-apk"
 mkdir -p "$APK_DIR"
 
-# --split-per-abi confligge con ndk.abiFilters in android/app/build.gradle;
-# compiliamo ogni ABI separatamente con --target-platform.
+# Solo ABI installabili su smartphone/tablet Android reali (no x86_64 emulatori).
 declare -a BUILDS=(
   "android-arm:armeabi-v7a"
   "android-arm64:arm64-v8a"
-  "android-x64:x86_64"
 )
 
 APK_PATHS=()
 
-echo "==> Generazione APK debug (tutte le ABI)"
+echo "==> Generazione APK debug per dispositivi mobili"
 for entry in "${BUILDS[@]}"; do
   platform="${entry%%:*}"
   suffix="${entry##*:}"
@@ -51,3 +61,6 @@ echo "==> APK debug generati:"
 for apk in "${APK_PATHS[@]}"; do
   echo "    $ROOT_DIR/$apk"
 done
+
+# Rimuove l'APK generico dell'ultima build (restano solo quelli per ABI).
+rm -f "${APK_DIR}/app-debug.apk"

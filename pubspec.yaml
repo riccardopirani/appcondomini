@@ -1,7 +1,7 @@
 name: condominio
 description: "pdg"
 publish_to: 'none'
-version: 1.1.6+20
+version: 1.1.7+21
 
 environment:
   sdk: ^3.5.4

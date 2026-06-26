@@ -1,0 +1,5 @@
+app_identifier("com.paoloorecchioni.pdg")
+team_id("A68W374637")
+
+# Opzionale in locale se non usi la API key App Store Connect:
+# apple_id(ENV["APPLE_ID"])

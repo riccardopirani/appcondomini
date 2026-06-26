@@ -53,3 +53,15 @@ app.*.map.json
 # Coding agent (chiavi API locali)
 /scripts/coding_agent.env
 /.coding_agent_backups/
+
+# Fastlane / firma iOS (non committare)
+ios/fastlane/report.xml
+ios/fastlane/Preview.html
+ios/fastlane/screenshots
+ios/fastlane/test_output
+ios/fastlane/README.md
+*.p8
+AuthKey_*.p8
+*.mobileprovision
+*.p12
+*.cer

@@ -1,0 +1,123 @@
+# Rilascio automatico iOS → App Store Connect (TestFlight / App Store)
+#
+# Segreti da configurare in GitHub → Settings → Secrets and variables → Actions:
+#
+#   APP_STORE_CONNECT_API_KEY_ID
+#     Key ID della API key (App Store Connect → Users and Access → Integrations → App Store Connect API)
+#
+#   APP_STORE_CONNECT_ISSUER_ID
+#     Issuer ID (stessa pagina della API key)
+#
+#   APP_STORE_CONNECT_API_KEY_BASE64
+#     File AuthKey_XXXXXX.p8 codificato in base64 (una riga):
+#       base64 -i AuthKey_XXXXXX.p8 | tr -d '\n' | pbcopy
+#
+#   IOS_DISTRIBUTION_CERTIFICATE_BASE64
+#     Certificato "Apple Distribution" esportato come .p12 in base64:
+#       base64 -i Certificates.p12 | tr -d '\n' | pbcopy
+#
+#   IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+#     Password usata per esportare il .p12
+#
+#   IOS_PROVISIONING_PROFILE_BASE64
+#     Profilo "App Store" per com.paoloorecchioni.pdg in base64:
+#       base64 -i profile.mobileprovision | tr -d '\n' | pbcopy
+#
+# Avvio:
+#   - Manuale: Actions → "Release iOS to App Store Connect" → Run workflow
+#   - Tag: push tag semver es. v1.1.6 → upload su TestFlight
+
+name: Release iOS to App Store Connect
+
+on:
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: Destinazione upload
+        type: choice
+        required: true
+        default: beta
+        options:
+          - beta
+          - release
+  push:
+    tags:
+      - 'v*'
+
+env:
+  IOS_LANE_ON_TAG: beta
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Fastlane lane
+        id: lane
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.lane }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ env.IOS_LANE_ON_TAG }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Import distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+
+      - name: Install provisioning profile
+        env:
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          if [ -z "$PROFILE_BASE64" ]; then
+            echo "Missing secret IOS_PROVISIONING_PROFILE_BASE64"
+            exit 1
+          fi
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$PROFILE_BASE64" | base64 -d > "$PROFILE_PATH"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$PROFILE_PATH")")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${UUID}.mobileprovision"
+
+      - name: Write App Store Connect API key
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          if [ -z "$API_KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$API_KEY_BASE64" ]; then
+            echo "Missing App Store Connect API key secrets"
+            exit 1
+          fi
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          echo "$API_KEY_BASE64" | base64 -d > "$KEY_DIR/AuthKey_${API_KEY_ID}.p8"
+          echo "APP_STORE_CONNECT_API_KEY_ID=$API_KEY_ID" >> "$GITHUB_ENV"
+          echo "APP_STORE_CONNECT_ISSUER_ID=$ISSUER_ID" >> "$GITHUB_ENV"
+          echo "APP_STORE_CONNECT_API_KEY_PATH=$KEY_DIR/AuthKey_${API_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - name: Release to App Store Connect
+        working-directory: ios
+        env:
+          CI: true
+        run: bundle exec fastlane ios ${{ steps.lane.outputs.value }}
