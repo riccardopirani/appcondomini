@@ -8509,19 +8509,31 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   Widget _buildButton(BuildContext context, String label, String imagePath) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final fontSize =
+        screenWidth < 360 ? 15.0 : (screenWidth < 400 ? 17.0 : 20.0);
+    final horizontalPadding = screenWidth < 360 ? 12.0 : 20.0;
+    final iconSize = screenWidth < 360 ? 28.0 : 32.0;
+    final iconSpacing = screenWidth < 360 ? 8.0 : 12.0;
+
     return Container(
       width: double.infinity,
-      height: 70,
+      constraints: const BoxConstraints(minHeight: 70),
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: AppColors.serviceButtonBoxDecoration(radius: 20),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 12,
+          ),
         ),
         onPressed: () {
           // Gestisci casi speciali per Emergenze e Assistenza medica
@@ -8570,35 +8582,39 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (label == "Comunicazioni")
-              const Icon(
+              Icon(
                 Icons.campaign_rounded,
                 color: Colors.white,
-                size: 30,
+                size: iconSize,
               )
             else
               Image.asset(
                 imagePath,
-                width: 32,
-                height: 32,
+                width: iconSize,
+                height: iconSize,
                 color: Colors.white,
                 errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.image_not_supported,
-                      color: Colors.white, size: 28);
+                  return Icon(Icons.image_not_supported,
+                      color: Colors.white, size: iconSize - 4);
                 },
               ),
-            const SizedBox(width: 12),
+            SizedBox(width: iconSpacing),
             Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -9773,19 +9789,31 @@ class ContactOptionsScreen extends StatelessWidget {
   }
 
   Widget _buildButton(BuildContext context, String label, String imagePath) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final fontSize =
+        screenWidth < 360 ? 15.0 : (screenWidth < 400 ? 17.0 : 20.0);
+    final horizontalPadding = screenWidth < 360 ? 12.0 : 20.0;
+    final iconSize = screenWidth < 360 ? 28.0 : 32.0;
+    final iconSpacing = screenWidth < 360 ? 8.0 : 12.0;
+
     return Container(
       width: double.infinity,
-      height: 70,
+      constraints: const BoxConstraints(minHeight: 70),
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: AppColors.serviceButtonBoxDecoration(radius: 20),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: 12,
+          ),
         ),
         onPressed: () {
           // Gestisci casi speciali per Emergenze e Assistenza medica
@@ -9830,27 +9858,31 @@ class ContactOptionsScreen extends StatelessWidget {
           children: [
             Image.asset(
               imagePath,
-              width: 32,
-              height: 32,
+              width: iconSize,
+              height: iconSize,
               color: Colors.white,
               errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.image_not_supported,
-                    color: Colors.white, size: 28);
+                return Icon(Icons.image_not_supported,
+                    color: Colors.white, size: iconSize - 4);
               },
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: iconSpacing),
             Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
