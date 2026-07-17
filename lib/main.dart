@@ -8225,7 +8225,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
-                _buildPhoneNumber('Cell. +39 327 796 4108'),
+                _buildPhoneNumber('Cell. +39 335 646 2457'),
                 const Divider(height: 24),
                 _buildMedicalSection(
                     'ASL Gallura – Ambulatorio continuità assistenziale', [
@@ -9692,7 +9692,7 @@ class ContactOptionsScreen extends StatelessWidget {
                     'Periodo 15 giugno - 15 settembre:\n• Visite: 9.00-11.00 (lun-ven) presso ambulatorio Club\n• Reperibile: 8.00-18.00 (lun-ven) al 335 646 2457\n• Urgenze: 18.00-8.00 (tutti i giorni)',
                     style: TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
-                _buildPhoneNumber('Cell. +39 327 796 4108'),
+                _buildPhoneNumber('Cell. +39 335 646 2457'),
                 const Divider(height: 24),
                 _buildMedicalSection(
                     'ASL Gallura – Ambulatorio continuità assistenziale', [
