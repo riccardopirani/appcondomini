@@ -143,6 +143,35 @@ class EmailService {
   /// Invio SMTP tramite backend Render (`_sendEmailBaseUrl`); nessun fallback mailto.
   static const String _sendEmailBaseUrl = 'https://appcondomini.onrender.com';
 
+  /// Render free tier può impiegare >30s al cold start: timeout più lungo + warm-up.
+  static const Duration _emailTimeout = Duration(seconds: 90);
+
+  static String _formatItalianDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final dd = local.day.toString().padLeft(2, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    final yyyy = local.year.toString();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
+    return '$dd/$mm/$yyyy alle ore $hh:$min';
+  }
+
+  static Future<void> _warmUpBackend() async {
+    try {
+      await http
+          .get(
+            Uri.parse('$_sendEmailBaseUrl/health'),
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': AppSettings.userAgent,
+            },
+          )
+          .timeout(const Duration(seconds: 60));
+    } catch (e) {
+      debugPrint('[EmailService] warm-up backend: $e');
+    }
+  }
+
   static Future<void> _sendRawEmail({
     required String to,
     String? subject,
@@ -153,6 +182,8 @@ class EmailService {
     final textBody = body ?? '';
 
     try {
+      await _warmUpBackend();
+
       final uri = Uri.parse('$_sendEmailBaseUrl/send-email');
       final payload = <String, dynamic>{
         'to': to,
@@ -171,7 +202,7 @@ class EmailService {
             },
             body: jsonEncode(payload),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(_emailTimeout);
 
       Map<String, dynamic>? data;
       try {
@@ -219,10 +250,12 @@ class EmailService {
       throw StateError('Invio email disabilitato in modalità demo');
     }
 
+    final sentAt = _formatItalianDateTime(DateTime.now());
+
     final buffer = StringBuffer()
       ..writeln('Servizio: $service')
-      ..writeln(
-          'Nome: $senderName')
+      ..writeln('Data e ora richiesta: $sentAt')
+      ..writeln('Nome: $senderName')
       ..writeln(
           'Email: ${senderEmail.isNotEmpty ? senderEmail : 'Non fornita'}');
 
@@ -238,6 +271,11 @@ class EmailService {
       ..writeln(message)
       ..writeln()
       ..writeln('---')
+      ..writeln('Orari ufficio:')
+      ..writeln('Dal lunedì al venerdì: 8.30-13.00 e 14.00-17.00')
+      ..writeln('Sabato: 9.00-12.00')
+      ..writeln('Nelle giornate festive rivolgersi alla portineria.')
+      ..writeln()
       ..writeln('Inviato dall\'app pdg');
 
     final computedSubject = subject ?? '$service - $senderName';
