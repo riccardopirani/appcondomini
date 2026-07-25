@@ -6872,8 +6872,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             context,
                             icon: Icons.contact_mail,
                             title: AppLocalizations.of(context).contacts,
-                            subtitle:
-                                AppLocalizations.of(context).contactThePort,
                             color: AppColors.secondaryBlue,
                             onTap: () {
                               Navigator.pop(context);
@@ -8628,7 +8626,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     BuildContext context, {
     required IconData icon,
     required String title,
-    required String subtitle,
+    String? subtitle,
     required Color color,
     required VoidCallback onTap,
   }) {
@@ -8653,12 +8651,14 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
+        subtitle: subtitle == null || subtitle.isEmpty
+            ? null
+            : Text(
+                subtitle,
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
         trailing: const Icon(Icons.arrow_forward_ios,
             color: Colors.white70, size: 16),
         onTap: onTap,
@@ -8791,7 +8791,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               const Text('07020 Aglientu (SS)'),
               const Text('C.F.: 82001540903'),
               const Text('P. IVA: 00348270901'),
-              const Text('Lunedì-venerdì 8.30-12.00, 12.30-16.30'),
+              const Text(
+                'Dal lunedì al venerdì\n'
+                'Mattino ore 8.30 - 13.00 e ore 14.00 - 17.00\n'
+                'Sabato ore 9.00 - 12.00',
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Amministratore – Avv. Paolo Orecchioni',
@@ -8800,7 +8804,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               _buildPhoneNumber('Tel. +39 079 656 718'),
               _buildPhoneNumber('Tel. +39 079 656 766'),
               _buildPhoneNumber('Cell. +39 345 932 9195'),
-              const Text('Fax +39 079 656 666'),
               GestureDetector(
                 onTap: () async {
                   final Uri emailUri =
@@ -8823,7 +8826,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               _buildPhoneNumber('Tel. +39 079 656 718'),
-              const Text('Fax +39 079 656 666'),
               GestureDetector(
                 onTap: () async {
                   final Uri emailUri =
@@ -10047,7 +10049,6 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
 
   static const List<String> _timeSlots = [
     '09:00 - 16:00 (feriali)',
-    '09:00 - 12:00 (festivi)',
   ];
 
   @override
@@ -10089,38 +10090,18 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1) Invio principale verso endpoint (automazione lato server)
-      final response = await http.post(
-        Uri.parse(appSettings.urlRitiroRifiutiEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': AppSettings.userAgent,
+      // Invio email diretto con testo richiesta incluso (come gli altri moduli).
+      // L'endpoint WP non garantiva il campo "request" nella mail in ufficio.
+      await EmailService.sendAppEmail(
+        to: AppSettings.emailSegreteria,
+        service: 'Ritiro rifiuti',
+        senderName: widget.userName,
+        senderEmail: widget.userEmail,
+        message: requestText,
+        details: {
+          'Fascia oraria': _selectedSlot,
         },
-        body: jsonEncode({
-          'service': 'ritiro_rifiuti',
-          'name': widget.userName,
-          'email': widget.userEmail,
-          'time_slot': _selectedSlot,
-          'request': requestText,
-          'source': 'app_porti_italiani',
-          'created_at': DateTime.now().toIso8601String(),
-        }),
-      ).timeout(const Duration(seconds: 20));
-
-      // 2) Fallback email se endpoint non risponde bene
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        await EmailService.sendAppEmail(
-          to: AppSettings.emailSegreteria,
-          service: 'Ritiro rifiuti',
-          senderName: widget.userName,
-          senderEmail: widget.userEmail,
-          message: requestText,
-          details: {
-            'Fascia oraria': _selectedSlot,
-          },
-        );
-      }
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -10214,8 +10195,8 @@ class _WastePickupScreenState extends State<WastePickupScreen> {
                   ),
                   child: const Text(
                     'Fasce disponibili:\n'
-                    '• 09:00 - 16:00 (feriali)\n'
-                    '• 09:00 - 12:00 (festivi)',
+                    '• 09:00 - 16:00 (feriali)\n\n'
+                    'Nelle giornate festive rivolgersi alla portineria.',
                     softWrap: true,
                     style: TextStyle(fontSize: 14, height: 1.5),
                   ),
@@ -10646,6 +10627,22 @@ class _EmailFormTabState extends State<EmailFormTab> {
                       fontSize: 14,
                       color: Colors.black,
                       fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade100),
+                    ),
+                    child: const Text(
+                      'Le richieste tramite app sono disponibili nei giorni feriali.\n\n'
+                      'Nelle giornate festive rivolgersi alla portineria.',
+                      softWrap: true,
+                      style: TextStyle(fontSize: 14, height: 1.5),
                     ),
                   ),
                 ],
