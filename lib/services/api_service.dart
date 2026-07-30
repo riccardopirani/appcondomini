@@ -170,18 +170,14 @@ class ApiService {
     }
   }
 
-  /// Effettua una richiesta GET autenticata
+  /// Effettua una richiesta GET (con token se disponibile; altrimenti pubblica).
   Future<http.Response> get(String endpoint, {Map<String, String>? queryParams}) async {
-    if (!isAuthenticated) {
-      throw Exception('Token non valido o scaduto');
-    }
-
     final uri = Uri.parse('$apiBaseUrl$endpoint');
     final uriWithParams = queryParams != null ? uri.replace(queryParameters: queryParams) : uri;
 
     return http.get(
       uriWithParams,
-      headers: _getAuthHeaders(),
+      headers: isAuthenticated ? _getAuthHeaders() : _getPublicHeaders(),
     ).timeout(const Duration(seconds: 30));
   }
 
@@ -203,6 +199,38 @@ class ApiService {
       headers: _getAuthHeaders(),
       body: body != null ? jsonEncode(body) : null,
     ).timeout(const Duration(seconds: 30));
+  }
+
+  /// Elimina definitivamente l'account dell'utente autenticato.
+  Future<bool> deleteAccount() async {
+    if (!isAuthenticated) {
+      throw Exception('Token non valido o scaduto');
+    }
+
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$apiBaseUrl/account'),
+            headers: _getAuthHeaders(),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      debugPrint('🗑️ deleteAccount status: ${response.statusCode}');
+      debugPrint('🗑️ deleteAccount body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['success'] == true) {
+          await logout();
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint('❌ Errore deleteAccount: $e');
+      rethrow;
+    }
   }
 
   /// Pulisce cache persistenti + cache immagini in memoria SOLO quando cambia
@@ -253,6 +281,15 @@ class ApiService {
       // Fallback per hosting che non inoltrano l'header Authorization
       'x-pdg-token': '$_token',
       'Content-Type': 'application/json',
+    };
+  }
+
+  /// Header pubblici (solo API key) per contenuti non account-based.
+  Map<String, String> _getPublicHeaders() {
+    return {
+      apiKeyHeaderName: apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
     };
   }
 

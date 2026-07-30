@@ -740,10 +740,19 @@ Future<void> clearLoginData() async {
   await prefs.remove('password');
   await prefs.remove('originalUsername');
   await prefs.remove('originalEmail');
+  await prefs.remove('pdg_app_token');
+  await prefs.remove('pdg_app_token_expiry');
+  await prefs.remove(SessionPrefs.keyMode);
+  await prefs.remove(SessionPrefs.keyExpiry);
   await prefs.setBool('isLoggedIn', false);
+  // Dopo logout: modalità ospite (funzioni pubbliche restano accessibili).
+  await prefs.setBool('isGuest', true);
+  await prefs.setBool('demoMode', false);
   appSettings.clearToken();
+  await apiService.logout();
   debugPrint('✅ Tutti i dati utente cancellati');
 }
+
 
 Future<void> _openInAppBrowser(String url) async {
   final Uri uri = Uri.parse(url);
@@ -3375,6 +3384,27 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// Accesso ospite alle funzioni non account-based (Guideline 5.1.1).
+  Future<void> _continueAsGuest() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isGuest', true);
+    await prefs.setBool('demoMode', false);
+    await prefs.setBool('isLoggedIn', false);
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MyHomePage(
+          title: '',
+          userEmail: '',
+          userName: '',
+          isGuest: true,
+          isDemoMode: false,
+        ),
+      ),
+    );
+  }
+
   Future<void> handleLogin(String username, String password) async {
     if (_isLoading) return;
 
@@ -3857,6 +3887,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           const SizedBox(height: 14),
+                          OutlinedButton(
+                            onPressed: _isLoading ? null : _continueAsGuest,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.secondaryBlue,
+                              side: const BorderSide(
+                                  color: AppColors.secondaryBlue),
+                              minimumSize: const Size.fromHeight(48),
+                            ),
+                            child: const Text(
+                              'Continua senza account',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           TextButton(
                             onPressed:
                                 _isLoading ? null : _enableDemoModeForReview,
@@ -3965,9 +4009,11 @@ class _SplashScreenState extends State<SplashScreen>
 
       // "Scollega a fine utilizzo": ad ogni avvio a freddo serve un nuovo login.
       if (sessionMode == SessionPrefs.modeLogoutOnClose) {
-        debugPrint('🔒 Sessione "logout a fine uso": richiedo nuovo login');
+        debugPrint('🔒 Sessione "logout a fine uso": entro come ospite');
         await _clearSession(prefs);
-        _goToLogin();
+        await prefs.setBool('isGuest', true);
+        await prefs.setBool('demoMode', false);
+        _goToGuestHome();
         return;
       }
 
@@ -3976,9 +4022,11 @@ class _SplashScreenState extends State<SplashScreen>
         final expiry = prefs.getInt(SessionPrefs.keyExpiry);
         if (expiry != null &&
             DateTime.now().millisecondsSinceEpoch > expiry) {
-          debugPrint('🔒 Sessione 30 giorni scaduta: richiedo nuovo login');
+          debugPrint('🔒 Sessione 30 giorni scaduta: entro come ospite');
           await _clearSession(prefs);
-          _goToLogin();
+          await prefs.setBool('isGuest', true);
+          await prefs.setBool('demoMode', false);
+          _goToGuestHome();
           return;
         }
       }
@@ -4011,13 +4059,22 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } else {
-      debugPrint('👤 Nessun login precedente: apro schermata di login');
-      await prefs.setBool('isGuest', false);
+      // App Store 5.1.1: funzioni non account-based accessibili senza login.
+      debugPrint('👤 Nessun login precedente: entro come ospite');
+      await prefs.setBool('isGuest', true);
       await prefs.setBool('demoMode', false);
       if (context.mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          MaterialPageRoute(
+            builder: (context) => const MyHomePage(
+              title: '',
+              userEmail: '',
+              userName: '',
+              isGuest: true,
+              isDemoMode: false,
+            ),
+          ),
         );
       }
     }
@@ -4039,6 +4096,22 @@ class _SplashScreenState extends State<SplashScreen>
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+  }
+
+  void _goToGuestHome() {
+    if (!context.mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const MyHomePage(
+          title: '',
+          userEmail: '',
+          userName: '',
+          isGuest: true,
+          isDemoMode: false,
+        ),
+      ),
     );
   }
 
@@ -5848,19 +5921,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           } else {
             debugPrint('❌ Impossibile rigenerare token plugin per i post');
           }
+        } else {
+          debugPrint(
+              '👤 Nessuna credenziale: scarico post pubblici (modalità ospite)');
         }
       }
 
-      if (apiService.isAuthenticated) {
-        final pluginApiSuccess = await _tryFetchPostsViaPluginApi();
-        if (pluginApiSuccess) {
-          tempPosts.addAll(posts);
-          debugPrint('✅ Caricamento riuscito via plugin API');
-        } else {
-          debugPrint('⚠️ Plugin API non ha restituito post, mantengo cache');
-        }
+      // Autenticato: post personali. Ospite: endpoint pubblici (API key only).
+      final pluginApiSuccess = await _tryFetchPostsViaPluginApi();
+      if (pluginApiSuccess) {
+        tempPosts.addAll(posts);
+        debugPrint('✅ Caricamento riuscito via plugin API');
       } else {
-        debugPrint('⚠️ Utente non autenticato, skip download post');
+        debugPrint('⚠️ Plugin API non ha restituito post, mantengo cache');
       }
 
       // 🔄 STEP 3: Aggiorna cache solo se ci sono nuovi post
@@ -6025,18 +6098,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         }
       }
 
-      if (!apiService.isAuthenticated) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Sessione scaduta. Effettua di nuovo il login.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
       debugPrint('🔄 Refresh forzato di tutti i post...');
       final fetched = await apiService.fetchPosts(perPage: 100);
 
@@ -6156,20 +6217,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   /// Tenta di caricare i post usando il plugin API
+  /// (autenticato: post personali; ospite: solo pubblici).
   Future<bool> _tryFetchPostsViaPluginApi() async {
     try {
-      if (!apiService.isAuthenticated) {
-        debugPrint('⚠️ API plugin: Token non autenticato');
-        return false;
+      if (apiService.isAuthenticated) {
+        debugPrint('🔌 Caricamento post via plugin API (autenticato)...');
+      } else {
+        debugPrint('🔌 Caricamento post pubblici via plugin API (ospite)...');
       }
-
-      debugPrint('🔌 Caricamento tutti i post via plugin API...');
 
       final pluginPosts = await apiService.fetchPosts();
 
       if (pluginPosts.isNotEmpty) {
         debugPrint('✅ Plugin API: ${pluginPosts.length} post caricati');
-     await _processPosts(pluginPosts);
+        await _processPosts(pluginPosts);
         return true;
       } else {
         debugPrint('📭 Plugin API: Nessun post ricevuto');
@@ -6615,10 +6676,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               )
             : const NoAccessMessage();
       case 2:
-        if (!isLoggedIn || _isGuestMode || _isDemoMode) {
-          return _loginRequiredContent();
-        }
-
+        // Servizi: lista sempre consultabile; l'invio dei moduli richiede login.
         return ContactOptionsScreen(
           userName: userData?['name'] ?? '',
           userEmail: userData?['email'] ?? '',
@@ -7017,11 +7075,18 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         if (conferma == true && context.mounted) {
                           await clearLoginData();
 
-                          // Usa pushAndRemoveUntil per pulire tutto lo stack e tornare alla login
+                          // Torna alla home ospite (funzioni pubbliche accessibili).
                           if (context.mounted) {
                             Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute(
-                                  builder: (context) => const LoginScreen()),
+                                builder: (context) => const MyHomePage(
+                                  title: '',
+                                  userEmail: '',
+                                  userName: '',
+                                  isGuest: true,
+                                  isDemoMode: false,
+                                ),
+                              ),
                               (Route<dynamic> route) => false,
                             );
                           }
@@ -8905,9 +8970,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   }
 
   void _showAccountInfo(BuildContext context) {
+    final canDeleteAccount =
+        isLoggedIn && !_isGuestMode && !_isDemoMode;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Account'),
         content: Column(
@@ -8923,14 +8991,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8)),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.security, color: Colors.blue, size: 20),
-                  SizedBox(width: 8),
+                  Icon(
+                    canDeleteAccount ? Icons.security : Icons.person_outline,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Autenticazione attiva',
-                      style: TextStyle(
+                      canDeleteAccount
+                          ? 'Autenticazione attiva'
+                          : 'Modalità ospite: accedi per gestire l\'account',
+                      style: const TextStyle(
                           color: Colors.blue, fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -8940,12 +9014,107 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           ],
         ),
         actions: [
+          if (canDeleteAccount)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _confirmDeleteAccount(context);
+              },
+              child: const Text(
+                'Elimina account',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+              ),
+            ),
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Chiudi')),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Elimina account'),
+        content: const Text(
+          'Questa azione è permanente: il tuo account e i dati associati verranno eliminati. Vuoi continuare?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Elimina definitivamente',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await apiService.loadToken();
+      final deleted = await apiService.deleteAccount();
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+
+      if (!deleted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Impossibile eliminare l\'account. Riprova più tardi.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      await clearLoginData();
+      if (!context.mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const MyHomePage(
+            title: '',
+            userEmail: '',
+            userName: '',
+            isGuest: true,
+            isDemoMode: false,
+          ),
+        ),
+        (Route<dynamic> route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account eliminato correttamente.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore eliminazione account: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showLanguageDialog(BuildContext context) {
@@ -9361,7 +9530,7 @@ class _NoAccessMessageState extends State<NoAccessMessage>
               ),
               const SizedBox(height: 8),
               const Text(
-                'Puoi accedere come utente, oppure attivare la modalità demo per la revisione.',
+                'Al momento non ci sono contenuti pubblici da mostrare. Accedi per vedere i contenuti del tuo account, oppure attiva la modalità demo.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
@@ -9855,23 +10024,13 @@ class ContactOptionsScreen extends StatelessWidget {
             vertical: 12,
           ),
         ),
-        onPressed: () {
+        onPressed: () async {
           // Gestisci casi speciali per Emergenze e Assistenza medica
           if (label == "Numeri di Emergenza") {
             _showEmergencyDialog(context);
           } else if (label == "Assistenza medica" ||
               label == "Servizi sanitari") {
             _showMedicalServicesDialog(context);
-          } else if (label == "Ritiro rifiuti" || label == "Ritiro Rifiuti") {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => WastePickupScreen(
-                  userName: userName,
-                  userEmail: userEmail,
-                ),
-              ),
-            );
           } else if (label == "Pulizia fosse") {
             Navigator.push(
               context,
@@ -9880,17 +10039,64 @@ class ContactOptionsScreen extends StatelessWidget {
               ),
             );
           } else {
-            // Per gli altri servizi, apri il form email
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => EmailFormTab(
-                  userName: userName,
-                  userEmail: userEmail,
-                  subject: label,
+            // Moduli account-based: richiedono login per l'invio.
+            final prefs = await SharedPreferences.getInstance();
+            final hasAuth = (prefs.getBool('isLoggedIn') ?? false) &&
+                !(prefs.getBool('isGuest') ?? false) &&
+                !(prefs.getBool('demoMode') ?? false);
+            if (!hasAuth) {
+              if (!context.mounted) return;
+              showDialog(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Login richiesto'),
+                  content: const Text(
+                    'Per inviare richieste tramite i moduli devi prima effettuare il login.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Annulla'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const LoginScreen()),
+                        );
+                      },
+                      child: const Text('Login'),
+                    ),
+                  ],
                 ),
-              ),
-            );
+              );
+              return;
+            }
+
+            if (label == "Ritiro rifiuti" || label == "Ritiro Rifiuti") {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WastePickupScreen(
+                    userName: userName,
+                    userEmail: userEmail,
+                  ),
+                ),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EmailFormTab(
+                    userName: userName,
+                    userEmail: userEmail,
+                    subject: label,
+                  ),
+                ),
+              );
+            }
           }
         },
         child: Row(

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PdG App API (PublishPress-safe + Categories)
  * Description: API per app mobile: login + accesso ai soli post leggibili secondo PublishPress Permissions (permessi su post/categorie). Endpoint categorie "navigabile". Hardening endpoint sensibili.
- * Version: 3.8
+ * Version: 3.9
  * Author: Portobello di Gallura
  */
 
@@ -310,6 +310,34 @@ function pdg_app_require_auth(WP_REST_Request $request) {
     return true;
 }
 
+/**
+ * API key obbligatoria; token utente opzionale.
+ * Senza token: accesso ospite ai soli contenuti pubblici (Guideline 5.1.1).
+ * Con token valido: comportamento autenticato (post privati / PublishPress).
+ * Con token presente ma non valido: errore 401 (forza re-login).
+ */
+function pdg_app_require_api_key_optional_user(WP_REST_Request $request) {
+    $k = pdg_app_verify_api_key($request);
+    if (is_wp_error($k)) return $k;
+
+    $token = pdg_app_get_bearer_token($request);
+    if ($token === '') {
+        $request->set_param('_pdg_user_id', 0);
+        if (function_exists('wp_set_current_user')) {
+            wp_set_current_user(0);
+        }
+        return true;
+    }
+
+    $u = pdg_app_get_user_from_token($request);
+    if (is_wp_error($u)) return $u;
+
+    $request->set_param('_pdg_user_id', $u->ID);
+    pdg_app_set_current_user((int) $u->ID);
+
+    return true;
+}
+
 function pdg_app_current_user_id(WP_REST_Request $request): int {
     return (int) $request->get_param('_pdg_user_id');
 }
@@ -445,19 +473,27 @@ add_action('rest_api_init', function () {
     register_rest_route('pdg-app/v1', '/posts', [
         'methods'  => 'GET',
         'callback' => 'pdg_app_get_readable_posts',
-        'permission_callback' => 'pdg_app_require_auth',
+        // Token opzionale: senza login restituisce solo contenuti pubblici.
+        'permission_callback' => 'pdg_app_require_api_key_optional_user',
     ]);
 
     register_rest_route('pdg-app/v1', '/posts/(?P<id>\d+)', [
         'methods'  => 'GET',
         'callback' => 'pdg_app_get_readable_single_post',
-        'permission_callback' => 'pdg_app_require_auth',
+        'permission_callback' => 'pdg_app_require_api_key_optional_user',
     ]);
 
     // ✅ Categorie "navigabili": include solo categorie dove l'utente può leggere almeno 1 post
     register_rest_route('pdg-app/v1', '/categories', [
         'methods'  => 'GET',
         'callback' => 'pdg_app_get_navigable_categories',
+        'permission_callback' => 'pdg_app_require_api_key_optional_user',
+    ]);
+
+    // 🗑️ Cancellazione account (App Store Guideline 5.1.1(v))
+    register_rest_route('pdg-app/v1', '/account', [
+        'methods'  => 'DELETE',
+        'callback' => 'pdg_app_delete_account',
         'permission_callback' => 'pdg_app_require_auth',
     ]);
     
@@ -472,6 +508,51 @@ add_action('rest_api_init', function () {
 /* ---------------------------
  * Auth + rate limit
  * --------------------------- */
+
+/**
+ * Elimina definitivamente l'account dell'utente autenticato.
+ * Non consente la cancellazione di amministratori tramite l'app.
+ */
+function pdg_app_delete_account(WP_REST_Request $request) {
+    $user_id = pdg_app_current_user_id($request);
+    if ($user_id <= 0) {
+        return new WP_Error('not_authenticated', 'Authentication required', ['status' => 401]);
+    }
+
+    $user = get_userdata($user_id);
+    if (!$user) {
+        return new WP_Error('user_not_found', 'User not found', ['status' => 404]);
+    }
+
+    if (user_can($user, 'manage_options')) {
+        return new WP_Error(
+            'cannot_delete_admin',
+            'Administrator accounts cannot be deleted from the app.',
+            ['status' => 403]
+        );
+    }
+
+    $token_hash = (string) get_user_meta($user_id, PDG_APP_TOKEN_META, true);
+    if ($token_hash !== '') {
+        delete_transient('pdg_app_tok_' . $token_hash);
+    }
+    delete_user_meta($user_id, PDG_APP_TOKEN_META);
+    delete_user_meta($user_id, PDG_APP_TOKEN_EXP_META);
+
+    if (!function_exists('wp_delete_user')) {
+        require_once ABSPATH . 'wp-admin/includes/user.php';
+    }
+
+    $deleted = wp_delete_user($user_id);
+    if (!$deleted) {
+        return new WP_Error('delete_failed', 'Unable to delete account', ['status' => 500]);
+    }
+
+    return rest_ensure_response([
+        'success' => true,
+        'message' => 'Account deleted',
+    ]);
+}
 
 function pdg_app_authenticate_user(WP_REST_Request $request) {
     $username = (string) $request->get_param('username');
@@ -521,9 +602,16 @@ function pdg_app_authenticate_user(WP_REST_Request $request) {
 
 function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $user_id = pdg_app_current_user_id($request);
+    $is_guest = $user_id <= 0;
 
     // CRITICO: Imposta l'utente UNA volta per richiesta.
-    pdg_app_set_current_user($user_id);
+    if ($is_guest) {
+        if (function_exists('wp_set_current_user')) {
+            wp_set_current_user(0);
+        }
+    } else {
+        pdg_app_set_current_user($user_id);
+    }
 
     $load_all = (int) ($request->get_param('all') ?: 0) === 1;
 
@@ -549,6 +637,7 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
     $cat = (int) ($request->get_param('category') ?: 0);
 
     // ⚡ Cache per-utente (permessi PublishPress dipendono dall'utente).
+    // user_id 0 = cache contenuti pubblici per ospiti.
     $cache_ver = pdg_app_cache_version();
     $cache_key = 'pdg_app_posts_' . $cache_ver . '_' . $user_id . '_'
         . md5(wp_json_encode([
@@ -558,6 +647,7 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
             'orderby' => $orderby,
             'order'   => $order,
             'cat'     => $cat,
+            'guest'   => $is_guest ? 1 : 0,
         ]));
 
     if (!pdg_app_cache_bypass($request)) {
@@ -568,11 +658,14 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
         }
     }
 
+    // Ospite: solo post pubblici. Autenticato: publish + private (PublishPress).
+    $post_statuses = $is_guest ? ['publish'] : ['publish', 'private'];
+
     // IMPORTANTE: suppress_filters = false permette a PublishPress Permissions
     // di applicare i suoi filtri (posts_where, posts_join, etc.)
     $args = [
         'post_type'           => 'post',
-        'post_status'         => ['publish', 'private'],
+        'post_status'         => $post_statuses,
         'posts_per_page'      => $load_all ? -1 : $per_page,
         'orderby'             => $orderby,
         'order'               => $order,
@@ -628,12 +721,29 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
 
         if (!$post_obj instanceof WP_Post) continue;
         if ($post_obj->post_type !== 'post') continue;
-        if (!in_array($post_obj->post_status, ['publish', 'private'], true)) continue;
+        if (!in_array($post_obj->post_status, $post_statuses, true)) continue;
+
+        // Ospite: niente post protetti da password / non pubblicamente visibili.
+        if ($is_guest) {
+            if (!empty($post_obj->post_password)) {
+                $denied++;
+                continue;
+            }
+            if (function_exists('is_post_publicly_viewable') && !is_post_publicly_viewable($post_obj)) {
+                $denied++;
+                continue;
+            }
+        }
 
         $checked++;
 
         // ⚡ trust_filter: salta il doppio check; altrimenti check veloce per-post.
-        if ($trust_filter || pdg_app_user_can_read_post_fast($post_id, $post_obj)) {
+        // Per ospiti: current_user=0 + publish è sufficiente.
+        $allowed = $is_guest
+            ? true
+            : ($trust_filter || pdg_app_user_can_read_post_fast($post_id, $post_obj));
+
+        if ($allowed) {
             // ⚡ Lista: payload leggero (no the_content, no featured image).
             $formatted = pdg_app_format_post($post_obj, false);
             if (!empty($formatted)) {
@@ -656,7 +766,9 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
         'total_denied'  => $denied,
         'load_all'      => $load_all,
         'has_more'      => !$load_all && count($posts) >= $per_page,
-        'note'          => $load_all ? 'All readable posts loaded' : 'Filtered by PublishPress Permissions',
+        'note'          => $is_guest
+            ? 'Public posts only (guest)'
+            : ($load_all ? 'All readable posts loaded' : 'Filtered by PublishPress Permissions'),
         'cache'         => 'miss',
     ];
 
@@ -669,7 +781,15 @@ function pdg_app_get_readable_posts(WP_REST_Request $request) {
 
 function pdg_app_get_readable_single_post(WP_REST_Request $request) {
     $user_id = pdg_app_current_user_id($request);
-    pdg_app_set_current_user($user_id);
+    $is_guest = $user_id <= 0;
+
+    if ($is_guest) {
+        if (function_exists('wp_set_current_user')) {
+            wp_set_current_user(0);
+        }
+    } else {
+        pdg_app_set_current_user($user_id);
+    }
 
     $post_id = (int) $request->get_param('id');
     $post = get_post($post_id);
@@ -678,12 +798,20 @@ function pdg_app_get_readable_single_post(WP_REST_Request $request) {
         return new WP_Error('post_not_found', 'Post not found', ['status' => 404]);
     }
 
-    if (!in_array($post->post_status, ['publish', 'private'], true)) {
-        return new WP_Error('rest_forbidden', 'Forbidden', ['status' => 403]);
-    }
+    if ($is_guest) {
+        if ($post->post_status !== 'publish'
+            || !empty($post->post_password)
+            || (function_exists('is_post_publicly_viewable') && !is_post_publicly_viewable($post))) {
+            return new WP_Error('rest_forbidden', 'Forbidden', ['status' => 403]);
+        }
+    } else {
+        if (!in_array($post->post_status, ['publish', 'private'], true)) {
+            return new WP_Error('rest_forbidden', 'Forbidden', ['status' => 403]);
+        }
 
-    if (!pdg_app_user_can_read_post($user_id, $post_id)) {
-        return new WP_Error('rest_forbidden', 'Forbidden', ['status' => 403]);
+        if (!pdg_app_user_can_read_post($user_id, $post_id)) {
+            return new WP_Error('rest_forbidden', 'Forbidden', ['status' => 403]);
+        }
     }
 
     return rest_ensure_response(pdg_app_format_post($post, true));
@@ -695,7 +823,15 @@ function pdg_app_get_readable_single_post(WP_REST_Request $request) {
 
 function pdg_app_get_navigable_categories(WP_REST_Request $request) {
     $user_id = pdg_app_current_user_id($request);
-    pdg_app_set_current_user($user_id);
+    $is_guest = $user_id <= 0;
+
+    if ($is_guest) {
+        if (function_exists('wp_set_current_user')) {
+            wp_set_current_user(0);
+        }
+    } else {
+        pdg_app_set_current_user($user_id);
+    }
 
     $cache_ver = pdg_app_cache_version();
     $include_empty = (int) ($request->get_param('include_empty') ?: 0);
@@ -717,6 +853,7 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
     ]);
 
     $out = [];
+    $post_statuses = $is_guest ? ['publish'] : ['publish', 'private'];
 
     foreach (($cats ?: []) as $cat) {
         $cat_id = (int) $cat->term_id;
@@ -739,7 +876,7 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
         // ⚡ Campiona pochi post; PublishPress filtra già la query.
         $sample = new WP_Query([
             'post_type'              => 'post',
-            'post_status'            => ['publish', 'private'],
+            'post_status'            => $post_statuses,
             'posts_per_page'         => PDG_APP_CATEGORY_SAMPLE_POSTS,
             'fields'                 => 'ids',
             'no_found_rows'          => true,
@@ -753,8 +890,19 @@ function pdg_app_get_navigable_categories(WP_REST_Request $request) {
         $readable = false;
         foreach (($sample->posts ?: []) as $pid) {
             $pid = (int) $pid;
-            // ⚡ Check veloce (utente già impostato sopra).
-            if ($pid > 0 && pdg_app_user_can_read_post_fast($pid)) {
+            if ($pid <= 0) {
+                continue;
+            }
+            if ($is_guest) {
+                $post_obj = get_post($pid);
+                if ($post_obj instanceof WP_Post
+                    && $post_obj->post_status === 'publish'
+                    && empty($post_obj->post_password)
+                    && (!function_exists('is_post_publicly_viewable') || is_post_publicly_viewable($post_obj))) {
+                    $readable = true;
+                    break;
+                }
+            } elseif (pdg_app_user_can_read_post_fast($pid)) {
                 $readable = true;
                 break;
             }
