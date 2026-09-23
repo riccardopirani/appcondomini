@@ -4,6 +4,8 @@ Documentazione del **funzionamento attuale** dell’app Flutter del condominio /
 Versione app di riferimento: `1.1.11+31` (`pubspec.yaml`).  
 Data documento: settembre 2026.
 
+> Guida di progetto (setup, avvio, release, struttura repo): **[README.md](./README.md)**
+
 > **Nota sicurezza:** in questo documento **non** sono riportate API key, password o secret SMTP.  
 > Le chiavi vive stanno in codice (`lib/services/api_service.dart`, `lib/setttings.dart`, `backend-email/server.js`, `wp-config.php`) e vanno trattate come sensibili.
 
@@ -404,6 +406,7 @@ Login WP ──► Token 30gg ──► Post/categorie (Render cache → WP)
 
 ## 18. Dove leggere altro
 
+- Setup e overview: `README.md`
 - Backend: `backend-email/README.md`
 - Plugin WP: `wordpress-plugin/README.md`
 - Config URL/email/webcam: `lib/setttings.dart`
